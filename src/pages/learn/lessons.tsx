@@ -14,7 +14,7 @@ export interface Lesson {
 function FrequencyWidget() {
   const [H, setH] = useState(5);
   const [loss, setLoss] = useState(600);
-  const [gov, setGov] = useState(900);
+  const [gov, setGov] = useState(1300);
   const [ffr, setFfr] = useState(0);
   const r = useMemo(() => swing({ H, S: 3200, load: 3000, loss, gov, Tg: 4, ffr }), [H, loss, gov, ffr]);
   return (
