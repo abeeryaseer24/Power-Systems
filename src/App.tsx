@@ -8,13 +8,17 @@ const Control = lazy(() => import('./pages/Control'));
 const Debrief = lazy(() => import('./pages/Debrief'));
 const Learn = lazy(() => import('./pages/Learn'));
 const About = lazy(() => import('./pages/About'));
+const Atlas = lazy(() => import('./pages/Atlas'));
+const RegionExplorer = lazy(() => import('./pages/RegionExplorer'));
+const Blackouts = lazy(() => import('./pages/Blackouts'));
+const Replay = lazy(() => import('./pages/Replay'));
 
 export default function App() {
   const { pathname } = useLocation();
   useEffect(() => {
-    if (!pathname.startsWith('/control')) window.scrollTo(0, 0);
+    window.scrollTo(0, 0);
   }, [pathname]);
-  const chrome = !pathname.startsWith('/control');
+  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts)\/./.test(pathname);
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
@@ -28,6 +32,10 @@ export default function App() {
           <Route path="/learn" element={<Learn />} />
           <Route path="/learn/:topic" element={<Learn />} />
           <Route path="/about" element={<About />} />
+          <Route path="/atlas" element={<Atlas />} />
+          <Route path="/atlas/:id" element={<RegionExplorer />} />
+          <Route path="/blackouts" element={<Blackouts />} />
+          <Route path="/blackouts/:id" element={<Replay />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </Suspense>

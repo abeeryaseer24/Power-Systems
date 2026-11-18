@@ -50,7 +50,8 @@ button { font: inherit; color: inherit; }
   color: var(--porcelain); text-decoration: none;
 }
 .wordmark svg { width: 34px; height: 17px; color: var(--glaze); }
-.topbar nav { display: flex; gap: clamp(14px, 3vw, 30px); }
+.topbar nav { display: flex; gap: clamp(12px, 2.4vw, 28px); overflow-x: auto; scrollbar-width: none; margin-left: 16px; }
+.topbar nav a { white-space: nowrap; }
 .topbar nav a { color: var(--steel); text-decoration: none; font-size: 15px; padding: 4px 0; border-bottom: 1px solid transparent; }
 .topbar nav a:hover { color: var(--porcelain); }
 .topbar nav a.active { color: var(--porcelain); border-bottom-color: var(--sodium); }

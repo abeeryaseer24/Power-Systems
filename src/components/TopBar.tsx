@@ -12,6 +12,9 @@ export default function TopBar() {
       </Link>
       <nav aria-label="Main">
         <NavLink to="/shifts">Shifts</NavLink>
+        <NavLink to="/atlas">Atlas</NavLink>
+        <NavLink to="/blackouts">Blackouts</NavLink>
+        <NavLink to="/nuclear">Nuclear</NavLink>
         <NavLink to="/learn">Learn</NavLink>
         <NavLink to="/about">About</NavLink>
       </nav>

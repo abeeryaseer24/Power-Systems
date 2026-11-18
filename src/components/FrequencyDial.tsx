@@ -17,16 +17,20 @@ function arc(f0: number, f1: number, r: number) {
   return `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`;
 }
 
-export function freqState(f: number) {
+export function freqState(f: number, f0 = 50) {
   if (f <= 0) return 'dead';
+  f = f - f0 + 50;
   if (f < 48.8 || f > 51) return 'trip';
   if (f < 49.5 || f > 50.5) return 'alarm';
   if (f < 49.8 || f > 50.2) return 'warn';
   return 'ok';
 }
 
-export default function FrequencyDial({ f, rocof, trace }: { f: number; rocof: number; trace: number[] }) {
-  const state = freqState(f);
+export default function FrequencyDial({ f: fRaw, rocof, trace: traceRaw, f0 = 50 }: { f: number; rocof: number; trace: number[]; f0?: number }) {
+  const state = freqState(fRaw, f0);
+  const off = f0 - 50;
+  const f = fRaw > 0 ? fRaw - off : 0;
+  const trace = off ? traceRaw.map((v) => (v > 0 ? v - off : 0)) : traceRaw;
   const ticks: number[] = [];
   for (let x = LO; x <= HI + 1e-6; x += 0.1) ticks.push(Math.round(x * 10) / 10);
   const needle = ang(f > 0 ? f : LO);
@@ -61,7 +65,7 @@ export default function FrequencyDial({ f, rocof, trace }: { f: number; rocof: n
           const [x, y] = pt(ang(t), R + 27);
           return (
             <text key={t} x={x} y={y + 4} className="dial-num">
-              {t}
+              {t + off}
             </text>
           );
         })}
@@ -69,7 +73,7 @@ export default function FrequencyDial({ f, rocof, trace }: { f: number; rocof: n
         <circle cx={CX} cy={CY} r={5} className="hub" />
       </svg>
       <div className="dial-read">
-        <span className="dial-value">{f > 0 ? f.toFixed(3) : '0.000'}</span>
+        <span className="dial-value">{fRaw > 0 ? fRaw.toFixed(3) : '0.000'}</span>
         <span className="dial-unit">Hz</span>
       </div>
       <div className="dial-rocof">
@@ -82,7 +86,7 @@ export default function FrequencyDial({ f, rocof, trace }: { f: number; rocof: n
       </svg>
       <div className="trace-cap">
         <span>Last 2 minutes</span>
-        <span>49–51 Hz</span>
+        <span>{49 + off}–{51 + off} Hz</span>
       </div>
     </div>
   );
