@@ -130,8 +130,8 @@
 }
 .db-grade.g-S, .db-grade.g-A { border-color: var(--sodium); color: #ffd9a3; box-shadow: 0 0 60px rgba(255, 176, 77, 0.25), inset 0 0 40px rgba(255, 176, 77, 0.12); }
 .db-grade.g-D { border-color: var(--trip); color: #ff9a90; }
-.db-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; margin-bottom: 44px; }
-.stat { padding: 18px; background: var(--night); display: flex; flex-direction: column; gap: 4px; }
+.db-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 44px; }
+.stat { padding: 18px; border: 1px solid var(--rule); border-radius: 12px; background: rgba(7, 18, 34, 0.55); display: flex; flex-direction: column; gap: 4px; }
 .stat span { font-size: 13px; color: var(--steel); }
 .stat strong { font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1.05; }
 .stat em { font-style: normal; font-size: 13px; color: #b9b4a8; }
