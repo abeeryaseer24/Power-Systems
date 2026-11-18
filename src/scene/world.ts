@@ -36,7 +36,7 @@ export const PLANT_SITE: Record<string, { x: number; z: number }> = {
   glen: { x: -7, z: -24.3 },
   saltmarsh: { x: 21, z: 29 },
   sunfield: { x: 27, z: -21 },
-  bess: { x: 1.6, z: -1.8 },
+  bess: { x: 4.2, z: -4.2 },
   westmark: { x: -34.5, z: 6.5 },
 };
 

@@ -225,7 +225,12 @@ export class CityScene {
       this.lineState[i] = { loading: l.loading, flow: l.flow, live: s.energized[l.def.from] && l.closed, closed: l.closed };
     });
     for (let b = 0; b < 13; b++) this.busLive[b] = s.energized[b];
+    if (!this.primed) {
+      this.primed = true;
+      for (let i = 0; i < CHANNELS; i++) this.light[i] = this.target[i];
+    }
   }
+  private primed = false;
 
   private heroState(p: number) {
     DISTRICTS.forEach((d, i) => (this.target[i] = smooth(HERO_DISTRICT[d.id], HERO_DISTRICT[d.id] + 0.05, p)));

@@ -130,7 +130,7 @@ export function buildSea(shared: Shared, moonDir: THREE.Vector3) {
         // the city's glow on the water near the shore
         float shore = exp(-max(vW.z - 18.0, 0.0) * 0.35);
         float city = (uLight[3] + uLight[5] + uLight[4]) / 3.0;
-        c += vec3(1.0, 0.55, 0.22) * shore * city * 0.10 * (0.7 + 0.6 * w);
+        c += vec3(0.9, 0.55, 0.3) * shore * city * 0.035 * (0.7 + 0.6 * w);
         gl_FragColor = vec4(applyFog(c, vDepth), 1.0);
       }`,
   });
