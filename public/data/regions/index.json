@@ -1,0 +1,18 @@
+[
+ {
+  "id": "dhaka",
+  "city": "Dhaka",
+  "country": "Bangladesh",
+  "scope": "National grid of Bangladesh",
+  "freq": 50,
+  "center": [
+   23.81,
+   90.41
+  ],
+  "buses": 101,
+  "branches": 117,
+  "plants": 106,
+  "genMW": 22801,
+  "demandMW": 11200
+ }
+]
