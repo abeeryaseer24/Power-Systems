@@ -197,4 +197,8 @@ button { font: inherit; color: inherit; }
   .topbar { flex-wrap: wrap; gap: 8px; }
   .topbar nav { margin-left: 0; width: 100%; overflow-x: auto; overflow-y: visible; }
   .nav-menu { position: fixed; left: 12px; right: 12px; top: 96px; width: auto; }
+  /* six menus no longer fit at phone width: keep each label on one line and let the row scroll */
+  .topbar nav { gap: 16px; padding-bottom: 2px; padding-right: 24px; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .nav-group, .topbar nav > a { flex: none; }
+  .nav-trigger, .topbar nav a { white-space: nowrap; font-size: 14px; }
 }
