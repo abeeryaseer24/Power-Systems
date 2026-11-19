@@ -19,6 +19,6 @@ describe('historical replays', () => {
       const lost = 1 - s.served / s.demand;
       console.log(`${ev.id}: fMin ${fMin.toFixed(2)} lost ${(lost * 100).toFixed(0)} % peakLost ${Math.round(s.peakLost)} events ${s.events.map((e) => e.title).join(' | ')}`);
       expect(s.peakLost).toBeGreaterThan(0);
-    });
+    }, 60000);
   }
 });

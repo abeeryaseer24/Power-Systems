@@ -16,7 +16,7 @@ export const REGIONS = [
   },
   {
     id: 'london', city: 'London', country: 'United Kingdom', scope: 'South and east England, 400 and 275 kV',
-    bbox: [50.75, -1.7, 54.2, 2.3], minKV: 275, freq: 50, center: [51.507, -0.128],
+    bbox: [50.75, -1.7, 54.2, 2.3], exclude: [[49, 1.45, 51.08, 3]], minKV: 275, freq: 50, center: [51.507, -0.128],
     demandMW: 14000, ext: { name: 'Rest of Great Britain', MW: 18000, H: 4 },
     roads: 'motorway', rivers: false,
   },

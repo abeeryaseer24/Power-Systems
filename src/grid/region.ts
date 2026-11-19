@@ -98,6 +98,8 @@ export class RegionSim {
   private ufGenTimer = 0;
   /** Inverter output dropped by fault ride-through settings during voltage dips, MW per event. */
   rideThroughLoss = 0;
+  /** Fraction of synchronous capacity providing primary frequency response. */
+  responseShare = 0.35;
   /** Extra shunt susceptance per bus, pu (capacitors and lightly loaded cables push voltage up). */
   shunt: number[] = [];
   /** Extra demand per bus, MW (lost embedded generation shows up as demand). */
@@ -152,6 +154,26 @@ export class RegionSim {
     }
     this.ext = { online: true, p: opts.extImport ?? 0, sched: opts.extImport ?? 0, gov: 0, MW: data.ext.MW, H: data.ext.H, hvdc, bus: hvdc ? hvBus : this.extBus, deficit: 0, shed: 0 };
     this.flowLines = this.branches.map((b) => ({ from: b.def.a, to: b.def.b, x: b.def.x, closed: true }));
+    this.rebuild();
+    // fragments of the OSM network with no path to the main system are not energised
+    let main = 0;
+    let best = -1;
+    this.islands.members.forEach((m, k) => {
+      const d = m.reduce((a, b) => a + this.buses[b].def.load, 0) + (m.includes(this.ext.bus) ? 1e9 : 0);
+      if (d > best) {
+        best = d;
+        main = k;
+      }
+    });
+    this.buses.forEach((b, i) => {
+      if (this.islands.of[i] !== main) {
+        b.f = 0;
+        b.def.load = 0;
+      }
+    });
+    this.gens.forEach((g) => {
+      if (this.islands.of[g.def.bus] !== main) g.tripReason = 'not connected to the main system in this model';
+    });
     this.dispatch(opts.extImport);
     this.solveNetwork(true);
     this.settle();
@@ -475,7 +497,8 @@ export class RegionSim {
       if (g.sched > g.avail) g.sched = g.avail;
       if (k.droop > 0) {
         const e = Math.abs(df) > 0.015 ? df - Math.sign(df) * 0.015 : 0;
-        let target = -(g.def.mw / k.droop) * (e / this.f0);
+        // only part of the fleet runs in frequency-sensitive mode with headroom held back
+        let target = -((g.def.mw * this.responseShare) / k.droop) * (e / this.f0);
         target = Math.max(-g.sched, Math.min(g.avail - g.sched, target));
         g.gov += (target - g.gov) * (1 - Math.exp(-dt / k.Tg));
         // secondary control nudges the schedule back toward nominal frequency
@@ -495,9 +518,11 @@ export class RegionSim {
         pGen[kb] += this.ext.p;
       } else {
         const df = this.buses[this.extBus].f - this.f0;
-        const target = -(this.ext.MW / 0.05) * (df / this.f0);
+        const target = -((this.ext.MW * this.responseShare) / 0.05) * (df / this.f0);
         this.ext.gov += (target - this.ext.gov) * (1 - Math.exp(-dt / 5));
         // the rest of the system keeps its own internal balance; only a deficit there moves frequency
+        // slow secondary control in the wider grid restores the scheduled exchange
+        if (this.ext.deficit <= this.ext.shed) this.ext.sched -= this.ext.MW * 0.0004 * df * dt;
         this.ext.p = this.ext.sched + Math.max(-this.ext.MW * 0.12, Math.min(this.ext.MW * 0.12, this.ext.gov));
         pGen[kb] += this.ext.p - Math.max(0, this.ext.deficit - this.ext.shed);
       }

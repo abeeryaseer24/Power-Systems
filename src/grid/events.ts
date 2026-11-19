@@ -245,7 +245,18 @@ export const EVENTS: BlackoutEvent[] = [
     ],
     lead: 15,
     span: 120,
-    setup: () => {},
+    setup: (s, h) => {
+      // GB held about 1 GW of primary response that afternoon
+      s.responseShare = 0.06;
+      // Little Barford was running at about 640 MW that afternoon
+      const lb = h.plant('Little Barford', 52.21, -0.27, 'gas');
+      if (lb >= 0) {
+        s.gens[lb].online = true;
+        s.gens[lb].sched = 640;
+        s.gens[lb].tripReason = undefined;
+      }
+      s.settle(30);
+    },
     steps: [
       {
         t: 15, clock: '16:52:33', kind: 'trigger', label: 'Lightning strikes the Eaton Socon–Wymondley 400 kV line. Protection clears it in 70 ms.',
@@ -261,8 +272,12 @@ export const EVENTS: BlackoutEvent[] = [
         t: 15.3, clock: '16:52:33', kind: 'consequence', label: 'Hornsea One offshore wind farm reduces output by 737 MW: its voltage control oscillates.',
         run: (s, h) => {
           const i = h.plant('Hornsea', 53.88, 1.79, 'wind');
-          if (i >= 0) s.derateGen(i, Math.min(1, 737 / Math.max(1, s.gens[i].p)), 'unstable voltage control after the fault');
-          else h.extLoss(737, 'Hornsea One reduced its output by 737 MW');
+          let local = 0;
+          if (i >= 0 && /hornsea/i.test(s.gens[i].def.name)) {
+            local = Math.min(737, s.gens[i].p);
+            s.derateGen(i, local / Math.max(1, s.gens[i].p), 'unstable voltage control after the fault');
+          }
+          if (737 - local > 1) h.extLoss(737 - local, 'Hornsea One offshore wind farm reduced its output: unstable voltage control after the fault');
         },
       },
       {
@@ -276,6 +291,19 @@ export const EVENTS: BlackoutEvent[] = [
       {
         t: 72, clock: '16:53:31', kind: 'consequence', label: 'Little Barford gas turbine 1a trips (210 MW). Frequency falls to 48.8 Hz.',
         run: (s, h) => h.deratePlant('Little Barford', 52.21, -0.27, 0.5, 'gas turbine 1a tripped on high steam pressure'),
+      },
+      {
+        t: 74, clock: '16:53:33', kind: 'consequence', label: 'Frequency reaches 48.8 Hz. Low-frequency demand disconnection cuts 931 MW.',
+        run: (s) => {
+          // LFDD stage 1 operated across England and Wales; most of it lies outside this study area
+          s.ext.shed += 650;
+          s.shedLoad(0.02);
+          s.raise('Low-frequency demand disconnection', 'About 931 MW of demand, around 1.1 million customers, disconnected automatically at 48.8 Hz.', 'major');
+        },
+      },
+      {
+        t: 101, clock: '16:54:00', kind: 'consequence', label: 'The second Little Barford gas turbine is shut down (187 MW).',
+        run: (s, h) => h.tripPlant('Little Barford', 52.21, -0.27, 'gas turbine 1b tripped manually after the steam turbine loss', 'gas'),
       },
     ],
   },

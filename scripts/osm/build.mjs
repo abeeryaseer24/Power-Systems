@@ -142,6 +142,8 @@ async function build(reg) {
 
   const P = projector(reg.center[0], reg.center[1]);
   const inBox = (lat, lon) => lat >= s && lat <= n && lon >= w && lon <= e;
+  // areas inside the box that belong to another synchronous system (e.g. France beside London)
+  const excluded = (lat, lon) => (reg.exclude ?? []).some(([a, b, c, d]) => lat >= a && lat <= c && lon >= b && lon <= d);
   const [x0, z1] = P(s, w);
   const [x1, z0] = P(n, e);
   const extent = Math.max(x1 - x0, z1 - z0);
@@ -151,7 +153,7 @@ async function build(reg) {
   const S = [];
   for (const el of subs.elements) {
     const c = el.center ?? el;
-    if (c.lat === undefined) continue;
+    if (c.lat === undefined || excluded(c.lat, c.lon)) continue;
     const [x, z] = P(c.lat, c.lon);
     S.push({ x, z, name: el.tags?.['name:en'] ?? el.tags?.name ?? '', kv: parseKV(el.tags?.voltage) });
   }
@@ -160,8 +162,11 @@ async function build(reg) {
   const L = [];
   for (const el of lines.elements) {
     if (!el.geometry || el.geometry.length < 2) continue;
+    if (el.geometry.some((g) => excluded(g.lat, g.lon))) continue;
     const kv = parseKV(el.tags.voltage);
     if (kv < reg.minKV) continue;
+    // HVDC links are not part of the AC network (they are modelled as the external link)
+    if (el.tags.frequency === '0' || /hvdc|dc link/i.test(el.tags.name ?? '')) continue;
     const circuits = Number(el.tags.circuits) || (Number(el.tags.cables) ? Math.max(1, Math.round(Number(el.tags.cables) / 3)) : 1);
     const pts = el.geometry.map((g) => P(g.lat, g.lon));
     const a = el.geometry[0];
@@ -293,7 +298,7 @@ async function build(reg) {
   const PL = [];
   for (const el of plants.elements) {
     const c = el.center ?? el;
-    if (c.lat === undefined || !el.tags) continue;
+    if (c.lat === undefined || !el.tags || excluded(c.lat, c.lon)) continue;
     const kind = SOURCE(el.tags['plant:source'] ?? el.tags['generator:source'] ?? el.tags.source);
     let mw = parseMW(el.tags['plant:output:electricity']);
     if (!mw) mw = DEFAULT_MW[kind];
@@ -328,7 +333,7 @@ async function build(reg) {
   const DEF_POP = { city: 400000, town: 30000, suburb: 30000, quarter: 15000, village: 2500 };
   const PLC = [];
   for (const el of places.elements) {
-    if (!el.tags) continue;
+    if (!el.tags || excluded(el.lat, el.lon)) continue;
     const pop = Number(String(el.tags.population ?? '').replace(/[^\d]/g, '')) || DEF_POP[el.tags.place] || 2000;
     const [x, z] = P(el.lat, el.lon);
     PLC.push({ x: r2(x), z: r2(z), pop, name: el.tags.place === 'city' || el.tags.place === 'town' ? el.tags['name:en'] ?? el.tags.name : undefined, t: el.tags.place[0] });
