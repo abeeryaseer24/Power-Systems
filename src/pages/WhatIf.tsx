@@ -5,6 +5,7 @@ import { HoverTip, Inspect } from './atlas/RegionPanels';
 import FrequencyDial from '../components/FrequencyDial';
 import Traces from '../components/Traces';
 import SoundToggle from '../components/SoundToggle';
+import Weather, { WHATIF_WEATHER } from '../components/Weather';
 import { whatIfsFor } from '../grid/whatif';
 import { mw, num } from '../lib/format';
 import '../control.css';
@@ -48,6 +49,11 @@ export default function WhatIf() {
   return (
     <main id="main" className={`control region whatif ${r.cine ? 'is-cine' : ''}`}>
       <canvas ref={canvas} className="control-canvas" aria-label={data ? `Night map of ${data.city}` : 'Loading map'} />
+      {(() => {
+        // the strongest weather among the stacked scenarios sets the sky
+        const sky = (['storm', 'rain', 'heat'] as const).find((k) => picked.some((p) => WHATIF_WEATHER[p] === k));
+        return running && sky ? <Weather kind={sky} intensity={picked.length > 2 ? 1.3 : 1} /> : null;
+      })()}
       {!sim && <div className="loading" role="status">{r.error || r.loading}</div>}
       <header className="hud-top">
         <Link to="/atlas" className="hud-back" aria-label="Back to the atlas">

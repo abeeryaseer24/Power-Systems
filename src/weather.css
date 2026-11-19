@@ -1,0 +1,12 @@
+/* weather layer over the maps */
+.wx { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.wx-canvas { width: 100%; height: 100%; display: block; }
+.wx-storm::before, .wx-rain::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20, 30, 48, 0.35), transparent 60%); }
+.wx-heat::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 120%, rgba(255, 120, 40, 0.16), transparent 65%); mix-blend-mode: screen; }
+.wx-snow::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(120, 170, 230, 0.22), rgba(120, 170, 230, 0.06) 70%); mix-blend-mode: soft-light; }
+.wx-snow::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 120px rgba(180, 215, 255, 0.18); }
+.wx-flash { position: absolute; inset: 0; background: rgba(220, 225, 255, 0.0); }
+.wx-flash.on { animation: wx-flash 0.9s ease-out; }
+@keyframes wx-flash { 0% { background: rgba(220, 225, 255, 0.28); } 8% { background: rgba(220, 225, 255, 0.04); } 14% { background: rgba(220, 225, 255, 0.2); } 100% { background: rgba(220, 225, 255, 0); } }
+.wx-badge { position: absolute; z-index: 3; left: 50%; top: 92px; transform: translateX(-50%); font-size: 12px; letter-spacing: 0.04em; color: var(--steel); background: rgba(7, 17, 32, 0.7); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 12px; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .wx-flash.on { animation: none; } }

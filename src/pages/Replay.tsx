@@ -6,6 +6,7 @@ import FrequencyDial from '../components/FrequencyDial';
 import Traces from '../components/Traces';
 import SoundToggle from '../components/SoundToggle';
 import CoPilot from '../components/CoPilot';
+import Weather, { EVENT_WEATHER } from '../components/Weather';
 import { markDone } from '../lib/career';
 import { eventById, stageEvent, type BlackoutEvent } from '../grid/events';
 import { mw, num } from '../lib/format';
@@ -64,6 +65,7 @@ function ReplayView({ ev }: { ev: BlackoutEvent }) {
   return (
     <main id="main" className={`control region replay ${r.cine ? 'is-cine' : ''}`}>
       <canvas ref={canvas} className="control-canvas" aria-label={`Map of ${ev.where} during the replay`} />
+      {EVENT_WEATHER[ev.id] && sim && <Weather kind={EVENT_WEATHER[ev.id]} />}
       {!sim && <div className="loading" role="status">{r.error || r.loading}</div>}
       {data && sim && (
         <>
