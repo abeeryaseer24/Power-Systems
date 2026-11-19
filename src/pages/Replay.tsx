@@ -5,6 +5,7 @@ import { HoverTip, Inspect, SystemStats } from './atlas/RegionPanels';
 import FrequencyDial from '../components/FrequencyDial';
 import Traces from '../components/Traces';
 import SoundToggle from '../components/SoundToggle';
+import CoPilot from '../components/CoPilot';
 import { eventById, stageEvent, type BlackoutEvent } from '../grid/events';
 import { mw, num } from '../lib/format';
 import '../control.css';
@@ -108,6 +109,7 @@ function ReplayView({ ev }: { ev: BlackoutEvent }) {
                 <SystemStats sim={sim} />
                 {mode === 'control' && (
                   <>
+                    <CoPilot sim={sim} tick={r.tick} />
                     <h3>Your levers</h3>
                     <div className="stress">
                       <button className="btn ghost" onClick={() => sim.shedLoad(0.05)}>Shed 5 % of demand now</button>
