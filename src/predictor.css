@@ -1,0 +1,28 @@
+.pr-card { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 0 0 40px; }
+.pr-card div { padding: 18px; border-radius: 12px; border: 1px solid var(--rule); background: rgba(7, 18, 34, 0.55); display: flex; flex-direction: column; gap: 4px; }
+.pr-card span { font-size: 12px; color: var(--steel); }
+.pr-card strong { font-family: var(--display); font-weight: 900; font-size: 36px; line-height: 1; }
+.pr-card em { font-style: normal; font-size: 13px; color: #b9b4a8; }
+.pr-sec { margin-top: 44px; }
+.pr-sec h2 { font-family: var(--display); font-weight: 700; font-size: 32px; margin: 0 0 12px; }
+.pr-pick { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; color: var(--steel); }
+.pr-pick select { background: var(--panel-solid); color: var(--porcelain); border: 1px solid var(--rule-strong); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.pr-chart { width: 100%; height: auto; display: block; padding: 10px; border-radius: 12px; border: 1px solid var(--rule); background: #060f1c; }
+.pr-chart.pending { padding: 60px; text-align: center; color: var(--steel); }
+.pr-risk { fill: rgba(255, 91, 79, 0.42); stroke: #ff5b4f; stroke-width: 1.5; }
+.pr-f { fill: none; stroke: var(--porcelain); stroke-width: 1.4; }
+.pr-half { stroke: rgba(255, 255, 255, 0.15); stroke-dasharray: 3 5; }
+.pr-step { stroke: rgba(255, 91, 79, 0.25); }
+.pr-warn { stroke: var(--sodium); stroke-width: 2; }
+.pr-col { stroke: var(--trip); stroke-width: 2; }
+.pr-ax { fill: var(--steel); font-size: 12px; }
+.pr-lbl { font-size: 13px; font-weight: 700; }
+.pr-lbl.warn { fill: var(--sodium); }
+.pr-lbl.col { fill: var(--trip); }
+.pr-verdict { font-family: var(--display); font-weight: 700; font-size: 26px; margin: 14px 0 0; }
+.pr-board { list-style: none; margin: 16px 0 0; padding: 0; max-width: 820px; }
+.pr-board li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.pr-b-v { font-weight: 700; }
+.pr-b-v.ok { color: var(--ok); }
+.pr-b-v.miss { color: var(--trip); }
+.pr-b-v.fa { color: var(--sodium); }
