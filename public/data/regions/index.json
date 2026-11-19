@@ -94,5 +94,21 @@
   "plants": 12,
   "genMW": 6775,
   "demandMW": 5000
+ },
+ {
+  "id": "adelaide",
+  "city": "Adelaide",
+  "country": "Australia",
+  "scope": "South Australia, 275 and 132 kV",
+  "freq": 50,
+  "center": [
+   -34.929,
+   138.601
+  ],
+  "buses": 119,
+  "branches": 140,
+  "plants": 39,
+  "genMW": 6792,
+  "demandMW": 1900
  }
 ]

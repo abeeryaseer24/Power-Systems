@@ -55,7 +55,7 @@ export const REGIONS = [
   {
     id: 'adelaide', city: 'Adelaide', country: 'Australia', scope: 'South Australia, 275 and 132 kV',
     bbox: [-38.2, 134.8, -31.6, 141.0], minKV: 132, freq: 50, center: [-34.929, 138.601],
-    demandMW: 1900, ext: { name: 'Victoria (Heywood interconnector)', MW: 9000, H: 4 },
+    demandMW: 1900, ext: { name: 'Victoria (Heywood interconnector)', MW: 650, H: 0, hvdc: true, at: [-37.6, 140.9] },
     roads: 'motorway|trunk', rivers: false,
   },
   {

@@ -386,10 +386,28 @@ async function build(reg) {
       }
     });
   }
+  // explicit interconnection points: nearest boundary bus to each
+  let tieBuses;
+  if (reg.ext.ties) {
+    tieBuses = reg.ext.ties.map(([la, lo]) => {
+      const [tx, tz] = P(la, lo);
+      let best = -1;
+      let bd = Infinity;
+      buses.forEach((b, i) => {
+        if (!b.boundary) return;
+        const d = Math.hypot(b.x - tx, b.z - tz);
+        if (d < bd) {
+          bd = d;
+          best = i;
+        }
+      });
+      return best;
+    }).filter((i) => i >= 0);
+  }
   const out = {
     id: reg.id, city: reg.city, country: reg.country, scope: reg.scope, freq: reg.freq,
     center: reg.center, bbox: reg.bbox, extent: r2(extent), bounds: [r2(x0), r2(z0), r2(x1), r2(z1)],
-    demandMW: reg.demandMW, ext: { ...reg.ext, at: undefined, bus: extBus },
+    demandMW: reg.demandMW, ext: { ...reg.ext, at: undefined, ties: undefined, bus: extBus, tieBuses },
     buses, branches, plants: PL, places: placesKept, roads: roadsOut, coast: coastOut, rivers: riversOut,
     source: 'OpenStreetMap contributors, ODbL',
     built: new Date().toISOString().slice(0, 10),

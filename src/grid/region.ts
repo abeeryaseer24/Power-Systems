@@ -19,7 +19,7 @@ export interface RegionPlace { x: number; z: number; pop: number; name?: string;
 export interface RegionData {
   id: string; city: string; country: string; scope: string; freq: number;
   center: [number, number]; bbox: [number, number, number, number]; extent: number; bounds: [number, number, number, number];
-  demandMW: number; ext: { name: string; MW: number; H: number; hvdc?: boolean; bus?: number };
+  demandMW: number; ext: { name: string; MW: number; H: number; hvdc?: boolean; bus?: number; tieBuses?: number[] };
   buses: RegionBus[]; branches: RegionBranch[]; plants: RegionPlant[]; places: RegionPlace[];
   roads: [number, number][][]; coast: [number, number][][]; rivers: [number, number][][];
   source: string; built: string;
@@ -149,9 +149,13 @@ export class RegionSim {
       const [x0, z0, x1, z1] = data.bounds;
       const def: RegionBus = { x: (x0 + x1) / 2, z: z0 - (z1 - z0) * 0.2, name: data.ext.name, kv: 400, load: 0 };
       this.buses.push({ def, V: 1, theta: 0, f: this.f0, rocof: 0, live: true, demand: 0, served: 0, shed: 0, connected: 1, uvTimer: 0 });
-      for (const bi of boundary) {
+      // only the strongest crossings carry the interconnection; low-voltage stubs leaving the box are left radial
+      const topKV = Math.max(...boundary.map((bi) => data.buses[bi].kv));
+      const tied = data.ext.tieBuses?.length ? data.ext.tieBuses : boundary;
+      void topKV;
+      for (const bi of tied) {
         const kv = data.buses[bi].kv;
-        const tie: RegionBranch = { a: bi, b: this.extBus, kv, circuits: 2, km: 0, x: 0.004, r: 0.0004, bc: 0, mva: kv >= 370 ? 3000 : kv >= 270 ? 1600 : 900, name: `Tie to ${data.ext.name}`, pts: [] };
+        const tie: RegionBranch = { a: bi, b: this.extBus, kv, circuits: 2, km: 0, x: 0.015, r: 0.0015, bc: 0, mva: kv >= 370 ? 3000 : kv >= 270 ? 1600 : 900, name: `Tie to ${data.ext.name}`, pts: [] };
         this.branches.push({ def: tie, closed: true, P: 0, Q: 0, loading: 0, heat: 0, ext: true });
       }
     }
@@ -168,7 +172,7 @@ export class RegionSim {
     let main = 0;
     let best = -1;
     this.islands.members.forEach((m, k) => {
-      const d = m.reduce((a, b) => a + this.buses[b].def.load, 0) + (m.includes(this.ext.bus) ? 1e9 : 0);
+      const d = m.reduce((a, b) => a + this.buses[b].def.load, 0) + (this.extBus >= 0 && m.includes(this.extBus) ? 1e9 : 0);
       if (d > best) {
         best = d;
         main = k;
@@ -193,6 +197,10 @@ export class RegionSim {
     const sched = this.scheduled;
     this.scheduled = [];
     this.advance(seconds);
+    // undo anything the start-up transient shed or curtailed, then settle again
+    for (const b of this.buses) if (b.live) b.shed = 0;
+    for (const g of this.gens) if (!KIND[g.def.kind].sync && !g.tripReason) g.avail = g.def.mw;
+    this.advance(10);
     this.scheduled = sched;
     this.t = 0;
     this.log = [];
@@ -252,6 +260,14 @@ export class RegionSim {
       if (g.tripReason) continue;
       g.online = committed < need * margin;
       if (g.online) committed += g.avail;
+    }
+    // system strength: keep a minimum of synchronous machines online, as operators require
+    let syncOn = order.filter((g) => g.online && KIND[g.def.kind].sync).reduce((x, g) => x + g.avail, 0);
+    for (const g of order) {
+      if (syncOn >= this.demand * 0.4) break;
+      if (g.online || g.tripReason || !KIND[g.def.kind].sync) continue;
+      g.online = true;
+      syncOn += g.avail;
     }
     for (const g of order) {
       g.sched = 0;
@@ -513,6 +529,8 @@ export class RegionSim {
         // secondary control nudges the schedule back toward nominal frequency
         g.sched = Math.max(g.avail * k.minFrac, Math.min(g.avail, g.sched - 0.002 * g.def.mw * df * dt));
       }
+      // limited frequency-sensitive mode: inverter plant backs off at high frequency
+      if (!k.sync && df > 0.1) g.sched = Math.max(0, g.sched - 0.01 * g.def.mw * (df - 0.1) * dt * 10);
       g.p = Math.max(0, g.sched + g.gov);
       pGen[this.islands.of[g.def.bus]] += g.p;
     }
@@ -531,7 +549,7 @@ export class RegionSim {
         this.ext.gov += (target - this.ext.gov) * (1 - Math.exp(-dt / 5));
         // the rest of the system keeps its own internal balance; only a deficit there moves frequency
         // slow secondary control in the wider grid restores the scheduled exchange
-        if (this.ext.deficit <= this.ext.shed) this.ext.sched -= this.ext.MW * 0.0004 * df * dt;
+        if (this.ext.deficit <= this.ext.shed) this.ext.sched -= this.ext.MW * 0.0012 * df * dt;
         this.ext.p = this.ext.sched + Math.max(-this.ext.MW * 0.12, Math.min(this.ext.MW * 0.12, this.ext.gov));
         pGen[kb] += this.ext.p - Math.max(0, this.ext.deficit - this.ext.shed);
       }
@@ -549,7 +567,7 @@ export class RegionSim {
         continue;
       }
       const frac = b.connected * Math.max(0, 1 - b.shed);
-      const vfac = Math.min(1.1, Math.max(0.3, b.V)); // constant-current-like voltage dependence
+      const vfac = Math.min(1, Math.max(0.3, b.V)); // demand falls with voltage below 1 pu, constant above
       b.served = b.demand * frac * vfac;
       served += b.served;
       const df = b.f - this.f0;
@@ -654,11 +672,15 @@ export class RegionSim {
         acbr.push({ from: local.get(br.def.a)!, to: local.get(br.def.b)!, r: br.def.r, x: Math.max(6e-4, br.def.x), b: br.def.bc, closed: true });
         brIdx.push(i);
       });
-      const res = fdlf(acb, acbr, {
+      let res = fdlf(acb, acbr, {
         V0: initial ? undefined : m.map((b) => this.buses[b].V || 1),
         theta0: initial ? undefined : m.map((b) => this.buses[b].theta),
-        maxIter: 40, tol: 6e-4,
+        maxIter: initial ? 200 : 40, tol: 6e-4,
       });
+      if (!res.converged && !initial) {
+        // a warm start can wander off after a big change; retry from flat before calling it a collapse
+        res = fdlf(acb, acbr, { maxIter: 200, tol: 6e-4 });
+      }
       if (!res.converged) {
         const c = (this.divergeCount.get(k) ?? 0) + 1;
         this.divergeCount.set(k, c);
