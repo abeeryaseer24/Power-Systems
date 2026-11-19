@@ -1,3 +1,4 @@
+import { MORE_CASES } from './cases-more';
 // Case files: why each blackout happened, written from the investigation
 // reports listed with each event in events.ts. Where reports differ or are
 // still incomplete, the text says so.
@@ -339,5 +340,7 @@ export const CASES: CaseFile[] = [
     again: 'Keeping enough synchronous machines online for stability, not just energy, is the guard against a repeat.',
   },
 ];
+
+CASES.push(...MORE_CASES);
 
 export const caseById = (id: string) => CASES.find((c) => c.id === id);

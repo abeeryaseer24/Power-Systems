@@ -8,6 +8,7 @@
 // control mode they only happen if the physical condition for them is present.
 
 import type { RegionSim } from './region';
+import { MORE_EVENTS } from './events-more';
 
 export interface Step {
   t: number;
@@ -791,6 +792,7 @@ export const EVENTS: BlackoutEvent[] = [
   },
 ];
 
+EVENTS.push(...MORE_EVENTS);
 for (const e of EVENTS) e.steps.sort((a, b) => a.t - b.t);
 
 export const eventById = (id: string) => EVENTS.find((e) => e.id === id);

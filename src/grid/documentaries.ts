@@ -1,3 +1,4 @@
+import { MORE_EPISODES } from './episodes-more';
 // Documentary episodes: the minute-by-minute lead-up to each blackout, told as
 // scenes. `simT` is the replay time (seconds) the map is advanced to for the scene.
 // `fx` drives the anatomy diagram: effects accumulate from scene to scene.
@@ -421,5 +422,7 @@ export const EPISODES: Episode[] = [
     ],
   },
 ];
+
+EPISODES.push(...MORE_EPISODES);
 
 export const episodeById = (id: string) => EPISODES.find((e) => e.id === id);

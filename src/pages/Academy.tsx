@@ -20,7 +20,7 @@ export default function Academy() {
         <h1>Case files</h1>
         <p>Why each blackout happened, step by step: the state of the grid beforehand, the sequence, the physics behind each step and the root causes the investigators found.</p>
       </div>
-      <div className="cause-bar" aria-label="Root causes across all twelve blackouts">
+      <div className="cause-bar" aria-label="Root causes across all the blackouts">
         {counts.map(({ k, n }) => (
           <div key={k} className={`cb cb-${k}`} style={{ flexGrow: n }}>
             <strong>{n}</strong>
@@ -28,7 +28,7 @@ export default function Academy() {
           </div>
         ))}
       </div>
-      <p className="muted small">Root causes counted across all twelve case files. Almost every blackout needs several at once.</p>
+      <p className="muted small">Root causes counted across all the case files. Almost every blackout needs several at once.</p>
       <ol className="case-list">
         {EVENTS.map((e) => {
           const c = caseById(e.id);

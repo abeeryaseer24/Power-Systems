@@ -137,7 +137,7 @@ export default function Landing() {
         </Link>
         <Link to="/blackouts" className="ch">
           <span className="ch-k">The blackouts</span>
-          <span className="ch-t">Twelve nights the lights went out</span>
+          <span className="ch-t">Eighteen nights the grid failed</span>
           <span className="ch-d">From New York in 1977 to Iberia in 2025, rebuilt from the investigation reports. Watch them happen, then try to stop them.</span>
         </Link>
         <Link to="/nuclear" className="ch">
