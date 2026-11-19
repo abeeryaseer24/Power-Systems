@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { PLANTS, plantById } from '../nuclear/plants';
 import ReactorRoom from '../nuclear/ReactorRoom';
+import RooppurGrid from '../nuclear/RooppurGrid';
 import '../nuclear.css';
 
 export default function Nuclear() {
@@ -66,6 +67,7 @@ function PlantPage({ id }: { id: string }) {
         <p className="lede">{p.place}. {p.type}.</p>
       </header>
       <ReactorRoom plant={p} />
+      {p.id === 'rooppur' && <RooppurGrid />}
       <div className="plant-body">
         <article className="prose">
           <h2>How it works</h2>

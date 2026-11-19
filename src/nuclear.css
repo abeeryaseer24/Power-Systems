@@ -174,3 +174,7 @@
 @media (prefers-reduced-motion: reduce) {
   .pipe, .nh-pipe, .nh-wave, .blades, .pump path, .sch-bubble, .ann.flash, .nh-core { animation: none !important; }
 }
+.rp-grid { margin-top: 40px; }
+.rp-grid h2 { font-family: var(--display); font-weight: 700; font-size: 34px; margin: 0 0 10px; }
+.rp-grid > p { max-width: 70ch; color: #d6d0c1; }
+.rp-trace { height: 240px; margin: 8px 0; padding: 10px; border-radius: 10px; background: #060f1c; border: 1px solid var(--rule); }

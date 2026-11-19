@@ -8,6 +8,7 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
       { to: '/shifts', label: 'Halvern shifts', note: 'Run a fictional city through seven shifts' },
       { to: '/black-start', label: 'Black start', note: 'Rebuild a real grid from total darkness' },
       { to: '/what-if', label: 'What if', note: 'Stack disasters on a real grid' },
+      { to: '/dhaka-tonight', label: 'Dhaka tonight', note: 'Plan a night of load shedding' },
       { to: '/reactor-startup', label: 'Reactor startup', note: 'Take Rooppur from cold to full power' },
     ],
   },

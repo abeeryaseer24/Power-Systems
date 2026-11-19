@@ -15,6 +15,12 @@ export const REGIONS = [
     roads: 'motorway|trunk', rivers: true,
   },
   {
+    id: 'dhaka-metro', city: 'Dhaka metro', country: 'Bangladesh', scope: 'Greater Dhaka, 230 and 132 kV',
+    bbox: [23.55, 90.15, 24.1, 90.7], minKV: 132, freq: 50, center: [23.81, 90.41],
+    demandMW: 5200, ext: { name: 'Rest of the Bangladesh grid', MW: 9000, H: 4 },
+    roads: 'motorway|trunk|primary', rivers: true,
+  },
+  {
     id: 'london', city: 'London', country: 'United Kingdom', scope: 'South and east England, 400 and 275 kV',
     bbox: [50.75, -1.7, 54.2, 2.3], exclude: [[49, 1.45, 51.08, 3]], minKV: 275, freq: 50, center: [51.507, -0.128],
     demandMW: 14000, ext: { name: 'Rest of Great Britain', MW: 18000, H: 4 },

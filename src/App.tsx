@@ -19,6 +19,7 @@ const BlackStart = lazy(() => import('./pages/BlackStart'));
 const ReactorStartup = lazy(() => import('./pages/ReactorStartup'));
 const Predictor = lazy(() => import('./pages/Predictor'));
 const Course = lazy(() => import('./pages/Course'));
+const DhakaTonight = lazy(() => import('./pages/DhakaTonight'));
 const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 
 export default function App() {
@@ -26,7 +27,7 @@ export default function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
-  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts|documentary)\/./.test(pathname) && !pathname.startsWith('/what-if') && !pathname.startsWith('/black-start');
+  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts|documentary)\/./.test(pathname) && !pathname.startsWith('/what-if') && !pathname.startsWith('/black-start') && !pathname.startsWith('/dhaka-tonight');
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/nuclear/instrumentation" element={<Instrumentation />} />
           <Route path="/reactor-startup" element={<ReactorStartup />} />
           <Route path="/predictor" element={<Predictor />} />
+          <Route path="/dhaka-tonight" element={<DhakaTonight />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />

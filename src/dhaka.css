@@ -1,0 +1,13 @@
+.dhaka .dk-left { bottom: 24px; }
+.dhaka .dk-right { bottom: 24px; width: 420px; }
+.dk-stats { display: flex; gap: 24px; margin: 6px 0 10px; }
+.dk-stats span { display: block; font-size: 12px; color: var(--steel); }
+.dk-stats strong { font-family: var(--display); font-weight: 700; font-size: 26px; }
+.dk-grid { display: grid; gap: 2px; font-size: 11px; }
+.dk-row { display: grid; grid-template-columns: 110px repeat(24, 1fr); gap: 2px; align-items: center; }
+.dk-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #cfc9ba; }
+.dk-row i { height: 12px; border-radius: 2px; background: rgba(255, 176, 77, 0.55); font-style: normal; }
+.dk-row i.off { background: #11161d; outline: 1px solid rgba(255, 255, 255, 0.06); }
+.dk-row i.now { box-shadow: 0 0 0 1px var(--porcelain); }
+.dk-hours i { background: none; height: auto; color: var(--steel); text-align: left; }
+@media (max-width: 900px) { .dhaka .dk-right { width: auto; } }
