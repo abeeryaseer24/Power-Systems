@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
-import Landing from './pages/Landing';
 import TopBar from './components/TopBar';
 
+const Landing = lazy(() => import('./pages/Landing'));
 const Shifts = lazy(() => import('./pages/Shifts'));
 const Control = lazy(() => import('./pages/Control'));
 const Debrief = lazy(() => import('./pages/Debrief'));
@@ -18,6 +18,7 @@ const Documentary = lazy(() => import('./pages/Documentary'));
 const WhatIf = lazy(() => import('./pages/WhatIf'));
 const BlackStart = lazy(() => import('./pages/BlackStart'));
 const ReactorStartup = lazy(() => import('./pages/ReactorStartup'));
+const Predictor = lazy(() => import('./pages/Predictor'));
 const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/nuclear" element={<Nuclear />} />
           <Route path="/nuclear/instrumentation" element={<Instrumentation />} />
           <Route path="/reactor-startup" element={<ReactorStartup />} />
+          <Route path="/predictor" element={<Predictor />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />
           <Route path="*" element={<Landing />} />
         </Routes>
