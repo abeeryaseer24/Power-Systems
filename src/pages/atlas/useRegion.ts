@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadRegion, RegionSim, type RegionData, type RegionEvent } from '../../grid/region';
 import { RegionScene, type Hover } from '../../scene/RegionScene';
+import { sfx } from '../../lib/sfx';
 
 export interface RegionIndexEntry {
   id: string; city: string; country: string; scope: string; freq: number; center: [number, number];
@@ -59,6 +60,11 @@ export function useRegion(id: string, canvas: React.RefObject<HTMLCanvasElement 
       if (s.events.length > seen.current) {
         const fresh = s.events.slice(seen.current);
         seen.current = s.events.length;
+        if (fresh.some((e) => /tripped|lost|blocked|Separated/i.test(e.title))) sfx.clunk(fresh.length > 2 ? 1.3 : 1);
+        if (fresh.some((e) => e.severity === 'blackout')) {
+          sfx.powerDown();
+          sfx.klaxon(2);
+        } else if (fresh.some((e) => e.severity === 'major')) sfx.klaxon(1);
         const big = fresh.find((e) => e.severity === 'blackout') ?? fresh.find((e) => e.severity === 'major');
         if (big) {
           setCine(big);
@@ -69,10 +75,15 @@ export function useRegion(id: string, canvas: React.RefObject<HTMLCanvasElement 
       if (now - lastUi > 120) {
         lastUi = now;
         setHover(sc.hover);
+        sfx.setHum(s.frequency, Math.min(1, s.served / Math.max(1, s.demand)));
         setTick((t) => t + 1);
       }
     };
+    const unlock = () => sfx.unlock();
+    window.addEventListener('pointerdown', unlock);
     return () => {
+      window.removeEventListener('pointerdown', unlock);
+      sfx.quiet();
       sc.dispose();
       scene.current = null;
       sim.current = null;

@@ -8,6 +8,8 @@ import FrequencyDial from '../components/FrequencyDial';
 import Timeline from '../components/Timeline';
 import Inspector, { type Selection } from '../components/Inspector';
 import { GridAudio } from '../lib/audio';
+import { sfx } from '../lib/sfx';
+import SoundToggle from '../components/SoundToggle';
 import { clock, mw, num } from '../lib/format';
 import { saveRun } from '../lib/runStore';
 import { PLANT_SITE } from '../scene/world';
@@ -43,7 +45,6 @@ function ControlRoom({ sc }: { sc: Scenario }) {
   const [sel, setSel] = useState<Selection>(null);
   const [cine, setCine] = useState<SimEvent | null>(null);
   const [ended, setEnded] = useState(false);
-  const [muted, setMuted] = useState(false);
   const [panel, setPanel] = useState<'freq' | 'inspect' | 'time'>('inspect');
   const slow = useRef<{ until: number; back: number } | null>(null);
   const seen = useRef(0);
@@ -99,6 +100,8 @@ function ControlRoom({ sc }: { sc: Scenario }) {
         seen.current = s.events.length;
         const big = fresh.find((e) => e.severity !== 'minor') ?? fresh[fresh.length - 1];
         audio.current.alarm(big.severity);
+        if (fresh.some((e) => /tripped|shutdown|Load shedding/i.test(e.title))) sfx.clunk();
+        if (big.severity === 'blackout') sfx.powerDown();
         scene.kick(big.severity === 'blackout' ? 1.4 : big.severity === 'major' ? 0.8 : 0.3);
         if (big.severity !== 'minor') {
           setCine(big);
@@ -141,6 +144,13 @@ function ControlRoom({ sc }: { sc: Scenario }) {
   }, [finish]);
 
   useEffect(() => {
+    const off = sfx.onMute((m) => audio.current.setMuted(m));
+    return () => {
+      off();
+    };
+  }, []);
+
+  useEffect(() => {
     sceneRef.current?.setSelectedLine(sel?.kind === 'line' ? sel.id : null);
     if (sel && window.matchMedia('(max-width: 900px)').matches) setPanel('inspect');
   }, [sel]);
@@ -167,7 +177,9 @@ function ControlRoom({ sc }: { sc: Scenario }) {
   }, []);
 
   const begin = () => {
+    sfx.unlock();
     audio.current.start();
+    audio.current.setMuted(sfx.muted);
     setStarted(true);
     setSpeed(sc.id === 'blackstart' ? 2 : 3);
   };
@@ -245,13 +257,7 @@ function ControlRoom({ sc }: { sc: Scenario }) {
           <div className="kpi-wx"><span>Wind</span><strong>{sim.wind.toFixed(0)} m/s</strong></div>
         </div>
         <div className="hud-actions">
-          <button className="icon-btn" onClick={() => { setMuted(!muted); audio.current.setMuted(!muted); }} aria-label={muted ? 'Unmute grid sound' : 'Mute grid sound'}>
-            {muted ? (
-              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3z" fill="currentColor" /><path d="m13 7 5 6m0-6-5 6" stroke="currentColor" strokeWidth="1.6" /></svg>
-            ) : (
-              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3z" fill="currentColor" /><path d="M13 7c1.5 1.6 1.5 4.4 0 6M15.5 5c2.8 2.8 2.8 7.2 0 10" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
-            )}
-          </button>
+          <SoundToggle />
           <button className="btn ghost small" onClick={() => finish(true)} disabled={!started || ended}>End shift</button>
         </div>
       </header>

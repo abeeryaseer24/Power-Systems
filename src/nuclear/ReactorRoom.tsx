@@ -3,6 +3,8 @@ import type { Reactor } from './reactor';
 import { BETA } from './reactor';
 import { buildReactor, type NuclearPlant } from './plants';
 import { num } from '../lib/format';
+import { sfx } from '../lib/sfx';
+import SoundToggle from '../components/SoundToggle';
 
 const ALARMS = [
   'High neutron flux', 'Short reactor period', 'High pressure', 'Low pressure', 'Low coolant flow', 'Low water level',
@@ -38,6 +40,7 @@ export default function ReactorRoom({ plant }: { plant: NuclearPlant }) {
   const trendRef = useRef<HTMLCanvasElement>(null);
 
   const start = (m: 'watch' | 'control') => {
+    sfx.unlock();
     rRef.current = buildReactor(plant, m);
     setMode(m);
     setAcked(new Set());
@@ -116,6 +119,15 @@ export default function ReactorRoom({ plant }: { plant: NuclearPlant }) {
   });
 
   const alarms = [...s.alarms];
+  const alarmCount = useRef(0);
+  const scrammed = useRef(false);
+  useEffect(() => {
+    if (s.alarms.size > alarmCount.current) sfx.klaxon(1);
+    alarmCount.current = s.alarms.size;
+    if (s.scram && !scrammed.current) sfx.clunk(1.4);
+    scrammed.current = s.scram;
+    if (s.destroyed) sfx.boom();
+  });
   const unacked = alarms.filter((a) => !acked.has(a));
   const isPWR = sp.type === 'pwr' || sp.type === 'vver';
   const rhoDollars = r.rho / BETA;
@@ -142,6 +154,7 @@ export default function ReactorRoom({ plant }: { plant: NuclearPlant }) {
             </button>
           ))}
         </div>
+        <SoundToggle />
         <button className="btn ghost small" onClick={() => start(mode ?? 'watch')} disabled={!mode}>Restart</button>
       </div>
 

@@ -4,6 +4,7 @@ import { useRegion } from './atlas/useRegion';
 import { HoverTip, Inspect, SystemStats } from './atlas/RegionPanels';
 import FrequencyDial from '../components/FrequencyDial';
 import Traces from '../components/Traces';
+import SoundToggle from '../components/SoundToggle';
 import { eventById, stageEvent, type BlackoutEvent } from '../grid/events';
 import { mw, num } from '../lib/format';
 import '../control.css';
@@ -79,6 +80,7 @@ function ReplayView({ ev }: { ev: BlackoutEvent }) {
               <div><span>Mode</span><strong>{mode === 'control' ? 'You have control' : 'Watching history'}</strong></div>
             </div>
             <div className="hud-actions">
+              <SoundToggle />
               <button className="btn ghost small" onClick={() => setAbout(true)}>What happened</button>
             </div>
           </header>

@@ -4,6 +4,8 @@ import { episodeById, EPISODES } from '../grid/documentaries';
 import { eventById, stageEvent } from '../grid/events';
 import { useRegion } from './atlas/useRegion';
 import Anatomy from '../components/Anatomy';
+import SoundToggle from '../components/SoundToggle';
+import { sfx } from '../lib/sfx';
 import '../documentary.css';
 
 export default function Documentary() {
@@ -39,6 +41,8 @@ function Episode({ id }: { id: string }) {
   const [typed, setTyped] = useState('');
   const scene = ep.scenes[i];
 
+  useEffect(() => () => sfx.quiet(), []);
+
   // keep the map's simulator in step with the scene
   useEffect(() => {
     r.speed.current = 0;
@@ -67,6 +71,7 @@ function Episode({ id }: { id: string }) {
     const iv = setInterval(() => {
       k++;
       setTyped(scene.clock.slice(0, k));
+      if (scene.clock[k - 1] && scene.clock[k - 1] !== ' ') sfx.tick();
       if (k >= scene.clock.length) clearInterval(iv);
     }, 90);
     return () => clearInterval(iv);
@@ -80,6 +85,12 @@ function Episode({ id }: { id: string }) {
   }, [i, started, scene.hold, ep.scenes.length]);
 
   useEffect(() => {
+    if (started) {
+      const level = { calm: 0.25, tension: 0.55, impact: 0.9, dark: 0.4, after: 0.15 }[scene.mood ?? 'calm'];
+      sfx.setDrone(level);
+      if (scene.mood === 'impact') sfx.boom();
+      if (scene.mood === 'dark' && ep.scenes[i - 1]?.mood !== 'dark') sfx.powerDown();
+    }
     if (started && (scene.mood === 'impact' || scene.mood === 'dark')) r.scene?.kick(scene.mood === 'dark' ? 1 : 0.6);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i, started]);
@@ -96,7 +107,7 @@ function Episode({ id }: { id: string }) {
           <span className="doc-ep">Episode {ep.number}</span>
           <h1>{ep.title}</h1>
           <p>{ep.tagline}</p>
-          <button className="btn primary" onClick={() => setStarted(true)} disabled={!r.sim}>{r.sim ? 'Play' : 'Loading the grid…'}</button>
+          <button className="btn primary" onClick={() => { sfx.unlock(); setStarted(true); }} disabled={!r.sim}>{r.sim ? 'Play' : 'Loading the grid…'}</button>
         </div>
       ) : (
         <>
@@ -113,6 +124,7 @@ function Episode({ id }: { id: string }) {
           <button onClick={() => setI(Math.max(0, i - 1))} disabled={i === 0}>Previous</button>
           <span>{i + 1} / {ep.scenes.length}</span>
           <button onClick={() => setI(Math.min(ep.scenes.length - 1, i + 1))} disabled={i === ep.scenes.length - 1}>Next</button>
+          <SoundToggle className="doc-sound" />
           <Link to={`/academy/${ep.id}`}>Case file</Link>
           <Link to="/documentary">All episodes</Link>
         </nav>

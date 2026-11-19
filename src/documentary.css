@@ -86,3 +86,5 @@
   .doc-scene, .doc-title-card { bottom: 13vh; }
 }
 @media (prefers-reduced-motion: reduce) { .an-flow, .an-link.surge .an-base, .an-shock, .an-bolt, .an-split.fresh { animation: none; } }
+.doc-sound { background: none; border: 1px solid rgba(255, 255, 255, 0.2); color: #e9e2d4; border-radius: 999px; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; cursor: pointer; }
+.doc-sound svg { width: 16px; height: 16px; }

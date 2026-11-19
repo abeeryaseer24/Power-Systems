@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useRegion } from './atlas/useRegion';
 import { HoverTip, Inspect, SystemStats } from './atlas/RegionPanels';
 import FrequencyDial from '../components/FrequencyDial';
+import SoundToggle from '../components/SoundToggle';
 import { eventsFor } from '../grid/events';
 import { clock } from '../lib/format';
 import '../control.css';
@@ -32,6 +33,7 @@ export default function RegionExplorer() {
               <span className="hud-shift">{data.country}</span>
               <span className="hud-clock">{data.city}</span>
             </div>
+            <div className="hud-actions" style={{ order: 9 }}><SoundToggle /></div>
             <p className="region-scope">{data.scope}. {data.buses.length} buses, {data.branches.length} branches, {data.plants.length} power stations.</p>
           </header>
           <aside className="hud-left">
