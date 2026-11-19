@@ -102,3 +102,16 @@
   .bo-year { text-align: left; font-size: 40px; padding-top: 10px; }
   .region-scope { display: none; }
 }
+
+/* phones: map on top, the main panel as a bottom sheet */
+@media (max-width: 900px) {
+  .region .hud-right {
+    display: block; left: 0; right: 0; top: auto; bottom: 0; width: auto; height: 44vh;
+    border-radius: 16px 16px 0 0; overflow-y: auto;
+  }
+  .region .hud-left, .region .hud-bottom { display: none; }
+  .whatif .wi-left { display: block; position: absolute; left: 8px; right: 8px; top: 120px; bottom: auto; max-height: 30vh; width: auto; }
+  .region .hud-top { flex-wrap: wrap; }
+  .region .hud-kpis { order: 5; width: 100%; justify-content: space-between; margin: 0; }
+  .region .osm-credit, .replay .osm-credit { bottom: calc(44vh + 4px); }
+}
