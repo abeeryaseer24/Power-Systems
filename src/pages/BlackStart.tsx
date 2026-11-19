@@ -6,6 +6,7 @@ import FrequencyDial from '../components/FrequencyDial';
 import SoundToggle from '../components/SoundToggle';
 import { mw, num } from '../lib/format';
 import { sfx } from '../lib/sfx';
+import { markDone } from '../lib/career';
 import '../control.css';
 import '../atlas.css';
 import '../whatif.css';
@@ -43,6 +44,8 @@ export default function BlackStart() {
   useEffect(() => {
     if (sim && started && won === null && restored >= 0.9) {
       setWon(sim.t);
+      markDone('blackstart');
+      if (sim.t <= PAR) markDone('blackstart-par');
       setSpeed(0);
       sfx.klaxon(1);
     }

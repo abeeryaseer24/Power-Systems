@@ -8,6 +8,7 @@ import Anatomy from '../components/Anatomy';
 import CoreView from '../components/CoreView';
 import SoundToggle from '../components/SoundToggle';
 import { sfx } from '../lib/sfx';
+import { markDone } from '../lib/career';
 import '../documentary.css';
 
 export default function Documentary() {
@@ -66,6 +67,10 @@ function usePlayer(ep: Ep, started: boolean) {
     }, 90);
     return () => clearInterval(iv);
   }, [i, started, scene.clock]);
+
+  useEffect(() => {
+    if (started && i === ep.scenes.length - 1) markDone(`doc:${ep.id}`);
+  }, [started, i, ep]);
 
   useEffect(() => {
     if (!started || i >= ep.scenes.length - 1) return;

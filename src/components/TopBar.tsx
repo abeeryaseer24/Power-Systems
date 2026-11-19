@@ -5,6 +5,7 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
   {
     label: 'Play',
     items: [
+      { to: '/career', label: 'Career', note: 'From trainee to chief of the grid' },
       { to: '/shifts', label: 'Halvern shifts', note: 'Run a fictional city through seven shifts' },
       { to: '/black-start', label: 'Black start', note: 'Rebuild a real grid from total darkness' },
       { to: '/what-if', label: 'What if', note: 'Stack disasters on a real grid' },

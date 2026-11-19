@@ -6,6 +6,7 @@ import FrequencyDial from '../components/FrequencyDial';
 import Traces from '../components/Traces';
 import SoundToggle from '../components/SoundToggle';
 import CoPilot from '../components/CoPilot';
+import { markDone } from '../lib/career';
 import { eventById, stageEvent, type BlackoutEvent } from '../grid/events';
 import { mw, num } from '../lib/format';
 import '../control.css';
@@ -47,6 +48,12 @@ function ReplayView({ ev }: { ev: BlackoutEvent }) {
   const done = sim ? t >= ev.span : false;
   useEffect(() => {
     if (done && speedIdx) setSpeed(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
+  useEffect(() => {
+    if (!done || !sim || !mode) return;
+    if (mode === 'watch') markDone(`watch:${ev.id}`);
+    else if (sim.served > sim.demand * 0.9) markDone(`save:${ev.id}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
   const marks = useMemo(() => ev.steps.map((s) => ({ t: s.t, label: s.label })), [ev]);

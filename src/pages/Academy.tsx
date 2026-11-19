@@ -8,6 +8,7 @@ import { chapterById } from './course/chapters';
 const LESSON_TO_CHAPTER: Record<string, string> = { frequency: 'frequency', powerflow: 'power-flow', cascade: 'protection', merit: 'markets', blackstart: 'operating' };
 import Traces from '../components/Traces';
 import Anatomy from '../components/Anatomy';
+import { markDone } from '../lib/career';
 import { episodeById } from '../grid/documentaries';
 import '../atlas.css';
 import '../academy.css';
@@ -92,6 +93,7 @@ function useReplayTrace(evId: string) {
 }
 
 function CasePage({ id }: { id: string }) {
+  useEffect(() => markDone(`case:${id}`), [id]);
   const ev = eventById(id);
   const c = caseById(id);
   const sim = useReplayTrace(id);

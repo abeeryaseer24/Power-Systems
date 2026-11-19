@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Reactor, SPECS, BETA } from '../nuclear/reactor';
 import SoundToggle from '../components/SoundToggle';
 import { sfx } from '../lib/sfx';
+import { markDone } from '../lib/career';
 import { num } from '../lib/format';
 import '../nuclear.css';
 import '../startup.css';
@@ -81,6 +82,7 @@ export default function ReactorStartup() {
     if (phase === 'heat' && s.n > 0.12) setPhase('sync');
     if (phase === 'load' && s.Pe > 0.95 * r.spec.Pe0) {
       setPhase('done');
+      markDone('reactor-startup');
       sfx.klaxon(1);
     }
   });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { markDone } from '../lib/career';
 import '../live.css';
 
 // Public, keyless, CORS-enabled feeds for Great Britain.
@@ -55,6 +56,7 @@ function Gauge({ f, rocof }: { f: number; rocof: number }) {
 }
 
 export default function Live() {
+  useEffect(() => markDone('visit:live'), []);
   const [freq, setFreq] = useState<FreqPt[]>([]);
   const [fuel, setFuel] = useState<Fuel[]>([]);
   const [demand, setDemand] = useState<DemandPt[]>([]);

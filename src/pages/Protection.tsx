@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { markDone } from '../lib/career';
 import '../protection.css';
 
 // A 400 kV double-ended feed: source — A ——100 km—— B ——80 km—— C — source.
@@ -78,6 +79,7 @@ const sy = (x: number) => PX.h - ((x - PX.x0) / (PX.x1 - PX.x0)) * PX.h;
 const sk = (ohm: number) => (ohm / (PX.r1 - PX.r0)) * PX.w;
 
 export default function Protection() {
+  useEffect(() => markDone('visit:protection'), []);
   const [x, setX] = useState(62);
   const [rf, setRf] = useState(2);
   const [eye, setEye] = useState('A');
