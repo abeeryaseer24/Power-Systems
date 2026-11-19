@@ -1,12 +1,11 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import TopBar from './components/TopBar';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Shifts = lazy(() => import('./pages/Shifts'));
 const Control = lazy(() => import('./pages/Control'));
 const Debrief = lazy(() => import('./pages/Debrief'));
-const Learn = lazy(() => import('./pages/Learn'));
 const About = lazy(() => import('./pages/About'));
 const Atlas = lazy(() => import('./pages/Atlas'));
 const RegionExplorer = lazy(() => import('./pages/RegionExplorer'));
@@ -38,8 +37,8 @@ export default function App() {
           <Route path="/shifts" element={<Shifts />} />
           <Route path="/control/:id" element={<Control />} />
           <Route path="/debrief" element={<Debrief />} />
-          <Route path="/learn" element={<Learn />} />
-          <Route path="/learn/:topic" element={<Learn />} />
+          <Route path="/learn" element={<Navigate to="/course" replace />} />
+          <Route path="/learn/:topic" element={<LearnRedirect />} />
           <Route path="/about" element={<About />} />
           <Route path="/atlas" element={<Atlas />} />
           <Route path="/atlas/:id" element={<RegionExplorer />} />
@@ -65,4 +64,11 @@ export default function App() {
       </Suspense>
     </>
   );
+}
+
+// the old lessons now live inside the course
+const LESSON_TO_CHAPTER: Record<string, string> = { frequency: 'frequency', powerflow: 'power-flow', cascade: 'protection', merit: 'markets', blackstart: 'operating' };
+function LearnRedirect() {
+  const { topic = '' } = useParams();
+  return <Navigate to={`/course/${LESSON_TO_CHAPTER[topic] ?? ''}`} replace />;
 }

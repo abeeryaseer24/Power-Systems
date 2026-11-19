@@ -119,7 +119,7 @@ export default function Landing() {
             </p>
             <div className="finale-cta">
               <Link to="/shifts" className="btn primary">Take the control room</Link>
-              <Link to="/learn" className="btn ghost">How grids stay up</Link>
+              <Link to="/course" className="btn ghost">Learn power systems</Link>
             </div>
           </div>
         </div>

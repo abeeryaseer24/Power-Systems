@@ -39,7 +39,7 @@ export default function About() {
             <li>ENTSO-E, <em>Continental Europe synchronous area separation on 8 January 2021</em>, final report.</li>
             <li>ENTSO-E, <em>Frequency stability evaluation criteria for the synchronous zone of Continental Europe</em>.</li>
           </ul>
-          <p><Link to="/learn">The lessons</Link> explain each of these pieces with something to try.</p>
+          <p><Link to="/course">Power Systems 101</Link> explains each of these pieces from scratch, with something to try in every chapter.</p>
         </article>
         <figure className="about-map">
           <NetworkMap />

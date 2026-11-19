@@ -3,7 +3,9 @@ import { Link, useParams } from 'react-router-dom';
 import { EVENTS, eventById, stageEvent } from '../grid/events';
 import { CASES, CAUSE_LABEL, caseById, type CauseKind } from '../grid/cases';
 import { loadRegion, RegionSim, type RegionTrace } from '../grid/region';
-import { LESSONS } from './learn/lessons';
+import { chapterById } from './course/chapters';
+
+const LESSON_TO_CHAPTER: Record<string, string> = { frequency: 'frequency', powerflow: 'power-flow', cascade: 'protection', merit: 'markets', blackstart: 'operating' };
 import Traces from '../components/Traces';
 import Anatomy from '../components/Anatomy';
 import { episodeById } from '../grid/documentaries';
@@ -139,12 +141,12 @@ function CasePage({ id }: { id: string }) {
         <h2>The physics</h2>
         <div className="mech-grid">
           {c.mechanisms.map((m, i) => {
-            const lesson = LESSONS.find((l) => l.id === m.lesson);
+            const lesson = m.lesson ? chapterById(LESSON_TO_CHAPTER[m.lesson] ?? m.lesson) : undefined;
             return (
               <article key={i} className="mech">
                 <h3>{m.title}</h3>
                 <p>{m.body}</p>
-                {lesson && <Link to={`/learn/${lesson.id}`}>Lesson: {lesson.title}</Link>}
+                {lesson && <Link to={`/course/${lesson.id}`}>Course: {lesson.title}</Link>}
               </article>
             );
           })}
