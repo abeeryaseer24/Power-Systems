@@ -1,0 +1,17 @@
+.whatif .wi-left { top: 86px; bottom: 214px; width: 320px; overflow-y: auto; }
+.wi-panel { padding: 16px; border-radius: 14px; background: rgba(7, 17, 32, 0.82); border: 1px solid var(--rule); backdrop-filter: blur(10px); }
+.wi-panel h2 { font-family: var(--display); font-weight: 700; font-size: 24px; margin: 0; }
+.wi-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 6px; }
+.wi-list label { display: grid; grid-template-columns: 18px 1fr; gap: 10px; padding: 10px; border-radius: 10px; border: 1px solid var(--rule); cursor: pointer; }
+.wi-list label.on { border-color: var(--sodium); background: rgba(255, 176, 77, 0.07); }
+.wi-list input { accent-color: var(--sodium); margin-top: 3px; }
+.wi-list b { display: block; font-size: 14px; }
+.wi-list em { font-style: normal; font-size: 12px; color: var(--steel); }
+.wi-cta { display: flex; gap: 8px; }
+.wi-region select { margin-top: 2px; background: transparent; border: 0; color: var(--porcelain); font-family: var(--display); font-weight: 500; font-size: 36px; cursor: pointer; }
+.wi-region select option { background: var(--panel-solid); font-size: 16px; }
+.whatif .hud-right .dial { padding: 0 6px 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 900px) {
+  .whatif .wi-left { position: static; width: auto; }
+}

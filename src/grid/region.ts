@@ -375,6 +375,24 @@ export class RegionSim {
     }
   }
 
+  /** Add a new plant (e.g. a unit that does not exist yet) running at `mw`, backing off others. */
+  addPlant(def: RegionPlant, mw: number) {
+    this.gens.push({ def, online: true, sched: mw, gov: 0, p: mw, q: 0, avail: def.mw, vTimer: 0 });
+    // other plant backs down to make room, cheapest-last
+    let excess = mw;
+    const order = this.gens.slice(0, -1).filter((g) => g.online && KIND[g.def.kind].droop > 0).sort((a, b) => KIND[b.def.kind].cost - KIND[a.def.kind].cost);
+    for (const g of order) {
+      if (excess <= 0) break;
+      const cut = Math.min(excess, g.sched - g.avail * KIND[g.def.kind].minFrac);
+      if (cut > 0) {
+        g.sched -= cut;
+        g.p -= cut;
+        excess -= cut;
+      }
+    }
+    this.data.plants.push(def);
+  }
+
   /** Add demand spread over buses near a point (or everywhere), MW. */
   loadStep(mw: number, near?: { x: number; z: number; r: number }) {
     const idx = this.buses.map((_b, i) => i).filter((i) => this.buses[i].def.load > 0 && (!near || Math.hypot(this.buses[i].def.x - near.x, this.buses[i].def.z - near.z) < near.r));

@@ -422,6 +422,7 @@ export class RegionScene {
     colAttr.needsUpdate = true;
     s.gens.forEach((g, i) => {
       const sp = this.plantSprites[i];
+      if (!sp) return; // plants added at run time have no sprite
       const m = sp.material as THREE.SpriteMaterial;
       m.opacity = g.online ? 0.35 + 0.65 * Math.min(1, g.p / Math.max(1, g.def.mw)) : g.tripReason ? 0.18 + 0.12 * Math.sin(t * 6) : 0.08;
       if (g.tripReason) m.color.set('#ff5b4f');
