@@ -86,3 +86,38 @@ export async function loadPredictor(): Promise<PredictorModel> {
   if (!r.ok) throw new Error('predictor model missing');
   return r.json();
 }
+
+/**
+ * Why the model is worried: for each feature, how much the risk falls if that one
+ * reading is put back to its typical training value with everything else unchanged.
+ * Occlusion is crude but honest for a model this small, and it needs no extra training.
+ */
+export function explain(model: PredictorModel, x: number[]) {
+  const base = predict(model, x);
+  return x
+    .map((v, i) => {
+      const y = x.slice();
+      y[i] = model.mean[i];
+      return { i, name: model.names[i] ?? FEATURE_NAMES[i], value: v, share: base - predict(model, y) };
+    })
+    .sort((a, b) => b.share - a.share);
+}
+
+/** A reading in words, for the explanation panel. */
+export function describe(i: number, v: number, f0: number) {
+  switch (i) {
+    case 0: return `${(f0 * (1 + v / 100)).toFixed(2)} Hz`;
+    case 1: return `${((v / 100) * f0).toFixed(2)} Hz/s`;
+    case 2: return `${(f0 * (1 + v / 100)).toFixed(2)} Hz`;
+    case 3: return `${v.toFixed(2)} pu`;
+    case 4: return `${Math.round(v * 100)} % of demand`;
+    case 5: return `${Math.round(v)}`;
+    case 6: return `${Math.round(v * 100)} % of demand`;
+    case 7: return `${v.toFixed(1)} s`;
+    case 8: return `${Math.round(v * 100)} % of rating`;
+    case 9: return `${Math.round(v * 100)} % of lines`;
+    case 10: return `${Math.round(v * 100)} % of demand`;
+    case 11: return `${Math.round(v * 100)} % of demand`;
+    default: return v.toFixed(2);
+  }
+}

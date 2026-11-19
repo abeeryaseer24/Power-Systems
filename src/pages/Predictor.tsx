@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EVENTS, eventById, stageEvent } from '../grid/events';
 import { loadRegion, RegionSim } from '../grid/region';
-import { features, loadPredictor, predict, type PredictorModel } from '../ai/features';
+import { describe, explain, features, loadPredictor, predict, type PredictorModel } from '../ai/features';
 import { num } from '../lib/format';
 import '../predictor.css';
 
-interface Point { t: number; f: number; p: number; served: number }
+interface Point { t: number; f: number; p: number; served: number; x: number[] }
 interface Result { id: string; points: Point[]; warnAt: number | null; collapseAt: number | null; f0: number }
 
 async function evaluate(model: PredictorModel, id: string, onProgress?: (pts: Point[]) => void, alive = () => true): Promise<Result> {
@@ -25,8 +25,9 @@ async function evaluate(model: PredictorModel, id: string, onProgress?: (pts: Po
       while (s.t < end && performance.now() - t0 < 12) {
         s.advance(2);
         const served = s.served / Math.max(1, s.demand);
-        const p = served < 0.5 ? 1 : predict(model, features(s));
-        pts.push({ t: s.t, f: s.frequency, p, served });
+        const x = features(s);
+        const p = served < 0.5 ? 1 : predict(model, x);
+        pts.push({ t: s.t, f: s.frequency, p, served, x });
         if (warnAt === null && p > 0.5 && served >= 0.5) warnAt = s.t;
         if (collapseAt === null && served < 0.5) collapseAt = s.t;
       }
@@ -39,7 +40,7 @@ async function evaluate(model: PredictorModel, id: string, onProgress?: (pts: Po
   return { id, points: pts, warnAt, collapseAt, f0: s.f0 };
 }
 
-function RiskChart({ r, steps }: { r: Result; steps: number[] }) {
+function RiskChart({ r, steps, at }: { r: Result; steps: number[]; at: number | null }) {
   const W = 900;
   const H = 300;
   const pl = 50;
@@ -64,6 +65,7 @@ function RiskChart({ r, steps }: { r: Result; steps: number[] }) {
       <path d={fl} className="pr-f" />
       {r.warnAt !== null && (<g><line x1={X(r.warnAt)} x2={X(r.warnAt)} y1={12} y2={H - 40} className="pr-warn" /><text x={X(r.warnAt) + 6} y={24} className="pr-lbl warn">First warning</text></g>)}
       {r.collapseAt !== null && (<g><line x1={X(r.collapseAt)} x2={X(r.collapseAt)} y1={12} y2={H - 40} className="pr-col" /><text x={X(r.collapseAt) + 6} y={42} className="pr-lbl col">Collapse</text></g>)}
+      {at !== null && <line x1={X(at)} x2={X(at)} y1={12} y2={H - 40} className="pr-at" />}
       {[0, 0.25, 0.5, 0.75, 1].map((k) => <text key={k} x={X(k * t1)} y={H - 18} className="pr-ax" textAnchor="middle">{Math.round(k * t1)} s</text>)}
     </svg>
   );
@@ -76,6 +78,7 @@ export default function Predictor() {
   const [res, setRes] = useState<Result | null>(null);
   const [board, setBoard] = useState<Result[]>([]);
   const [scoring, setScoring] = useState(false);
+  const [moment, setMoment] = useState<number | null>(null);
   const runId = useRef(0);
   useEffect(() => {
     loadPredictor().then(setModel).catch((e) => setErr(String(e.message ?? e)));
@@ -85,6 +88,7 @@ export default function Predictor() {
     const my = ++runId.current;
     setRes({ id: sel, points: [], warnAt: null, collapseAt: null, f0: 50 });
     evaluate(model, sel, (pts) => my === runId.current && setRes((r) => (r ? { ...r, points: pts } : r)), () => my === runId.current).then((r) => my === runId.current && setRes(r));
+    setMoment(null);
   }, [model, sel]);
   const scoreAll = async () => {
     if (!model) return;
@@ -98,6 +102,19 @@ export default function Predictor() {
     setScoring(false);
   };
   const ev = eventById(sel)!;
+  // the moment to explain: chosen by the slider, else the first warning, else the riskiest live moment
+  const why = (() => {
+    if (!model || !res || res.points.length < 3) return null;
+    const pts = res.points;
+    let k = moment ?? -1;
+    if (k < 0 || k >= pts.length) {
+      k = res.warnAt !== null ? pts.findIndex((q) => q.t === res.warnAt) : -1;
+      if (k < 0) k = pts.reduce((bi, q, i) => (q.served >= 0.5 && q.p > pts[bi].p ? i : bi), 0);
+    }
+    const pt = pts[k];
+    const drivers = explain(model, pt.x).filter((d) => Math.abs(d.share) > 0.005).slice(0, 5);
+    return { k, pt, drivers };
+  })();
   const lead = res && res.warnAt !== null && res.collapseAt !== null ? res.collapseAt - res.warnAt : null;
 
   return (
@@ -124,7 +141,7 @@ export default function Predictor() {
             {EVENTS.map((e) => <option key={e.id} value={e.id}>{e.date.slice(-4)}, {e.title}</option>)}
           </select>
         </label>
-        {res && <RiskChart r={res} steps={ev.steps.map((s) => s.t)} />}
+        {res && <RiskChart r={res} steps={ev.steps.map((s) => s.t)} at={why ? why.pt.t : null} />}
         <ul className="legend">
           <li><i style={{ background: 'rgba(255,91,79,0.5)' }} />Predicted collapse risk</li>
           <li><i style={{ background: '#ece6d8' }} />Frequency</li>
@@ -138,6 +155,30 @@ export default function Predictor() {
           </p>
         )}
       </section>
+
+      {model && why && (
+        <section className="pr-sec pr-why">
+          <h2>Why it {why.pt.p > 0.5 ? 'is worried' : 'is calm'} at {Math.round(why.pt.t)} s</h2>
+          <p className="hint">Each bar is how much the risk would fall if that one reading were back to normal. Scrub through the replay to see what the model is looking at.</p>
+          <label className="w-slider">Moment in the replay <output>{Math.round(why.pt.t)} s, risk {Math.round(why.pt.p * 100)} %</output>
+            <input type="range" min={0} max={res!.points.length - 1} value={why.k} onChange={(e) => setMoment(Number(e.target.value))} />
+          </label>
+          {why.pt.served < 0.5 ? (
+            <p className="pr-verdict">The grid has already collapsed here.</p>
+          ) : (
+            <ol className="pr-drivers">
+              {why.drivers.map((d) => (
+                <li key={d.i}>
+                  <span className="pr-d-n">{d.name}</span>
+                  <span className="pr-d-v">{describe(d.i, d.value, res!.f0)}</span>
+                  <span className="pr-d-bar"><i style={{ width: `${Math.min(100, Math.abs(d.share) * 100)}%` }} className={d.share < 0 ? 'calm' : ''} /></span>
+                  <span className="pr-d-s">{d.share >= 0 ? '+' : '−'}{Math.round(Math.abs(d.share) * 100)} pts</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
 
       <section className="pr-sec">
         <h2>Every event</h2>
