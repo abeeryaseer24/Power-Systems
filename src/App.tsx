@@ -25,6 +25,7 @@ const Protection = lazy(() => import('./pages/Protection'));
 const Market = lazy(() => import('./pages/Market'));
 const Oscillations = lazy(() => import('./pages/Oscillations'));
 const Live = lazy(() => import('./pages/Live'));
+const LiveUS = lazy(() => import('./pages/LiveUS'));
 const Career = lazy(() => import('./pages/Career'));
 const Trailer = lazy(() => import('./pages/Trailer'));
 
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="/market" element={<Market />} />
           <Route path="/oscillations" element={<Oscillations />} />
           <Route path="/live" element={<Live />} />
+          <Route path="/live/us" element={<LiveUS />} />
           <Route path="/career" element={<Career />} />
           <Route path="/trailer" element={<Trailer />} />
           <Route path="/course" element={<Course />} />

@@ -124,6 +124,7 @@ export default function Live() {
 
   return (
     <main id="main" className="page live">
+      <nav className="lv-tabs" aria-label="Country"><Link to="/live" className="on">Great Britain</Link><Link to="/live/us">United States</Link></nav>
       <div className="page-head">
         <h1>Great Britain, right now</h1>
         <p>Everything else in this project is a model. This page is not: it reads the real British grid as it runs, every fifteen seconds. <span className="lv-dot" aria-hidden="true" /> {updated ? `Updated ${updated.toLocaleTimeString()}` : 'Connecting…'}</p>

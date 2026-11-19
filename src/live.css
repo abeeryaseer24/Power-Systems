@@ -38,3 +38,14 @@
 .lv-g-hub { fill: var(--sodium); }
 .lv-g-rocof { fill: var(--steel); font-size: 12px; }
 .lv-dial { display: flex; align-items: center; }
+.lv-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+.lv-tabs a { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--rule); color: var(--steel); text-decoration: none; font-size: 14px; }
+.lv-tabs a.on { color: #0c1a2d; background: var(--sodium); border-color: var(--sodium); }
+.lv-pick { display: inline-flex; gap: 10px; align-items: center; margin-top: 12px; color: var(--steel); font-size: 14px; }
+.lv-pick select { background: var(--panel-solid, #0c1a2d); color: var(--porcelain); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; font: inherit; }
+.lv-top-us { grid-template-columns: 1fr; }
+.lv-top-us .lv-kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.lv-fc { fill: none; stroke: rgba(236, 230, 216, 0.6); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.lv-ng { fill: none; stroke: rgba(255, 176, 77, 0.7); stroke-width: 1.2; }
+.lv-legend-inline { margin-top: 8px; }
+.lv-dash { background: repeating-linear-gradient(90deg, #ece6d8 0 4px, transparent 4px 7px); }

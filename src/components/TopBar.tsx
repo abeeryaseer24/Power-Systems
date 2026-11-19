@@ -16,7 +16,7 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
   {
     label: 'Real grids',
     items: [
-      { to: '/live', label: 'Live', note: 'The real British grid, right now' },
+      { to: '/live', label: 'Live', note: 'Real grids right now: Britain and the US' },
       { to: '/atlas', label: 'Atlas', note: 'Grids rebuilt from OpenStreetMap' },
       { to: '/blackouts', label: 'Blackouts', note: 'Replay historical failures' },
       { to: '/documentary', label: 'Documentaries', note: 'The last minutes, told as a story' },
