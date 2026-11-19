@@ -29,6 +29,8 @@ export function makeShared() {
     uTime: { value: 0 },
     uFog: { value: new THREE.Color('#0b1a2c') },
     uFogDensity: { value: 0.014 },
+    /** 0 at night, 1 at midday. */
+    uDay: { value: 0 },
   };
 }
 export type Shared = ReturnType<typeof makeShared>;
@@ -85,13 +87,14 @@ export function buildGround(shared: Shared) {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uLight[${CHANNELS}]; uniform vec3 uMoon;
+      uniform float uLight[${CHANNELS}]; uniform vec3 uMoon; uniform float uDay;
       varying float vGlow; varying float vChan; varying vec3 vN; varying vec3 vW; varying float vDepth;
       ${FOG_GLSL}
       void main() {
         float L = uLight[int(vChan + 0.5)];
         float moon = max(dot(normalize(vN), uMoon), 0.0);
         vec3 c = vec3(0.020, 0.032, 0.048) + vec3(0.03, 0.045, 0.07) * moon;
+        c = mix(c, vec3(0.20, 0.23, 0.19) * (0.55 + 0.45 * moon), uDay);
         c += vec3(1.0, 0.55, 0.2) * vGlow * L * 0.09;
         gl_FragColor = vec4(applyFog(c, vDepth), 1.0);
       }`,
@@ -110,7 +113,7 @@ export function buildSea(shared: Shared, moonDir: THREE.Vector3) {
       varying vec3 vW; varying float vDepth;
       void main() { vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; vec4 mv = viewMatrix * w; vDepth = -mv.z; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: /* glsl */ `
-      uniform vec3 uMoon; uniform float uTime; uniform float uLight[${CHANNELS}];
+      uniform vec3 uMoon; uniform float uTime; uniform float uLight[${CHANNELS}]; uniform float uDay;
       varying vec3 vW; varying float vDepth;
       ${FOG_GLSL}
       float h(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5); }
@@ -126,6 +129,7 @@ export function buildSea(shared: Shared, moonDir: THREE.Vector3) {
         float spec = pow(max(dot(r, uMoon), 0.0), 900.0) * step(0.55, w);
         float fres = pow(1.0 - max(view.y, 0.0), 4.0);
         vec3 c = vec3(0.006, 0.014, 0.028) + vec3(0.03, 0.05, 0.08) * fres;
+        c = mix(c, vec3(0.10, 0.20, 0.28) + vec3(0.25, 0.32, 0.4) * fres, uDay);
         c += vec3(0.75, 0.82, 0.95) * spec * 0.6;
         // the city's glow on the water near the shore
         float shore = exp(-max(vW.z - 18.0, 0.0) * 0.35);
@@ -148,21 +152,27 @@ export function buildLake(shared: Shared, moonDir: THREE.Vector3) {
 
 // --------------------------------------------------------------- sky
 
-export function buildSky(moonDir: THREE.Vector3) {
+export function buildSky(moonDir: THREE.Vector3, shared?: Shared) {
+  const uDay = shared?.uDay ?? { value: 0 };
   const group = new THREE.Group();
   const geo = new THREE.SphereGeometry(600, 32, 16);
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    uniforms: { uMoon: { value: moonDir } },
+    uniforms: { uMoon: { value: moonDir }, uDay },
     vertexShader: `varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
     fragmentShader: /* glsl */ `
-      uniform vec3 uMoon; varying vec3 vD;
+      uniform vec3 uMoon; uniform float uDay; varying vec3 vD;
       void main(){
         float y = max(vD.y, 0.0);
         vec3 zen = vec3(0.006, 0.012, 0.03);
         vec3 hor = vec3(0.028, 0.05, 0.085);
         vec3 c = mix(hor, zen, pow(y, 0.45));
+        vec3 dayC = mix(vec3(0.62, 0.70, 0.78), vec3(0.24, 0.43, 0.70), pow(y, 0.5));
+        // dusk: a warm band along the horizon while the sun is low
+        float dusk = uDay * (1.0 - uDay) * 4.0;
+        dayC += vec3(0.55, 0.22, 0.05) * exp(-y * 6.0) * dusk;
+        c = mix(c, dayC, smoothstep(0.0, 0.6, uDay) + dusk * 0.35 * (1.0 - smoothstep(0.0, 0.6, uDay)));
         float m = max(dot(vD, uMoon), 0.0);
         c += vec3(0.35, 0.42, 0.55) * pow(m, 80.0) * 0.35 + vec3(0.1,0.13,0.2) * pow(m, 8.0) * 0.18;
         // faint sodium skyglow over the city
@@ -190,10 +200,10 @@ export function buildSky(moonDir: THREE.Vector3) {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: `attribute float aSize; uniform float uTime; varying float vA;
+    uniforms: { uTime: { value: 0 }, uDay },
+    vertexShader: `attribute float aSize; uniform float uTime; uniform float uDay; varying float vA;
       void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix*mv;
-      vA = 0.55 + 0.45 * sin(uTime * (0.6 + aSize) + position.x);
+      vA = (0.55 + 0.45 * sin(uTime * (0.6 + aSize) + position.x)) * (1.0 - smoothstep(0.0, 0.4, uDay));
       gl_PointSize = aSize; }`,
     fragmentShader: `varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d) * vA; gl_FragColor = vec4(vec3(0.8,0.86,1.0) * a, a); }`,
   });
@@ -264,7 +274,7 @@ export function buildCity(shared: Shared) {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uLight[${CHANNELS}]; uniform float uTime;
+      uniform float uLight[${CHANNELS}]; uniform float uTime; uniform float uDay;
       varying vec3 vW; varying vec3 vN; varying float vD; varying float vS; varying float vDepth;
       ${FOG_GLSL}
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -272,6 +282,7 @@ export function buildCity(shared: Shared) {
         float L = uLight[int(vD + 0.5)];
         vec3 n = normalize(vN);
         vec3 c = vec3(0.028, 0.040, 0.062) * (0.7 + 0.5 * max(n.y, 0.0));
+        c = mix(c, vec3(0.30, 0.32, 0.35) * (0.65 + 0.45 * max(n.y, 0.0) + 0.15 * n.x), uDay);
         if (abs(n.y) < 0.5) {
           float u = (abs(n.x) > abs(n.z) ? vW.z : vW.x) * 75.0;
           float v = vW.y * 70.0;
@@ -281,7 +292,7 @@ export function buildCity(shared: Shared) {
           float h = hash(cell + vS * 31.0);
           float lit = step(h, 0.5 * L) * frame;
           vec3 warm = hash(cell * 1.3 + 2.0) > 0.82 ? vec3(0.75, 0.86, 1.0) : vec3(1.0, 0.70, 0.38);
-          c += warm * lit * (0.6 + 0.8 * hash(cell + 7.0)) * 1.25;
+          c += warm * lit * (0.6 + 0.8 * hash(cell + 7.0)) * 1.25 * (1.0 - 0.75 * uDay);
         }
         c += vec3(1.0, 0.58, 0.25) * L * 0.22 * exp(-max(vW.y, 0.0) * 9.0);
         gl_FragColor = vec4(applyFog(c, vDepth), 1.0);
@@ -379,7 +390,7 @@ export function buildLights(shared: Shared, extraRed: THREE.Vector3[]) {
     uniforms: { ...shared, uSize: { value: 1 } },
     vertexShader: /* glsl */ `
       attribute float aChan; attribute float aSeed; attribute vec3 aColor;
-      uniform float uLight[${CHANNELS}]; uniform float uSize; uniform float uTime;
+      uniform float uLight[${CHANNELS}]; uniform float uSize; uniform float uTime; uniform float uDay;
       varying float vA; varying vec3 vC; varying float vDepth;
       void main(){
         float L = uLight[int(aChan + 0.5)];
@@ -388,7 +399,7 @@ export function buildLights(shared: Shared, extraRed: THREE.Vector3[]) {
         vDepth = -mv.z;
         gl_Position = projectionMatrix * mv;
         gl_PointSize = on * uSize * (0.7 + 0.6 * fract(aSeed * 7.31)) * clamp(150.0 / vDepth, 1.0, 5.0);
-        vA = on * (0.55 + 0.45 * fract(aSeed * 13.7));
+        vA = on * (0.55 + 0.45 * fract(aSeed * 13.7)) * (1.0 - 0.85 * uDay);
         vC = aColor;
       }`,
     fragmentShader: /* glsl */ `

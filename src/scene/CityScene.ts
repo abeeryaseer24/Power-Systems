@@ -63,6 +63,10 @@ export class CityScene {
   private steam!: ReturnType<typeof buildSteam>;
   private steamPlant: number[] = [];
   private starMat!: THREE.ShaderMaterial;
+  private hemi!: THREE.HemisphereLight;
+  private sunLight!: THREE.DirectionalLight;
+  private day = 0;
+  private dayTarget = 0;
   private movers!: ReturnType<typeof buildMovers>;
   private clock = new THREE.Clock();
   private raf = 0;
@@ -127,11 +131,13 @@ export class CityScene {
 
   private build() {
     const moonDir = new THREE.Vector3(-0.35, 0.42, -0.84).normalize();
-    const sky = buildSky(moonDir);
+    const sky = buildSky(moonDir, this.shared);
     this.starMat = sky.starMat;
     this.scene.add(sky.group);
-    this.scene.add(new THREE.HemisphereLight('#3a5478', '#05080d', 0.3));
+    this.hemi = new THREE.HemisphereLight('#3a5478', '#05080d', 0.3);
+    this.scene.add(this.hemi);
     const moon = new THREE.DirectionalLight('#9fb4d8', 0.5);
+    this.sunLight = moon;
     moon.position.copy(moonDir.clone().multiplyScalar(60));
     this.scene.add(moon);
     this.scene.add(buildGround(this.shared));
@@ -209,7 +215,36 @@ export class CityScene {
 
   // ------------------------------------------------------------ state in
 
+  /** Daylight from the simulation clock: 0 at night, 1 at midday. */
+  setDaylight(d: number) {
+    this.dayTarget = Math.max(0, Math.min(1, d));
+  }
+
+  private applyDaylight(dt: number) {
+    this.day += (this.dayTarget - this.day) * Math.min(1, dt * 0.8);
+    const d = this.day;
+    this.shared.uDay.value = d;
+    const night = new THREE.Color('#0b1a2c');
+    const noon = new THREE.Color('#a9b9c6');
+    const fog = night.clone().lerp(noon, d);
+    (this.scene.fog as THREE.FogExp2).color.copy(fog);
+    this.shared.uFog.value.copy(fog);
+    (this.scene.background as THREE.Color).copy(fog);
+    this.shared.uFogDensity.value = 0.014 - 0.006 * d;
+    (this.scene.fog as THREE.FogExp2).density = 0.014 - 0.006 * d;
+    this.hemi.intensity = 0.3 + 1.4 * d;
+    this.sunLight.intensity = 0.5 + 2.2 * d;
+    this.sunLight.color.set(d > 0.05 ? '#fff1dc' : '#9fb4d8');
+    this.renderer.toneMappingExposure = 0.95 + 0.15 * d;
+    this.bloom.strength = 0.85 * (1 - 0.6 * d);
+  }
+
   updateFromSim(s: GridSim) {
+    const w = s.weather;
+    const h = ((s.hour % 24) + 24) % 24;
+    const span = w.sunset - w.sunrise;
+    const x = (h - w.sunrise + 0.6) / (span + 1.2); // include civil twilight
+    this.setDaylight(x > 0 && x < 1 ? Math.pow(Math.sin(Math.PI * x), 0.7) : 0);
     DISTRICTS.forEach((d, i) => {
       const ds = s.districts[i];
       const served = ds.demand > 0 ? ds.served / ds.demand : 0;
@@ -280,6 +315,7 @@ export class CityScene {
     this.shared.uTime.value = t;
     this.starMat.uniforms.uTime.value = t;
     if (this.mode === 'hero') this.heroState(this.heroP);
+    else this.applyDaylight(dt);
 
     // lights chase their targets with an incandescent-ish flicker when changing
     for (let i = 0; i < CHANNELS; i++) {
