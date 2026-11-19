@@ -99,6 +99,10 @@ export const REGIONS = [
   {
     id: 'istanbul', city: 'Istanbul', country: 'Türkiye', scope: 'National grid of Türkiye, 400 kV',
     bbox: [35.8, 25.6, 42.2, 44.9], area: 'TR', minKV: 380, freq: 50, center: [41.01, 28.98],
+    // Akkuyu was still under construction in 2015
+    offline: ['Akkuyu'],
+    // the big south-eastern dams were limited by the east-west transfer limit, not by their turbines
+    acShare: { 'Atatürk': 0.5, Karakaya: 0.5, Keban: 0.5, 'Ilısu': 0.5, Birecik: 0.5, 'Altınkaya': 0.6, Deriner: 0.6 },
     demandMW: 32200, ext: { name: 'Continental Europe (Bulgaria and Greece ties)', MW: 30000, H: 5, ties: [[41.75, 26.55], [41.3, 26.45]] },
     roads: 'motorway', rivers: false,
   },

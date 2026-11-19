@@ -8,7 +8,7 @@
 // separation, under-frequency load shedding, generator under/over-frequency and
 // over/under-voltage tripping, under-voltage load shedding and voltage collapse.
 
-import { fdlf, branchFlows, type ACBranch, type ACBus } from './acflow';
+import { fdlf, newtonRaphson, branchFlows, type ACBranch, type ACBus } from './acflow';
 import { findIslands, type FlowLine, type Islands } from './loadflow';
 
 export interface RegionBus { x: number; z: number; name: string; kv: number; boundary?: boolean; load: number }
@@ -779,6 +779,19 @@ export class RegionSim {
       if (!res.converged && !initial) {
         // a warm start can wander off after a big change; retry from flat before calling it a collapse
         res = fdlf(acb, acbr, { maxIter: 200, tol: 6e-4 });
+      }
+      if (!res.converged && initial) {
+        // the fast decoupled method can fail to start on large, heavily loaded EHV networks (Türkiye) that
+        // do have a solution; take the very first operating point from Newton-Raphson. Later solves warm-start
+        // from it, and genuine collapses during events are still detected by the decoupled solver.
+        const nr = newtonRaphson(acb.map((x) => ({ ...x })), acbr, 6e-4, 30);
+        if (nr.converged && Math.min(...Array.from(nr.V)) > 0.85) {
+          res = nr;
+          // long EHV lines lightly loaded push voltages up past what the machines can absorb: switch in the
+          // full complement of line reactors, as operators do at light load
+          // (the machines alone cannot absorb the charging); automatic switching takes them out again below 0.96 pu
+          for (const b of m) this.reactor[b] = Math.min(this.reactor[b], this.reactorMin[b]);
+        }
       }
       if (!res.converged) {
         const c = (this.divergeCount.get(k) ?? 0) + 1;

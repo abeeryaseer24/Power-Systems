@@ -205,7 +205,23 @@
   "branches": 81,
   "plants": 37,
   "genMW": 22304,
-  "demandMW": 16500
+  "demandMW": 22000
+ },
+ {
+  "id": "istanbul",
+  "city": "Istanbul",
+  "country": "Türkiye",
+  "scope": "National grid of Türkiye, 400 kV",
+  "freq": 50,
+  "center": [
+   41.01,
+   28.98
+  ],
+  "buses": 288,
+  "branches": 360,
+  "plants": 244,
+  "genMW": 75344,
+  "demandMW": 32200
  },
  {
   "id": "colombo",
