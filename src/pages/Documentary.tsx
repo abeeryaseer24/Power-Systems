@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { episodeById, EPISODES } from '../grid/documentaries';
 import { eventById, stageEvent } from '../grid/events';
 import { useRegion } from './atlas/useRegion';
+import Anatomy from '../components/Anatomy';
 import '../documentary.css';
 
 export default function Documentary() {
@@ -47,7 +48,9 @@ function Episode({ id }: { id: string }) {
     let raf = 0;
     const tick = () => {
       if (s.t < target) {
-        s.advance(Math.min(0.5, target - s.t));
+        // catch the map up to the scene within a small time budget per frame
+        const t0 = performance.now();
+        while (s.t < target && performance.now() - t0 < 14) s.advance(Math.min(0.5, target - s.t));
         raf = requestAnimationFrame(tick);
       }
     };
@@ -96,11 +99,14 @@ function Episode({ id }: { id: string }) {
           <button className="btn primary" onClick={() => setStarted(true)} disabled={!r.sim}>{r.sim ? 'Play' : 'Loading the grid…'}</button>
         </div>
       ) : (
+        <>
+        <Anatomy ep={ep} upto={i} />
         <section className="doc-scene" key={i} aria-live="polite">
           <span className="doc-clock">{typed}<b className="caret" aria-hidden="true" /></span>
           <h2>{scene.title}</h2>
           {scene.body && <p>{scene.body}</p>}
         </section>
+        </>
       )}
       {started && (
         <nav className="doc-controls" aria-label="Episode controls">

@@ -39,3 +39,50 @@
 .ep-t { font-family: var(--display); font-weight: 900; font-size: 38px; line-height: 0.95; }
 .ep-tag { color: #cfc6b4; }
 @media (prefers-reduced-motion: reduce) { .doc-grain, .caret { animation: none; } .doc-scene h2, .doc-scene p, .doc-title-card { animation: none; } }
+
+/* anatomy diagram */
+.anatomy {
+  position: absolute; z-index: 4; right: clamp(16px, 3vw, 40px); top: calc(11vh + 16px); width: min(420px, 38vw); margin: 0;
+  padding: 10px 12px 6px; border-radius: 12px; background: rgba(6, 8, 12, 0.72); border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px); animation: fadeup 1.2s ease both;
+}
+.anatomy figcaption { font-size: 12px; color: #c9a36a; margin-bottom: 2px; }
+.anatomy svg { width: 100%; height: auto; display: block; overflow: visible; }
+.an-base { stroke: rgba(134, 197, 218, 0.25); stroke-width: 3; }
+.an-flow { stroke: #86c5da; stroke-width: 2; stroke-dasharray: 3 9; animation: an-flow 1s linear infinite; }
+@keyframes an-flow { to { stroke-dashoffset: -24; } }
+.an-link.surge .an-base { stroke: rgba(255, 176, 77, 0.45); stroke-width: 5; animation: an-throb 0.5s ease-in-out infinite alternate; }
+.an-link.surge .an-flow { stroke: #ffb04d; stroke-width: 3; animation-duration: 0.35s; }
+@keyframes an-throb { to { stroke: rgba(255, 91, 79, 0.7); } }
+.an-link.dead .an-base { stroke: rgba(120, 130, 140, 0.18); }
+.an-link.tripped line { stroke: #5a1a16; stroke-width: 3; }
+.an-link.tripped.fresh line { animation: an-tripflash 0.9s ease-out both; }
+@keyframes an-tripflash { 0% { stroke: #fff; stroke-width: 6; } 30% { stroke: #ff5b4f; stroke-width: 5; } 100% { stroke: #5a1a16; stroke-width: 3; } }
+.an-shock { fill: none; stroke: #ff5b4f; stroke-width: 2; animation: an-shock 1.2s ease-out both; }
+.an-shock.s2 { animation-delay: 0.25s; }
+@keyframes an-shock { from { r: 4; opacity: 1; } to { r: 46; opacity: 0; } }
+.an-bolt { fill: none; stroke: #fff6c2; stroke-width: 2; animation: an-bolt 0.9s steps(2) 2 both; }
+@keyframes an-bolt { 50% { opacity: 0; } }
+.an-split { fill: none; stroke: #ff5b4f; stroke-width: 2.5; stroke-dasharray: 600; stroke-dashoffset: 0; }
+.an-split.fresh { animation: an-tear 1.4s cubic-bezier(.6, 0, .2, 1) both; }
+@keyframes an-tear { from { stroke-dashoffset: 600; } to { stroke-dashoffset: 0; } }
+.an-ll { fill: #8b9ab0; font-size: 10px; text-anchor: middle; font-family: var(--ui); }
+.an-nl { fill: #ddd4c2; font-size: 11px; text-anchor: middle; font-family: var(--ui); }
+.an-gen { fill: #1a2433; stroke: #ffb04d; stroke-width: 2; }
+.an-sine { fill: none; stroke: #ffb04d; stroke-width: 1.5; }
+.an-sub { fill: #1a2433; stroke: #ece6d8; stroke-width: 1.5; }
+.an-ext { fill: #1a2433; stroke: #c9b8ff; stroke-width: 1.5; }
+.an-city rect { fill: #ffcf8f; transition: fill 1.2s; }
+.an-halo { fill: rgba(255, 176, 77, 0.12); transition: fill 1.2s; }
+.an-node.dark .an-city rect { fill: #2a2f38; }
+.an-node.dark .an-halo { fill: rgba(0, 0, 0, 0); }
+.an-node.dark .an-nl { fill: #6c7380; }
+.an-node.lost .an-gen, .an-node.lost .an-ext, .an-node.lost .an-sub { stroke: #5a1a16; }
+.an-x { stroke: #ff5b4f; stroke-width: 2.5; }
+.an-node.lost.fresh .an-x { animation: an-x 0.6s ease-out both; }
+@keyframes an-x { from { opacity: 0; transform: scale(2); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .anatomy { left: 12px; right: 12px; width: auto; top: calc(11vh + 8px); }
+  .doc-scene, .doc-title-card { bottom: 13vh; }
+}
+@media (prefers-reduced-motion: reduce) { .an-flow, .an-link.surge .an-base, .an-shock, .an-bolt, .an-split.fresh { animation: none; } }
