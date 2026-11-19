@@ -22,6 +22,7 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
       { to: '/documentary', label: 'Documentaries', note: 'The last minutes, told as a story' },
       { to: '/academy', label: 'Case files', note: 'Why each one happened' },
       { to: '/predictor', label: 'Predictor', note: 'Would an AI have seen it coming?' },
+      { to: '/trailer', label: 'Trailer', note: 'A new cut of the disasters, every time' },
     ],
   },
   {
