@@ -319,6 +319,27 @@ async function build(reg) {
     };
   });
 
+  // known lines missing from OpenStreetMap, declared per region with their end points
+  for (const L of reg.extraLines ?? []) {
+    const near = ([la, lo]) => {
+      const [x, z] = P(la, lo);
+      return buses.reduce((bi, bb, i) => (Math.hypot(bb.x - x, bb.z - z) < Math.hypot(buses[bi].x - x, buses[bi].z - z) ? i : bi), 0);
+    };
+    const a = near(L.from);
+    const b = near(L.to);
+    const c = lineConst(L.kv);
+    const zb = (L.kv * L.kv) / 100;
+    const nc = L.circuits ?? 2;
+    const km = Math.hypot(buses[a].x - buses[b].x, buses[a].z - buses[b].z) * 1.15;
+    branches.push({
+      a, b, kv: L.kv, circuits: nc, km: r2(km),
+      x: +((c.x * km) / zb / nc).toFixed(5), r: +((c.r * km) / zb / nc).toFixed(5), bc: +((c.b * 1e-6 * km * zb) * nc).toFixed(5),
+      mva: Math.round(c.mva * nc * (reg.ratingScale ?? 1)), name: L.name,
+      pts: [[buses[a].x, buses[a].z], [buses[b].x, buses[b].z]],
+    });
+    console.log(`  added missing line ${L.name}: ${buses[a].name} - ${buses[b].name}, ${Math.round(km)} km`);
+  }
+
   // plants
   const PL = [];
   for (const el of plants.elements) {
@@ -377,6 +398,14 @@ async function build(reg) {
   }
   let totW = load.reduce((a, v) => a + v, 0) || 1;
   // no substation may carry more than its lines can deliver: spill the excess to neighbours
+  // regions where settlement counts overstate demand get a correction: [south, west, north, east, factor]
+  for (const [s0, w0, n0, e0, f] of reg.loadAreas ?? []) {
+    const [xa, za] = P(s0, w0);
+    const [xb, zb] = P(n0, e0);
+    buses.forEach((bb, i) => {
+      if (bb.x >= Math.min(xa, xb) && bb.x <= Math.max(xa, xb) && bb.z >= Math.min(za, zb) && bb.z <= Math.max(za, zb)) load[i] *= f;
+    });
+  }
   const busCap = buses.map((_, i) => (0.45 / (reg.ratingScale ?? 1)) * branches.filter((br) => br.a === i || br.b === i).reduce((a, br) => a + br.mva, 0));
   for (let pass = 0; pass < 8; pass++) {
     let moved = 0;

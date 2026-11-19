@@ -250,5 +250,5 @@ const ALL: BlackoutEvent[] = [
 ];
 
 /** Replays whose region file is still being built from OpenStreetMap stay hidden until it exists. */
-export const PENDING = new Set(['turkey-2015', 'srilanka-2020']);
+export const PENDING = new Set(['turkey-2015']);
 export const REGION_EVENTS = ALL.filter((e) => !PENDING.has(e.id));

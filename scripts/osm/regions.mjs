@@ -105,6 +105,10 @@ export const REGIONS = [
   {
     id: 'colombo', city: 'Colombo', country: 'Sri Lanka', scope: 'National grid of Sri Lanka, 220 and 132 kV',
     bbox: [5.8, 79.5, 9.95, 82.0], area: 'LK', minKV: 132, freq: 50, center: [6.93, 79.85],
+    // the 220 kV double circuit from Lakvijaya (Norochcholai) to Veyangoda is not mapped in OSM
+    extraLines: [{ name: 'Norochcholai–Veyangoda 220 kV', from: [8.02, 79.72], to: [7.15, 80.06], kv: 220, circuits: 2 }],
+    // the Northern Province is about 6 % of national demand, far less than its settlement count suggests
+    loadAreas: [[8.55, 79.5, 9.95, 81.0, 0.3]],
     demandMW: 1900, ext: { name: 'None (isolated grid)', MW: 1, H: 0, hvdc: true },
     roads: 'motorway|trunk', rivers: false,
   },
