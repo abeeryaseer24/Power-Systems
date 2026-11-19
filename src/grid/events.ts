@@ -448,28 +448,32 @@ export const EVENTS: BlackoutEvent[] = [
     span: 1500,
     setup: (s) => {
       s.ufGenRule = { f: 59.4, seconds: 540 };
-      s.loadScale = 1.25;
+      s.loadScale = 1.0;
       s.dispatch();
       s.settle(30);
     },
     steps: [
       ...[0, 1, 2, 3, 4, 5].map((k) => ({
-        t: 20 + k * 90, clock: `01:${String(23 + k * 2).padStart(2, '0')}`, kind: 'trigger' as const, label: k === 0 ? 'Gas-fired units start tripping as fuel supply freezes.' : `Another ${k % 2 ? 'gas plant' : 'block of generation across ERCOT'} is lost to the cold.`,
+        t: 20 + k * 90, clock: `01:${String(23 + k * 2).padStart(2, '0')}`, kind: 'trigger' as const,
+        label: k === 0 ? 'Gas-fired units start tripping as fuel supply freezes.' : `Another ${k % 2 ? 'gas plant in Houston' : 'block of generation across ERCOT'} is lost to the cold.`,
         run: (s: RegionSim, h: Helpers) => {
           if (k % 2) {
-            const g = s.gens.map((g, i) => ({ g, i })).filter(({ g }) => g.online && g.def.kind === 'gas').sort((a, b) => b.g.p - a.g.p)[0];
-            if (g) s.tripGen(g.i, 'frozen fuel supply');
+            // a mid-sized local unit, not the largest one in this reduced model
+            const gas = s.gens.map((g, i) => ({ g, i })).filter(({ g }) => g.online && g.def.kind === 'gas' && g.p > 50).sort((a, b) => a.g.p - b.g.p);
+            const pick = gas[Math.floor(gas.length * 0.6)];
+            if (pick) s.tripGen(pick.i, 'frozen fuel supply');
           } else h.extLoss(Math.round(s.ext.MW * 0.035), 'frozen instrumentation and gas supply across ERCOT');
         },
       })),
-      {
-        t: 600, clock: '01:41', kind: 'operator', label: 'ERCOT orders more rolling outages (historically, 10,500 MW and rising).',
-        run: (s) => {
-          s.shedLoad(0.18);
-          s.ext.shed += s.ext.MW * 0.12;
+      ...[0, 1, 2, 3].map((k) => ({
+        t: 60 + k * 110, clock: `01:${String(25 + k * 3).padStart(2, '0')}`, kind: 'operator' as const,
+        label: k === 0 ? 'ERCOT orders rolling outages: 1,000 MW, then more.' : `ERCOT orders another round of rolling outages (${['3,000', '6,500', '10,500'][k - 1]} MW in total).`,
+        run: (s: RegionSim) => {
+          s.shedLoad(0.07);
+          s.ext.shed += s.ext.MW * 0.05;
           s.note('warn', 'Operator: rolling outages ordered');
         },
-      },
+      })),
     ],
   },
   // ------------------------------------------------------------------ Iberia 2025

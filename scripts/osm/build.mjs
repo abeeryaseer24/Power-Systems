@@ -289,7 +289,7 @@ async function build(reg) {
     return {
       a: remap.get(ed.a), b: remap.get(ed.b), kv: ed.kv, circuits: nc, km: r2(km),
       x: +((c.x * km) / zb / nc).toFixed(5), r: +((c.r * km) / zb / nc).toFixed(5), bc: +((c.b * 1e-6 * km * zb) * nc).toFixed(5),
-      mva: c.mva * nc, name: ed.name || undefined,
+      mva: Math.round(c.mva * nc * (reg.ratingScale ?? 1)), name: ed.name || undefined,
       pts: simplify(ed.pts, tol).map(([x, z]) => [r2(x), r2(z)]),
     };
   });
@@ -350,7 +350,7 @@ async function build(reg) {
   }
   let totW = load.reduce((a, v) => a + v, 0) || 1;
   // no substation may carry more than its lines can deliver: spill the excess to neighbours
-  const busCap = buses.map((_, i) => 0.45 * branches.filter((br) => br.a === i || br.b === i).reduce((a, br) => a + br.mva, 0));
+  const busCap = buses.map((_, i) => (0.45 / (reg.ratingScale ?? 1)) * branches.filter((br) => br.a === i || br.b === i).reduce((a, br) => a + br.mva, 0));
   for (let pass = 0; pass < 8; pass++) {
     let moved = 0;
     for (let i = 0; i < buses.length; i++) {

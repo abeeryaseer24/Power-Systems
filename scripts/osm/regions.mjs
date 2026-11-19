@@ -28,7 +28,9 @@ export const REGIONS = [
   },
   {
     id: 'houston', city: 'Houston', country: 'United States', scope: 'Greater Houston, ERCOT 345 kV',
-    bbox: [28.8, -96.5, 30.7, -94.3], minKV: 345, freq: 60, center: [29.76, -95.37],
+    bbox: [28.8, -96.5, 30.7, -94.3], minKV: 345,
+    // only the 345 kV grid is modelled; the parallel 138 kV network carries much of the local transfer
+    ratingScale: 2, freq: 60, center: [29.76, -95.37],
     demandMW: 15000, ext: { name: 'Rest of ERCOT', MW: 45000, H: 4 },
     roads: 'motorway', rivers: false,
   },

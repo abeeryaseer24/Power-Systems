@@ -62,5 +62,37 @@
   "plants": 92,
   "genMW": 38535,
   "demandMW": 15000
+ },
+ {
+  "id": "madrid",
+  "city": "Madrid",
+  "country": "Spain",
+  "scope": "Madrid region, 400 and 220 kV",
+  "freq": 50,
+  "center": [
+   40.417,
+   -3.704
+  ],
+  "buses": 135,
+  "branches": 150,
+  "plants": 48,
+  "genMW": 4605,
+  "demandMW": 4200
+ },
+ {
+  "id": "delhi",
+  "city": "Delhi",
+  "country": "India",
+  "scope": "National Capital Region, 400 and 220 kV",
+  "freq": 50,
+  "center": [
+   28.614,
+   77.209
+  ],
+  "buses": 270,
+  "branches": 317,
+  "plants": 12,
+  "genMW": 6775,
+  "demandMW": 5000
  }
 ]

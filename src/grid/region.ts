@@ -564,6 +564,7 @@ export class RegionSim {
       if (Ek[k] <= 0) continue;
       const m = this.islands.members[k];
       const f = this.buses[m[0]].f;
+      if (f <= 0) continue;
       const rocof = (this.f0 * (pGen[k] - pLoad[k])) / (2 * Ek[k]);
       const fNew = f + rocof * dt;
       for (const b of m) {
@@ -724,7 +725,7 @@ export class RegionSim {
     }
     // generator voltage protection and under-voltage load shedding
     for (const g of this.gens) {
-      if (!g.online) continue;
+      if (!g.online || !this.buses[g.def.bus].live) continue;
       const V = this.buses[g.def.bus].V;
       if (V > 1.15 || V < 0.75) g.vTimer += dt;
       else g.vTimer = 0;
@@ -807,6 +808,11 @@ export class RegionSim {
       }
     }
     if (this.ext.hvdc && members.includes(this.ext.bus)) this.ext.p = 0;
+    if (!this.ext.hvdc && members.includes(this.extBus)) {
+      // the wider interconnection collapsed with this island
+      this.ext.online = false;
+      this.ext.p = 0;
+    }
     const share = lost / Math.max(1, this.demand);
     const big = share > 0.5;
     this.note('alarm', `${big ? 'System blackout' : 'Island collapse'}: ${why}. ${Math.round(lost)} MW of demand lost.`);
