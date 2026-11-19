@@ -341,19 +341,31 @@ async function build(reg) {
   PLC.sort((a, b) => b.pop - a.pop);
   const placesKept = PLC.slice(0, 2500);
   const load = new Array(buses.length).fill(0);
+  // each settlement draws from its three nearest substations (inverse-square weights)
   for (const p of PLC) {
-    let best = -1;
-    let bd = 60;
-    buses.forEach((b, i) => {
-      const d = Math.hypot(b.x - p.x, b.z - p.z);
-      if (d < bd) {
-        bd = d;
-        best = i;
-      }
-    });
-    if (best >= 0) load[best] += p.pop;
+    const near = buses.map((b, i) => ({ i, d: Math.hypot(b.x - p.x, b.z - p.z) })).filter((x) => x.d < 60).sort((x, y) => x.d - y.d).slice(0, 3);
+    const w = near.map((x) => 1 / Math.max(1, x.d) ** 2);
+    const tw = w.reduce((a, v) => a + v, 0);
+    near.forEach((x, k) => (load[x.i] += (p.pop * w[k]) / tw));
   }
-  const totW = load.reduce((a, v) => a + v, 0) || 1;
+  let totW = load.reduce((a, v) => a + v, 0) || 1;
+  // no substation may carry more than its lines can deliver: spill the excess to neighbours
+  const busCap = buses.map((_, i) => 0.45 * branches.filter((br) => br.a === i || br.b === i).reduce((a, br) => a + br.mva, 0));
+  for (let pass = 0; pass < 8; pass++) {
+    let moved = 0;
+    for (let i = 0; i < buses.length; i++) {
+      const mw = (reg.demandMW * load[i]) / totW;
+      if (mw <= busCap[i]) continue;
+      const excess = ((mw - busCap[i]) * totW) / reg.demandMW;
+      const nb = branches.filter((br) => br.a === i || br.b === i).map((br) => (br.a === i ? br.b : br.a));
+      if (!nb.length) continue;
+      load[i] -= excess;
+      nb.forEach((j) => (load[j] += excess / nb.length));
+      moved++;
+    }
+    if (!moved) break;
+  }
+  totW = load.reduce((a, v) => a + v, 0) || 1;
   buses.forEach((b, i) => (b.load = Math.round((reg.demandMW * load[i]) / totW)));
 
   // map layers

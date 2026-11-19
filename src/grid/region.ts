@@ -104,6 +104,9 @@ export class RegionSim {
   shunt: number[] = [];
   /** Extra demand per bus, MW (lost embedded generation shows up as demand). */
   extraLoad: number[] = [];
+  /** Shunt reactors at EHV substations, pu (negative susceptance), sized against line charging. */
+  reactor: number[] = [];
+  private reactorMin: number[] = [];
   islands!: Islands;
   private topoDirty = true;
   private acTimer = 0;
@@ -154,6 +157,12 @@ export class RegionSim {
     }
     this.ext = { online: true, p: opts.extImport ?? 0, sched: opts.extImport ?? 0, gov: 0, MW: data.ext.MW, H: data.ext.H, hvdc, bus: hvdc ? hvBus : this.extBus, deficit: 0, shed: 0 };
     this.flowLines = this.branches.map((b) => ({ from: b.def.a, to: b.def.b, x: b.def.x, closed: true }));
+    this.reactor = this.buses.map(() => 0);
+    this.reactorMin = this.buses.map(() => 0);
+    for (const br of this.branches) {
+      this.reactorMin[br.def.a] -= 0.9 * (br.def.bc / 2);
+      this.reactorMin[br.def.b] -= 0.9 * (br.def.bc / 2);
+    }
     this.rebuild();
     // fragments of the OSM network with no path to the main system are not energised
     let main = 0;
@@ -378,7 +387,7 @@ export class RegionSim {
 
   branchName(i: number) {
     const br = this.branches[i];
-    if (br.def.name) return br.def.name;
+    if (br.def.name && !/^[a-z]{2,10}$/.test(br.def.name)) return br.def.name;
     const a = this.data.buses[br.def.a]?.name ?? '';
     const b = br.ext ? this.data.ext.name : this.data.buses[br.def.b]?.name ?? '';
     return `${a || 'Junction'} to ${b || 'junction'} ${br.def.kv} kV`;
@@ -598,7 +607,7 @@ export class RegionSim {
       const acb: ACBus[] = m.map((bi) => {
         const b = this.buses[bi];
         const Pl = b.served / 100;
-        return { type: 'pq', P: -Pl, Q: -Pl * 0.33, Vset: 1, Qmin: 0, Qmax: 0, Bsh: (b.def.kv >= 200 ? 0.15 : 0.05) * (b.served / 400) + (this.shunt[bi] ?? 0) };
+        return { type: 'pq', P: -Pl, Q: -Pl * 0.33, Vset: 1, Qmin: 0, Qmax: 0, Bsh: Pl * 0.26 + (this.shunt[bi] ?? 0) + this.reactor[bi] };
       });
       // generation and their reactive capability
       let Ekk = 0;
@@ -610,7 +619,7 @@ export class RegionSim {
         const k = KIND[g.def.kind];
         if (k.sync) {
           acb[li].type = 'pv';
-          acb[li].Vset = 1.02;
+          acb[li].Vset = 1.0;
           acb[li].Qmax += (0.55 * g.def.mw) / 100;
           acb[li].Qmin -= (0.3 * g.def.mw) / 100;
           Ekk += k.H * g.def.mw;
@@ -641,13 +650,13 @@ export class RegionSim {
       const brIdx: number[] = [];
       this.branches.forEach((br, i) => {
         if (!br.closed || !local.has(br.def.a) || !local.has(br.def.b)) return;
-        acbr.push({ from: local.get(br.def.a)!, to: local.get(br.def.b)!, r: br.def.r, x: Math.max(1e-4, br.def.x), b: br.def.bc, closed: true });
+        acbr.push({ from: local.get(br.def.a)!, to: local.get(br.def.b)!, r: br.def.r, x: Math.max(6e-4, br.def.x), b: br.def.bc, closed: true });
         brIdx.push(i);
       });
       const res = fdlf(acb, acbr, {
         V0: initial ? undefined : m.map((b) => this.buses[b].V || 1),
         theta0: initial ? undefined : m.map((b) => this.buses[b].theta),
-        maxIter: 25, tol: 1e-4,
+        maxIter: 40, tol: 6e-4,
       });
       if (!res.converged) {
         const c = (this.divergeCount.get(k) ?? 0) + 1;
@@ -659,6 +668,12 @@ export class RegionSim {
       m.forEach((b, i) => {
         this.buses[b].V = res.V[i];
         this.buses[b].theta = res.theta[i];
+        // automatic switching of shunt reactors and capacitors toward 0.97–1.05 pu
+        const bs = this.buses[b];
+        const capMax = (bs.def.load * 0.35) / 100;
+        const step = Math.max(0.02, -this.reactorMin[b] * 0.1, capMax * 0.1);
+        if (res.V[i] > 1.05) this.reactor[b] = Math.max(this.reactorMin[b], this.reactor[b] - step);
+        else if (res.V[i] < 0.96) this.reactor[b] = Math.min(capMax, this.reactor[b] + step);
       });
       acbr.forEach((br, j) => {
         const st = this.branches[brIdx[j]];

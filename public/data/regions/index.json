@@ -46,5 +46,21 @@
   "plants": 52,
   "genMW": 22696,
   "demandMW": 11000
+ },
+ {
+  "id": "houston",
+  "city": "Houston",
+  "country": "United States",
+  "scope": "Greater Houston, ERCOT 345 kV",
+  "freq": 60,
+  "center": [
+   29.76,
+   -95.37
+  ],
+  "buses": 78,
+  "branches": 86,
+  "plants": 92,
+  "genMW": 38535,
+  "demandMW": 15000
  }
 ]

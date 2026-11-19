@@ -20,9 +20,17 @@ export default function About() {
             <li><strong>Weather.</strong> Seeded random processes for wind, cloud and demand, so every shift replays the same way, and the forecast you see is the noiseless version of the truth.</li>
           </ul>
           <h2>What it leaves out</h2>
-          <p>Voltage and reactive power are not modelled; the DC load flow assumes flat voltages and lossless lines. Machines do not swing against each other inside an island, so there are no inter-area oscillations. Unit commitment, market bidding and transmission maintenance windows are left to you. The numbers are realistic in size and shape, not calibrated to any one real grid.</p>
+          <p>In Halvern, voltage and reactive power are not modelled; its DC load flow assumes flat voltages and lossless lines. The atlas regions use a full AC power flow instead. Machines do not swing against each other inside an island, so there are no inter-area oscillations. Unit commitment, market bidding and transmission maintenance windows are left to you. The numbers are realistic in size and shape, not calibrated to any one real grid.</p>
           <h2>Built with</h2>
           <p>TypeScript, React and Vite. The city is drawn with three.js: around seven thousand instanced buildings whose windows light from a single shared array of district supply levels, a sodium street grid, catenary power lines and post-processed bloom. The grid engine is plain TypeScript with no dependencies and its own test suite.</p>
+          <h2>Real grids and historical events</h2>
+          <p>The atlas regions are reduced transmission models built from OpenStreetMap: substations, lines and power stations as mapped by volunteers, with line impedances and ratings estimated from voltage level, circuit count and route length. Demand is spread over substations by the population of nearby settlements. The rest of each interconnection is represented by one external equivalent with its own inertia and governor response. The blackout replays follow the sequence in each investigation report, but they run on these reduced models, so timings and magnitudes are approximate.</p>
+          <p>The nuclear control rooms use a lumped point-kinetics and thermal-hydraulic model with published reactor characteristics. They reproduce the mechanisms of each accident, not the detailed plant response.</p>
+          <h2>Data</h2>
+          <ul>
+            <li>Network, settlement and road data © OpenStreetMap contributors, available under the Open Database Licence.</li>
+            <li>World outline from Natural Earth (public domain).</li>
+          </ul>
           <h2>Further reading</h2>
           <ul>
             <li>P. Kundur, <em>Power System Stability and Control</em>, McGraw-Hill, 1994.</li>

@@ -124,6 +124,28 @@ export default function Landing() {
           </div>
         </div>
       </div>
+      <section className="chapters" aria-label="What is inside">
+        <Link to="/shifts" className="ch">
+          <span className="ch-k">Halvern</span>
+          <span className="ch-t">Run a city through seven shifts</span>
+          <span className="ch-d">A fictional coastal city with a 275 kV ring, nine power stations and weather. Heatwaves, storms, a nuclear trip and a full black start.</span>
+        </Link>
+        <Link to="/atlas" className="ch">
+          <span className="ch-k">The atlas</span>
+          <span className="ch-t">Ten real grids from OpenStreetMap</span>
+          <span className="ch-d">Bangladesh, London, New York, Houston, Madrid, Delhi, Rome, Adelaide, Sapporo and Karachi, solved live with AC power flow and voltages.</span>
+        </Link>
+        <Link to="/blackouts" className="ch">
+          <span className="ch-k">The blackouts</span>
+          <span className="ch-t">Twelve nights the lights went out</span>
+          <span className="ch-d">From New York in 1977 to Iberia in 2025, rebuilt from the investigation reports. Watch them happen, then try to stop them.</span>
+        </Link>
+        <Link to="/nuclear" className="ch">
+          <span className="ch-k">The reactors</span>
+          <span className="ch-t">Chernobyl, Three Mile Island, Fukushima, Rooppur</span>
+          <span className="ch-d">Point kinetics, decay heat and the electronics that protect a core, in four control rooms you can operate.</span>
+        </Link>
+      </section>
     </main>
   );
 }

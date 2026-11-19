@@ -130,9 +130,11 @@ export const EVENTS: BlackoutEvent[] = [
     lead: 20,
     span: 150,
     setup: (s) => {
-      s.dispatch(undefined, 1.04);
+      // thin reserve and patchy load shedding, as described in post-event analysis
+      s.responseShare = 0.2;
+      s.dispatch(undefined, 1.03);
       s.settle(30);
-      s.uflsWorks = 0.45;
+      s.uflsWorks = 0.3;
     },
     steps: [
       {
@@ -150,6 +152,20 @@ export const EVENTS: BlackoutEvent[] = [
         run: (s, h) => {
           h.tripPlant('Ashuganj North', 24.04, 91.0, 'unit protection during the disturbance');
           h.tripPlant('Ashuganj East', 24.04, 91.0, 'unit protection during the disturbance');
+        },
+      },
+      {
+        t: 30, clock: '14:04:20', kind: 'consequence', label: 'Generators across the country trip on under-frequency. The national grid collapses.',
+        cond: (s) => lowF(s, 49.0),
+        run: (s) => {
+          const on = s.gens.map((g, i) => ({ g, i })).filter((x) => x.g.online).sort((a, b) => b.g.p - a.g.p);
+          const total = on.reduce((a, x) => a + x.g.p, 0);
+          let lost = 0;
+          for (const x of on) {
+            if (lost > total * 0.5) break;
+            lost += x.g.p;
+            s.tripGen(x.i, 'under-frequency protection');
+          }
         },
       },
       {
@@ -748,6 +764,8 @@ export const EVENTS: BlackoutEvent[] = [
     ],
   },
 ];
+
+for (const e of EVENTS) e.steps.sort((a, b) => a.t - b.t);
 
 export const eventById = (id: string) => EVENTS.find((e) => e.id === id);
 export const eventsFor = (region: string) => EVENTS.filter((e) => e.region === region);

@@ -158,3 +158,19 @@ button { font: inherit; color: inherit; }
   background: radial-gradient(ellipse 60% 45% at 50% 50%, rgba(5, 12, 24, 0.72), transparent 75%);
 }
 .finale.on::before { opacity: 1; }
+
+/* landing chapters, after the hero */
+.chapters {
+  position: relative; z-index: 4; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px; background: var(--rule); border-top: 1px solid var(--rule);
+}
+.ch {
+  display: flex; flex-direction: column; gap: 10px; min-height: 46vh; justify-content: flex-end;
+  padding: clamp(28px, 5vw, 64px); background: var(--night); color: inherit; text-decoration: none;
+  transition: background 0.3s;
+}
+.ch:hover { background: #10223a; }
+.ch-k { font-size: 14px; color: var(--sodium); }
+.ch-t { font-family: var(--display); font-weight: 900; font-size: clamp(36px, 4.6vw, 64px); line-height: 0.95; max-width: 14ch; }
+.ch-d { max-width: 46ch; color: #cfc9ba; font-size: 17px; }
+@media (max-width: 760px) { .chapters { grid-template-columns: 1fr; } .ch { min-height: 0; } }
