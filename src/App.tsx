@@ -16,6 +16,7 @@ const Nuclear = lazy(() => import('./pages/Nuclear'));
 const Academy = lazy(() => import('./pages/Academy'));
 const Documentary = lazy(() => import('./pages/Documentary'));
 const WhatIf = lazy(() => import('./pages/WhatIf'));
+const BlackStart = lazy(() => import('./pages/BlackStart'));
 const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 
 export default function App() {
@@ -23,7 +24,7 @@ export default function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
-  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts|documentary)\/./.test(pathname) && !pathname.startsWith('/what-if');
+  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts|documentary)\/./.test(pathname) && !pathname.startsWith('/what-if') && !pathname.startsWith('/black-start');
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
@@ -41,6 +42,8 @@ export default function App() {
           <Route path="/atlas/:id" element={<RegionExplorer />} />
           <Route path="/blackouts" element={<Blackouts />} />
           <Route path="/blackouts/:id" element={<Replay />} />
+          <Route path="/black-start" element={<BlackStart />} />
+          <Route path="/black-start/:id" element={<BlackStart />} />
           <Route path="/what-if" element={<WhatIf />} />
           <Route path="/what-if/:id" element={<WhatIf />} />
           <Route path="/documentary" element={<Documentary />} />

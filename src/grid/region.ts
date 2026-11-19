@@ -221,7 +221,8 @@ export class RegionSim {
     let best = -1;
     let bestD = -1;
     this.islands.members.forEach((m, k) => {
-      const d = m.reduce((a, b) => a + this.buses[b].demand, 0);
+      if (this.buses[m[0]].f <= 0) return; // the main island is the largest live one
+      const d = m.reduce((a, b) => a + this.buses[b].demand, 0) + 1;
       if (d > bestD) {
         bestD = d;
         best = k;
@@ -331,9 +332,66 @@ export class RegionSim {
     this.note('alarm', `${g.def.name} tripped (${Math.round(lost)} MW): ${reason}`);
     this.raise(`${g.def.name} tripped`, `${Math.round(lost)} MW lost. ${reason}`, lost > 200 ? 'major' : 'minor');
   }
+  /** Hydro and small gas or oil units can start without outside power. */
+  canBlackStart(i: number) {
+    const d = this.gens[i].def;
+    return d.kind === 'hydro' || ((d.kind === 'gas' || d.kind === 'oil') && d.mw <= 220);
+  }
+
+  /** Total blackout: every machine stopped, every breaker open, every feeder off. */
+  goDark() {
+    for (const g of this.gens) {
+      if (g.tripReason === 'out of service' || g.tripReason?.startsWith('not connected')) continue;
+      g.online = false;
+      g.tripReason = undefined;
+      g.p = g.sched = g.gov = 0;
+    }
+    this.branches.forEach((b) => {
+      b.closed = false;
+      b.tripped = undefined;
+      b.heat = 0;
+    });
+    for (const b of this.buses) {
+      b.f = 0;
+      b.V = 0;
+      b.live = false;
+      b.connected = 0;
+      b.shed = 0;
+    }
+    this.ext.sched = this.ext.p = 0;
+    this.topoDirty = true;
+    this.rebuild();
+    this.log = [];
+    this.events = [];
+    this.trace = [];
+    this.peakLost = 0;
+    this.t = 0;
+  }
+
+  /** Reconnect demand at one substation in a block. */
+  connectBus(i: number, frac: number) {
+    const b = this.buses[i];
+    if (!b.live) return;
+    b.connected = Math.max(0, Math.min(1, b.connected + frac));
+    if (frac > 0) b.shed = Math.max(0, b.shed - frac);
+  }
+
   startGen(i: number) {
     const g = this.gens[i];
     const b = this.buses[g.def.bus];
+    if (!g.online && !b.live && this.canBlackStart(i) && !g.tripReason) {
+      // black start: this machine forms a new live island
+      if (this.topoDirty) this.rebuild();
+      g.online = true;
+      g.sched = 0;
+      for (const m of this.islands.members[this.islands.of[g.def.bus]]) {
+        this.buses[m].f = this.f0;
+        this.buses[m].V = 1;
+        this.buses[m].live = true;
+      }
+      this.note('info', `${g.def.name} black-started: a live island forms`);
+      return true;
+    }
     if (g.online || !b.live) return false;
     g.online = true;
     g.tripReason = undefined;
