@@ -1,0 +1,45 @@
+.co-part { margin-top: 36px; }
+.co-part h2 { font-family: var(--display); font-weight: 700; font-size: 30px; margin: 0 0 8px; }
+.co-list { list-style: none; margin: 0; padding: 0; max-width: 860px; }
+.co-list a { display: grid; grid-template-columns: 50px 1fr auto; grid-template-areas: 'n t m' 'n h m'; gap: 2px 16px; padding: 16px 4px; border-top: 1px solid var(--rule); color: inherit; text-decoration: none; }
+.co-list a:hover .co-t { color: var(--sodium); }
+.co-n { grid-area: n; font-family: var(--display); font-weight: 300; font-size: 38px; line-height: 1; color: var(--dim); }
+.co-t { grid-area: t; font-family: var(--display); font-weight: 700; font-size: 24px; }
+.co-h { grid-area: h; color: var(--steel); font-size: 14px; }
+.co-m { grid-area: m; font-size: 13px; color: var(--steel); align-self: center; }
+.co-list li.done .co-n { color: var(--ok); }
+.co-partlabel { font-size: 13px; color: var(--sodium); }
+.co-quiz { margin-top: 40px; padding: 20px; border-radius: 14px; border: 1px solid var(--rule); background: rgba(7, 18, 34, 0.55); }
+.co-quiz h2 { margin-top: 0 !important; }
+.co-q { margin-bottom: 16px; }
+.co-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip.right { border-color: var(--ok); color: var(--ok); }
+.chip.wrong { border-color: var(--trip); color: #ff8d83; }
+.cw-svg { width: 100%; height: auto; display: block; max-width: 640px; margin: 0 auto; }
+.cw-wire { fill: none; stroke: #4c6a88; stroke-width: 4; }
+.cw-flow { fill: none; stroke: var(--sodium); stroke-width: 3; stroke-dasharray: 4 16; animation: flow linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -40; } }
+.cw-bat { fill: #10263d; stroke: var(--porcelain); }
+.cw-bulb { stroke: #ffcf8f; stroke-width: 2; }
+.cw-t, .ph-l { fill: #d6d0c1; font-size: 13px; text-anchor: middle; font-family: var(--ui); }
+.ph-l { text-anchor: start; }
+.ph-big { fill: var(--porcelain); font-family: var(--display); font-weight: 700; font-size: 24px; }
+.ph-circle { fill: none; stroke: rgba(134, 197, 218, 0.2); }
+.ph-axis { stroke: rgba(134, 197, 218, 0.2); }
+.ph-v { fill: none; stroke: var(--sodium); stroke-width: 3; }
+.ph-i { fill: none; stroke: var(--glaze); stroke-width: 3; }
+.ph-n { stroke: var(--trip); stroke-width: 4; stroke-dasharray: 6 4; }
+.ph-l.v { fill: var(--sodium); } .ph-l.i { fill: var(--glaze); }
+.tr-coil { fill: none; stroke: var(--sodium); stroke-width: 3; }
+.tr-line { stroke: var(--glaze); }
+.ss-bus { stroke: var(--porcelain); stroke-width: 6; }
+.ss-c { stroke: #6c7a8c; stroke-width: 3; fill: none; }
+.ss-c.live { stroke: var(--sodium); }
+.ss-brk { fill: #10263d; stroke: #6c7a8c; stroke-width: 2; }
+.ss-brk.closed { fill: var(--sodium); stroke: var(--sodium); }
+.ss-dev { cursor: pointer; }
+.dist-chain { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 0 0 12px; }
+.dist-chain li { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rule); }
+.dist-chain b { font-family: var(--display); font-size: 20px; }
+.dist-chain span { font-size: 12px; color: var(--steel); }
+.s-dim { fill: none; stroke: var(--dim); stroke-width: 1.5; stroke-dasharray: 4 4; }

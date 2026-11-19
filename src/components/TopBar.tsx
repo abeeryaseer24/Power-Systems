@@ -74,7 +74,7 @@ export default function TopBar() {
           );
         })}
         <NavLink to="/nuclear">Nuclear</NavLink>
-        <NavLink to="/learn">Learn</NavLink>
+        <NavLink to="/course">Course</NavLink>
         <NavLink to="/about">About</NavLink>
       </nav>
     </header>

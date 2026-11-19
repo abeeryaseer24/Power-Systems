@@ -19,6 +19,7 @@ const WhatIf = lazy(() => import('./pages/WhatIf'));
 const BlackStart = lazy(() => import('./pages/BlackStart'));
 const ReactorStartup = lazy(() => import('./pages/ReactorStartup'));
 const Predictor = lazy(() => import('./pages/Predictor'));
+const Course = lazy(() => import('./pages/Course'));
 const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 
 export default function App() {
@@ -56,6 +57,8 @@ export default function App() {
           <Route path="/nuclear/instrumentation" element={<Instrumentation />} />
           <Route path="/reactor-startup" element={<ReactorStartup />} />
           <Route path="/predictor" element={<Predictor />} />
+          <Route path="/course" element={<Course />} />
+          <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />
           <Route path="*" element={<Landing />} />
         </Routes>

@@ -11,7 +11,7 @@ export interface Lesson {
 
 // ------------------------------------------------------------ 1. frequency
 
-function FrequencyWidget() {
+export function FrequencyWidget() {
   const [H, setH] = useState(5);
   const [loss, setLoss] = useState(600);
   const [gov, setGov] = useState(1300);
@@ -42,7 +42,7 @@ function FrequencyWidget() {
 
 // ------------------------------------------------------------ 2. power flow
 
-function FlowWidget() {
+export function FlowWidget() {
   const [gen, setGen] = useState(800);
   const [xTop, setXTop] = useState(0.05);
   const [open, setOpen] = useState<string | null>(null);
@@ -113,7 +113,7 @@ function FlowWidget() {
 
 // ------------------------------------------------------------ 3. cascades
 
-function CascadeWidget() {
+export function CascadeWidget() {
   const [transfer, setTransfer] = useState(1500);
   const [t, setT] = useState(0);
   const [run, setRun] = useState(false);
@@ -217,7 +217,7 @@ const STACK = [
   { name: 'Peaking gas', cap: 240, cost: 165, co2: 560, cls: 'k-ocgt' },
 ];
 
-function MeritWidget() {
+export function MeritWidget() {
   const [demand, setDemand] = useState(2900);
   const [wind, setWind] = useState(0.4);
   const [sun, setSun] = useState(0.5);
@@ -277,7 +277,7 @@ function MeritWidget() {
 
 // ------------------------------------------------------------ 5. black start
 
-function BlackstartWidget() {
+export function BlackstartWidget() {
   const [units, setUnits] = useState(1);
   const [block, setBlock] = useState(25);
   const [steps, setSteps] = useState<{ t: number; dP: number }[]>([]);
