@@ -576,6 +576,14 @@ export const EVENTS: BlackoutEvent[] = [
         t: 18, clock: '12:59', kind: 'consequence', label: 'The Northern Region separates from the rest of India.',
         run: (s, h) => h.extLoss(Math.round(s.ext.MW * 0.1), 'Northern Region islanded while importing'),
       },
+      {
+        t: 24, clock: '13:00', kind: 'consequence', label: 'Generators across the Northern Region trip on under-frequency. The grid collapses.',
+        cond: (s) => lowF(s, 48.9),
+        run: (s, h) => {
+          h.extLoss(Math.round(s.ext.MW * 0.3), 'cascading generator trips across the Northern Region');
+          s.gens.map((g, i) => ({ g, i })).filter((x) => x.g.online).sort((a, b) => b.g.p - a.g.p).slice(0, 4).forEach((x) => s.tripGen(x.i, 'under-frequency protection'));
+        },
+      },
     ],
   },
   // ------------------------------------------------------------------ Italy 2003
