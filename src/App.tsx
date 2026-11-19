@@ -24,6 +24,7 @@ const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 const Protection = lazy(() => import('./pages/Protection'));
 const Market = lazy(() => import('./pages/Market'));
 const Oscillations = lazy(() => import('./pages/Oscillations'));
+const Live = lazy(() => import('./pages/Live'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/protection" element={<Protection />} />
           <Route path="/market" element={<Market />} />
           <Route path="/oscillations" element={<Oscillations />} />
+          <Route path="/live" element={<Live />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />

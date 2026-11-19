@@ -1,0 +1,40 @@
+/* Great Britain, right now */
+.live { max-width: 1100px; }
+.lv-dot { display: inline-block; width: 9px; height: 9px; margin: 0 4px 0 8px; border-radius: 50%; background: #3fd28b; box-shadow: 0 0 0 0 rgba(63, 210, 139, 0.6); animation: lv-pulse 1.8s infinite; vertical-align: 1px; }
+@keyframes lv-pulse { 70% { box-shadow: 0 0 0 9px rgba(63, 210, 139, 0); } 100% { box-shadow: 0 0 0 0 rgba(63, 210, 139, 0); } }
+.lv-top { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 18px; margin-bottom: 18px; align-items: stretch; }
+.lv-dial { padding: 10px; border-radius: 14px; background: rgba(7, 18, 34, 0.7); border: 1px solid var(--rule); }
+.lv-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.lv-kpis div { padding: 18px; border-radius: 14px; background: rgba(7, 18, 34, 0.7); border: 1px solid var(--rule); display: flex; flex-direction: column; gap: 4px; }
+.lv-kpis span { font-size: 12px; color: var(--steel); }
+.lv-kpis strong { font-family: var(--display); font-weight: 500; font-size: clamp(28px, 3.4vw, 42px); line-height: 1; font-variant-numeric: tabular-nums; }
+.lv-kpis em { font-style: normal; font-size: 13px; color: #b9b4a8; }
+.lv-panel { padding: 22px; border-radius: 14px; background: rgba(7, 18, 34, 0.7); border: 1px solid var(--rule); margin-bottom: 18px; }
+.lv-panel h2 { font-family: var(--display); font-weight: 700; font-size: 26px; margin: 0 0 6px; }
+.live .hint { font-size: 13px; color: var(--steel); margin: 0 0 10px; max-width: 80ch; }
+.live .hint.bad { color: var(--trip); }
+.lv-svg { width: 100%; height: auto; display: block; }
+.lv-band { fill: rgba(63, 210, 139, 0.05); }
+.lv-grid { stroke: rgba(139, 154, 176, 0.15); }
+.lv-mid { stroke: rgba(236, 230, 216, 0.35); stroke-dasharray: 4 4; }
+.lv-ax { fill: var(--steel); font-size: 12px; }
+.lv-f { fill: none; stroke: var(--sodium); stroke-width: 1.6; }
+.lv-d { fill: none; stroke: var(--glaze, #86c5da); stroke-width: 1.8; }
+.lv-now { fill: var(--sodium); filter: drop-shadow(0 0 6px var(--sodium)); }
+.lv-mix { display: flex; height: 34px; border-radius: 8px; overflow: hidden; gap: 2px; margin: 10px 0 14px; }
+.lv-mix i { display: block; min-width: 2px; }
+.lv-legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 20px; font-size: 14px; }
+.lv-legend li { display: flex; align-items: center; gap: 8px; }
+.lv-legend li i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.lv-legend li b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.lv-int { background: repeating-linear-gradient(45deg, #ece6d8 0 3px, #8b9ab0 3px 6px); }
+.lv-foot { max-width: 80ch; }
+@media (max-width: 760px) { .lv-top { grid-template-columns: 1fr; } }
+.lv-gauge { width: 100%; height: auto; display: block; }
+.lv-g-track { fill: none; stroke: rgba(255, 91, 79, 0.35); stroke-width: 10; stroke-linecap: round; }
+.lv-g-band { fill: none; stroke: rgba(63, 210, 139, 0.55); stroke-width: 10; }
+.lv-g-tick { stroke: var(--steel); stroke-width: 1.5; }
+.lv-g-needle { stroke: var(--sodium); stroke-width: 3; stroke-linecap: round; transition: all 0.8s ease; }
+.lv-g-hub { fill: var(--sodium); }
+.lv-g-rocof { fill: var(--steel); font-size: 12px; }
+.lv-dial { display: flex; align-items: center; }
