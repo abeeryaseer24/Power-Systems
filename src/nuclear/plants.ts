@@ -1,4 +1,5 @@
 import { Reactor, SPECS } from './reactor';
+import { MORE_PLANTS } from './plants-more';
 
 export interface PlantStep {
   t: number;
@@ -182,10 +183,12 @@ export const PLANTS: NuclearPlant[] = [
   },
 ];
 
+PLANTS.push(...MORE_PLANTS);
+
 export const plantById = (id: string) => PLANTS.find((p) => p.id === id);
 
 export function buildReactor(p: NuclearPlant, mode: 'watch' | 'control') {
-  const init = p.id === 'chernobyl' ? { power: 0.065, xenon: 2.4, rods: 0.03 } : { power: p.id === 'tmi' ? 0.97 : 1 };
+  const init = p.id === 'chernobyl' ? { power: 0.065, xenon: 2.4, rods: 0.03 } : p.id === 'zaporizhzhia' ? { power: 0.004, rods: 1 } : { power: p.id === 'tmi' ? 0.97 : 1 };
   const r = new Reactor(SPECS[p.spec], init);
   if (p.id === 'chernobyl') r.s.flow = 1.15;
   p.setup(r);

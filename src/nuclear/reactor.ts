@@ -58,6 +58,18 @@ export const SPECS: Record<string, ReactorSpec> = {
     type: 'bwr', name: 'GE BWR/3, Mark I (Fukushima Daiichi 1)', P0: 1380, Pe0: 460, Lambda: 4e-5, aFuel: -2.0, aMod: -10, aVoid: -110,
     rodWorth: 9000, scramTime: 3, scramTip: 0, Tc0: 286, p0: 7.0, Tf0: 820, xenonWorth: 2600, pumps: 2, relief: 7.4, passive: 25,
   },
+  forsmark: {
+    type: 'bwr', name: 'ASEA-Atom BWR (Forsmark 1)', P0: 2928, Pe0: 1000, Lambda: 4e-5, aFuel: -2.0, aMod: -10, aVoid: -110,
+    rodWorth: 9000, scramTime: 3, scramTip: 0, Tc0: 286, p0: 7.0, Tf0: 820, xenonWorth: 2600, pumps: 2, relief: 7.4, passive: 0,
+  },
+  daini: {
+    type: 'bwr', name: 'BWR-5, Mark II (Fukushima Daini)', P0: 3293, Pe0: 1100, Lambda: 4e-5, aFuel: -2.0, aMod: -10, aVoid: -110,
+    rodWorth: 9000, scramTime: 3, scramTip: 0, Tc0: 286, p0: 7.0, Tf0: 820, xenonWorth: 2600, pumps: 2, relief: 7.4, passive: 0,
+  },
+  zaporizhzhia: {
+    type: 'vver', name: 'VVER-1000 (Zaporizhzhia)', P0: 3000, Pe0: 1000, Lambda: 2.5e-5, aFuel: -2.6, aMod: -30, aVoid: -60,
+    rodWorth: 9000, scramTime: 3.5, scramTip: 0, Tc0: 290, p0: 15.7, Tf0: 880, xenonWorth: 2700, pumps: 4, relief: 17.6, passive: 0,
+  },
   chernobyl: {
     type: 'rbmk', name: 'RBMK-1000 (Chernobyl 4)', P0: 3200, Pe0: 1000, Lambda: 1e-3, aFuel: -1.2, aMod: 6, aVoid: 45,
     rodWorth: 6000, scramTime: 18, scramTip: 350, Tc0: 284, p0: 7.0, Tf0: 700, xenonWorth: 3000, pumps: 8, relief: 7.9, passive: 0,
