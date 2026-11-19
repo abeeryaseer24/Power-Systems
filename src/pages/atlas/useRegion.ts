@@ -36,6 +36,7 @@ export function useRegion(id: string, canvas: React.RefObject<HTMLCanvasElement 
   useEffect(() => {
     let alive = true;
     setData(null);
+    setError('');
     setLoading('Downloading the grid…');
     loadRegion(id, (f) => alive && setLoading(`Downloading the grid ${Math.round(f * 100)} %`)).then((d) => alive && setData(d)).catch((e) => alive && setError(String(e.message ?? e)));
     return () => {

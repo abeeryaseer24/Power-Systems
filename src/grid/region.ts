@@ -934,7 +934,8 @@ export const GEN_KIND = KIND;
 
 export async function loadRegion(id: string, onProgress?: (frac: number) => void): Promise<RegionData> {
   const r = await fetch(`/data/regions/${id}.json`);
-  if (!r.ok) throw new Error(`Region ${id} not found`);
+  // single-page hosting answers unknown paths with the app's HTML, not a 404
+  if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) throw new Error(`Region ${id} not found`);
   const total = Number(r.headers.get('content-length')) || 0;
   if (!r.body || !onProgress) return r.json();
   // stream the download so the page can show progress for the bigger grids

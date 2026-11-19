@@ -77,10 +77,26 @@ export default function DhakaTonight() {
     }
     s.loadScale = demandAt(h);
     for (const a of areas) s.buses[a.i].connected = dark.has(a.i) ? 0 : 1;
-    // whatever is not shed shows up as a generation deficit that the frequency must absorb
-    const shed = areas.filter((a) => dark.has(a.i)).reduce((x, a) => x + a.load * demandAt(h), 0);
-    s.ext.deficit = Math.max(0, demandNow(h) - shed - available);
-    s.ext.shed = 0;
+    // redispatch for this hour, then scale generation to the demand still connected
+    s.dispatch(s.ext.hvdc ? s.ext.MW * 0.6 : 0);
+    const total = s.buses.reduce((x, b) => x + b.def.load * s.loadScale, 0);
+    const connected = s.buses.reduce((x, b) => x + b.def.load * s.loadScale * b.connected, 0);
+    const supplyNow = s.gens.reduce((x, g) => x + (g.online ? g.sched : 0), 0) + (s.ext.online ? s.ext.sched : 0);
+    const k = total > 0 ? connected / total : 1;
+    // what the plan did not shed is missing generation: plants simply cannot make it
+    const short = Math.max(0, connected - available);
+    const target = Math.max(0, supplyNow * k - short);
+    const f = supplyNow > 0 ? target / supplyNow : 1;
+    for (const g of s.gens) {
+      if (!g.online) continue;
+      g.sched *= f;
+      g.p = g.sched;
+      g.gov = 0;
+      if (short > 0) g.avail = Math.max(g.sched, g.avail * f);
+    }
+    s.ext.sched *= f;
+    s.ext.p = s.ext.sched;
+    s.ext.deficit = 0;
     return dark;
   };
 
