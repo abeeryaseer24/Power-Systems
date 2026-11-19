@@ -12,6 +12,8 @@ const Atlas = lazy(() => import('./pages/Atlas'));
 const RegionExplorer = lazy(() => import('./pages/RegionExplorer'));
 const Blackouts = lazy(() => import('./pages/Blackouts'));
 const Replay = lazy(() => import('./pages/Replay'));
+const Nuclear = lazy(() => import('./pages/Nuclear'));
+const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -36,6 +38,9 @@ export default function App() {
           <Route path="/atlas/:id" element={<RegionExplorer />} />
           <Route path="/blackouts" element={<Blackouts />} />
           <Route path="/blackouts/:id" element={<Replay />} />
+          <Route path="/nuclear" element={<Nuclear />} />
+          <Route path="/nuclear/instrumentation" element={<Instrumentation />} />
+          <Route path="/nuclear/:id" element={<Nuclear />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </Suspense>
