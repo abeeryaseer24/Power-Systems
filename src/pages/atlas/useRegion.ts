@@ -29,11 +29,15 @@ export function useRegion(id: string, canvas: React.RefObject<HTMLCanvasElement 
   const [hover, setHover] = useState<Hover | null>(null);
   const [pick, setPick] = useState<Hover | null>(null);
   const [generation, setGeneration] = useState(0);
+  const [loading, setLoading] = useState('Loading the grid…');
+  /** Speed the simulator actually achieved, after the frame budget. */
+  const achieved = useRef(1);
 
   useEffect(() => {
     let alive = true;
     setData(null);
-    loadRegion(id).then((d) => alive && setData(d)).catch((e) => alive && setError(String(e.message ?? e)));
+    setLoading('Downloading the grid…');
+    loadRegion(id, (f) => alive && setLoading(`Downloading the grid ${Math.round(f * 100)} %`)).then((d) => alive && setData(d)).catch((e) => alive && setError(String(e.message ?? e)));
     return () => {
       alive = false;
     };
@@ -41,12 +45,30 @@ export function useRegion(id: string, canvas: React.RefObject<HTMLCanvasElement 
 
   useEffect(() => {
     if (!data || !canvas.current) return;
+    setLoading('Solving the first power flow…');
+    let cancelled = false;
+    let cleanup = () => {};
+    // let the browser paint the status before the (blocking) first solve
+    const timer = window.setTimeout(() => {
+      if (cancelled || !canvas.current) return;
+      cleanup = start(canvas.current);
+    }, 30);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      cleanup();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, generation]);
+
+  function start(cv: HTMLCanvasElement) {
+    if (!data) return () => {};
     // each region's JSON is shared: the simulator mutates loads during dispatch, so give it a copy
     const s = new RegionSim(structuredClone(data));
     prepare?.(s);
     sim.current = s;
     seen.current = 0;
-    const sc = new RegionScene(canvas.current, data);
+    const sc = new RegionScene(cv, data);
     scene.current = sc;
     sc.attach(s);
     sc.onPick = (h) => setPick(h);
@@ -56,7 +78,19 @@ export function useRegion(id: string, canvas: React.RefObject<HTMLCanvasElement 
       const now = performance.now();
       const real = Math.min(0.2, (now - last) / 1000);
       last = now;
-      if (speed.current > 0) s.advance(Math.min(speed.current * real, 6));
+      if (speed.current > 0) {
+        // frame budget: never spend more than ~8 ms simulating, so the map stays smooth
+        const want = Math.min(speed.current * real, 6);
+        const t0 = performance.now();
+        let done = 0;
+        while (done < want - 1e-9 && performance.now() - t0 < 8) {
+          const chunk = Math.min(0.25, want - done);
+          s.advance(chunk);
+          done += chunk;
+        }
+        const ratio = want > 0 ? done / want : 1;
+        achieved.current = achieved.current * 0.9 + speed.current * ratio * 0.1;
+      }
       if (s.events.length > seen.current) {
         const fresh = s.events.slice(seen.current);
         seen.current = s.events.length;
@@ -88,11 +122,10 @@ export function useRegion(id: string, canvas: React.RefObject<HTMLCanvasElement 
       scene.current = null;
       sim.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, generation]);
+  }
 
   return {
-    data, error, tick, sim: sim.current, scene: scene.current, speed, cine, hover, pick, setPick,
+    data, error, tick, sim: sim.current, scene: scene.current, speed, achieved, loading, cine, hover, pick, setPick,
     restart: () => setGeneration((g) => g + 1),
   };
 }

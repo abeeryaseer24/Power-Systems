@@ -107,7 +107,7 @@ function Episode({ id }: { id: string }) {
           <span className="doc-ep">Episode {ep.number}</span>
           <h1>{ep.title}</h1>
           <p>{ep.tagline}</p>
-          <button className="btn primary" onClick={() => { sfx.unlock(); setStarted(true); }} disabled={!r.sim}>{r.sim ? 'Play' : 'Loading the grid…'}</button>
+          <button className="btn primary" onClick={() => { sfx.unlock(); setStarted(true); }} disabled={!r.sim}>{r.sim ? 'Play' : r.loading}</button>
         </div>
       ) : (
         <>

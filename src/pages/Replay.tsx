@@ -56,7 +56,7 @@ function ReplayView({ ev }: { ev: BlackoutEvent }) {
   return (
     <main id="main" className={`control region replay ${r.cine ? 'is-cine' : ''}`}>
       <canvas ref={canvas} className="control-canvas" aria-label={`Map of ${ev.where} during the replay`} />
-      {!data && <div className="loading" role="status">{r.error || 'Loading the grid…'}</div>}
+      {!sim && <div className="loading" role="status">{r.error || r.loading}</div>}
       {data && sim && (
         <>
           <header className="hud-top">
@@ -76,6 +76,7 @@ function ReplayView({ ev }: { ev: BlackoutEvent }) {
             </div>
             <div className="hud-kpis">
               <div><span>Elapsed</span><strong>{num(t, 1)} s</strong></div>
+              {SPEEDS[speedIdx] > 1 && r.achieved.current < SPEEDS[speedIdx] * 0.8 && <div><span>Achieved</span><strong>{num(r.achieved.current, 1)}×</strong></div>}
               <div><span>Peak demand lost</span><strong className={sim.peakLost > 50 ? 'bad' : ''}>{mw(sim.peakLost)}</strong></div>
               <div><span>Mode</span><strong>{mode === 'control' ? 'You have control' : 'Watching history'}</strong></div>
             </div>

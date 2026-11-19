@@ -22,7 +22,7 @@ export default function RegionExplorer() {
   return (
     <main id="main" className={`control region ${r.cine ? 'is-cine' : ''}`}>
       <canvas ref={canvas} className="control-canvas" aria-label={data ? `Night map of the ${data.city} transmission grid` : 'Loading map'} />
-      {!data && <div className="loading" role="status">{r.error || 'Loading the grid…'}</div>}
+      {!sim && <div className="loading" role="status">{r.error || r.loading}</div>}
       {data && sim && (
         <>
           <header className="hud-top">

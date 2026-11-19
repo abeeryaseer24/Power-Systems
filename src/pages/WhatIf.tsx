@@ -48,7 +48,7 @@ export default function WhatIf() {
   return (
     <main id="main" className={`control region whatif ${r.cine ? 'is-cine' : ''}`}>
       <canvas ref={canvas} className="control-canvas" aria-label={data ? `Night map of ${data.city}` : 'Loading map'} />
-      {!data && <div className="loading" role="status">{r.error || 'Loading the grid…'}</div>}
+      {!sim && <div className="loading" role="status">{r.error || r.loading}</div>}
       <header className="hud-top">
         <Link to="/atlas" className="hud-back" aria-label="Back to the atlas">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>

@@ -932,8 +932,27 @@ export class RegionSim {
 
 export const GEN_KIND = KIND;
 
-export async function loadRegion(id: string): Promise<RegionData> {
+export async function loadRegion(id: string, onProgress?: (frac: number) => void): Promise<RegionData> {
   const r = await fetch(`/data/regions/${id}.json`);
   if (!r.ok) throw new Error(`Region ${id} not found`);
-  return r.json();
+  const total = Number(r.headers.get('content-length')) || 0;
+  if (!r.body || !onProgress) return r.json();
+  // stream the download so the page can show progress for the bigger grids
+  const reader = r.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    got += value.length;
+    onProgress(total ? Math.min(1, got / total) : Math.min(0.95, got / 600000));
+  }
+  const buf = new Uint8Array(got);
+  let o = 0;
+  for (const c of chunks) {
+    buf.set(c, o);
+    o += c.length;
+  }
+  return JSON.parse(new TextDecoder().decode(buf));
 }
