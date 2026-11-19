@@ -7,7 +7,7 @@ import { MapControls } from 'three/addons/controls/MapControls.js';
 import { DISTRICTS, LINES, PLANTS } from '../grid/network';
 import type { GridSim } from '../grid/engine';
 import {
-  buildCity, buildGround, buildLake, buildLights, buildPlants, buildPools, buildSea, buildSky,
+  buildCity, buildGround, buildMovers, buildLake, buildLights, buildPlants, buildPools, buildSea, buildSky,
   buildSteam, buildSubstations, buildTransmission, GLAZE, makeShared, SODIUM,
   type LineVisual, type PlantVisual,
 } from './builders';
@@ -63,6 +63,7 @@ export class CityScene {
   private steam!: ReturnType<typeof buildSteam>;
   private steamPlant: number[] = [];
   private starMat!: THREE.ShaderMaterial;
+  private movers!: ReturnType<typeof buildMovers>;
   private clock = new THREE.Clock();
   private raf = 0;
   private disposed = false;
@@ -154,6 +155,8 @@ export class CityScene {
       sources.push(s);
       this.steamPlant.push(i);
     }));
+    this.movers = buildMovers();
+    this.scene.add(this.movers.points);
     this.steam = buildSteam(sources);
     this.scene.add(this.steam.points);
   }
@@ -344,6 +347,10 @@ export class CityScene {
       }
     });
     this.updateSteam(dt);
+    // traffic thins out when districts go dark (signals fail, people stay home)
+    let lit = 0;
+    for (let i = 0; i < DISTRICTS.length; i++) lit += this.shared.uLight.value[i];
+    this.movers.update(dt, lit / DISTRICTS.length);
 
     // camera
     if (this.mode === 'hero') {

@@ -693,3 +693,74 @@ export function buildSteam(sources: THREE.Vector3[]) {
 }
 
 export { coastZ };
+
+// --------------------------------------------------------------- traffic and shipping
+
+/** Cars on the inter-district highways and ships crossing the bay. */
+export function buildMovers() {
+  const rand = mulberry32(31);
+  const roads: { ax: number; az: number; bx: number; bz: number; nx: number; nz: number; len: number }[] = [];
+  for (const l of LINES) {
+    const a = busPos(l.from);
+    const b = busPos(l.to);
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    roads.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, nx: -(b.z - a.z) / len, nz: (b.x - a.x) / len, len });
+  }
+  const nCars = 900;
+  const nShips = 14;
+  const n = nCars + nShips;
+  const pos = new Float32Array(n * 3);
+  const col = new Float32Array(n * 3);
+  const st = new Float32Array(n * 4);
+  for (let i = 0; i < nCars; i++) {
+    const r = Math.floor(rand() * roads.length);
+    const dir = rand() < 0.5 ? 1 : -1;
+    st.set([r, rand(), dir, 0.012 + rand() * 0.01], i * 4);
+    const c = dir > 0 ? [2.2, 2.0, 1.7] : [2.4, 0.25, 0.15];
+    col.set(c, i * 3);
+  }
+  for (let k = 0; k < nShips; k++) {
+    const i = nCars + k;
+    st.set([-1, rand(), rand() < 0.5 ? 1 : -1, 0.004 + rand() * 0.004], i * 4);
+    const c = k % 3 === 0 ? [0.3, 2.2, 0.6] : k % 3 === 1 ? [2.3, 0.3, 0.2] : [2.2, 2.2, 2.0];
+    col.set(c, i * 3);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uFade: { value: 1 } },
+    vertexShader: `attribute vec3 aColor; uniform float uFade; varying vec3 vC; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); gl_Position = projectionMatrix*mv; vC = aColor * uFade; gl_PointSize = clamp(110.0 / -mv.z, 1.0, 4.0); }`,
+    fragmentShader: `varying vec3 vC; void main(){ float d = length(gl_PointCoord-0.5); float a = smoothstep(0.5,0.0,d); gl_FragColor = vec4(vC*a, a); }`,
+  });
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  const update = (dt: number, traffic: number) => {
+    mat.uniforms.uFade.value = 0.15 + 0.85 * traffic;
+    for (let i = 0; i < n; i++) {
+      const r = st[i * 4];
+      let s = st[i * 4 + 1] + st[i * 4 + 2] * st[i * 4 + 3] * dt * (r >= 0 ? 0.3 + 0.7 * traffic : 1);
+      s = ((s % 1) + 1) % 1;
+      st[i * 4 + 1] = s;
+      if (r >= 0) {
+        const rd = roads[r];
+        const bow = Math.sin(s * Math.PI) * 1.2;
+        const lane = st[i * 4 + 2] > 0 ? 0.86 : 0.94;
+        const x = rd.ax + (rd.bx - rd.ax) * s + rd.nx * (lane + bow);
+        const z = rd.az + (rd.bz - rd.az) * s + rd.nz * (lane + bow);
+        pos.set([x, terrainY(x, z) + 0.03, z], i * 3);
+      } else {
+        // shipping lanes across the bay, parallel to the coast
+        const k = i - nCars;
+        const x = -45 + 95 * s;
+        const z = coastZ(x) + 5 + (k % 5) * 3.2;
+        pos.set([x, 0.02, z], i * 3);
+      }
+    }
+    geo.attributes.position.needsUpdate = true;
+  };
+  return { points, update };
+}
