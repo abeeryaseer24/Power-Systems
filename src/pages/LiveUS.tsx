@@ -9,7 +9,7 @@ const AREAS: [string, string][] = [
   ['NYIS', 'New York ISO'], ['ISNE', 'ISO New England'], ['SWPP', 'Southwest Power Pool'], ['BPAT', 'Bonneville (Northwest)'],
 ];
 const FUEL_COLOR: Record<string, string> = {
-  NG: '#ffb04d', COL: '#8b6b5a', NUC: '#c9b8ff', WND: '#86c5da', SUN: '#ffd27a', WAT: '#4f8fc0', OIL: '#ff5b4f', OTH: '#8b9ab0', BAT: '#7cf0b4', PS: '#3d6f99', SNB: '#e6c45a',
+  NG: '#ffb04d', COL: '#8b6b5a', NUC: '#c9b8ff', WND: '#86c5da', SUN: '#ffd27a', WAT: '#4f8fc0', OIL: '#ff5b4f', OTH: '#8b9ab0', BAT: '#7cf0b4', PS: '#3d6f99', SNB: '#e6c45a', GEO: '#d9825b',
 };
 interface Row { period: string; type: string; name: string; value: number | null }
 
