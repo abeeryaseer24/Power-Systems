@@ -5,8 +5,11 @@ import { CASES, CAUSE_LABEL, caseById, type CauseKind } from '../grid/cases';
 import { loadRegion, RegionSim, type RegionTrace } from '../grid/region';
 import { LESSONS } from './learn/lessons';
 import Traces from '../components/Traces';
+import Anatomy from '../components/Anatomy';
+import { episodeById } from '../grid/documentaries';
 import '../atlas.css';
 import '../academy.css';
+import '../documentary.css';
 
 const KINDS: CauseKind[] = ['trigger', 'weather', 'protection', 'people', 'planning', 'design'];
 
@@ -122,6 +125,8 @@ function CasePage({ id }: { id: string }) {
         </ol>
       </section>
 
+      <Explainer id={id} />
+
       <section className="case-sec">
         <h2>In the simulator</h2>
         <p className="muted">The same sequence run through this project’s grid engine, on a reduced OpenStreetMap model. Red lines mark the reconstructed steps. {sim.state === 'running' ? 'Running…' : sim.state === 'error' ? 'The grid model could not be loaded.' : ''}</p>
@@ -171,5 +176,42 @@ function CasePage({ id }: { id: string }) {
         <ul className="sources">{ev.sources.map((s, i) => <li key={i}>{s}</li>)}</ul>
       </section>
     </main>
+  );
+}
+
+function Explainer({ id }: { id: string }) {
+  const ep = episodeById(id);
+  const [i, setI] = useState(0);
+  const [auto, setAuto] = useState(false);
+  useEffect(() => {
+    if (!auto || !ep) return;
+    if (i >= ep.scenes.length - 1) {
+      setAuto(false);
+      return;
+    }
+    const t = setTimeout(() => setI(i + 1), 2600);
+    return () => clearTimeout(t);
+  }, [auto, i, ep]);
+  if (!ep) return null;
+  const sc = ep.scenes[i];
+  return (
+    <section className="case-sec">
+      <h2>What failed, step by step</h2>
+      <div className="explainer">
+        <Anatomy ep={ep} upto={i} />
+        <div className="ex-text" key={i}>
+          <span className="ex-clock">{sc.clock}</span>
+          <h3>{sc.title}</h3>
+          {sc.body && <p>{sc.body}</p>}
+          <div className="ex-ctl">
+            <button className="btn ghost small" onClick={() => setI(Math.max(0, i - 1))} disabled={i === 0}>Previous</button>
+            <span>{i + 1} / {ep.scenes.length}</span>
+            <button className="btn ghost small" onClick={() => setI(Math.min(ep.scenes.length - 1, i + 1))} disabled={i === ep.scenes.length - 1}>Next</button>
+            <button className="btn primary small" onClick={() => { if (i >= ep.scenes.length - 1) setI(0); setAuto(!auto); }}>{auto ? 'Pause' : 'Play'}</button>
+            <Link to={`/documentary/${id}`}>Watch the documentary</Link>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
