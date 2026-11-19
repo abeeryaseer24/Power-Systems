@@ -15,11 +15,13 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
   {
     label: 'Real grids',
     items: [
-      { to: '/atlas', label: 'Atlas', note: 'Ten grids rebuilt from OpenStreetMap' },
-      { to: '/blackouts', label: 'Blackouts', note: 'Replay eighteen historical failures' },
+      { to: '/atlas', label: 'Atlas', note: 'Grids rebuilt from OpenStreetMap' },
+      { to: '/blackouts', label: 'Blackouts', note: 'Replay historical failures' },
       { to: '/documentary', label: 'Documentaries', note: 'The last minutes, told as a story' },
       { to: '/academy', label: 'Case files', note: 'Why each one happened' },
       { to: '/predictor', label: 'Predictor', note: 'Would an AI have seen it coming?' },
+      { to: '/protection', label: 'Protection', note: 'Look through a distance relay’s eyes' },
+      { to: '/market', label: 'Markets', note: 'How the last megawatt sets the price' },
     ],
   },
 ];

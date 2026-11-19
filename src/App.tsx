@@ -21,6 +21,8 @@ const Predictor = lazy(() => import('./pages/Predictor'));
 const Course = lazy(() => import('./pages/Course'));
 const DhakaTonight = lazy(() => import('./pages/DhakaTonight'));
 const Instrumentation = lazy(() => import('./pages/Instrumentation'));
+const Protection = lazy(() => import('./pages/Protection'));
+const Market = lazy(() => import('./pages/Market'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -58,6 +60,8 @@ export default function App() {
           <Route path="/reactor-startup" element={<ReactorStartup />} />
           <Route path="/predictor" element={<Predictor />} />
           <Route path="/dhaka-tonight" element={<DhakaTonight />} />
+          <Route path="/protection" element={<Protection />} />
+          <Route path="/market" element={<Market />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />

@@ -1,0 +1,30 @@
+/* the price of a megawatt */
+.market { max-width: 1100px; }
+.mk-panel { padding: 22px; border-radius: 14px; background: rgba(7, 18, 34, 0.7); border: 1px solid var(--rule); margin-bottom: 18px; }
+.mk-panel h2 { font-family: var(--display); font-weight: 700; font-size: 26px; margin: 0 0 8px; }
+.mk-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 30px; align-items: end; margin-bottom: 10px; }
+.mk-read { display: flex; flex-wrap: wrap; gap: 10px 30px; }
+.mk-read span { display: block; font-size: 12px; color: var(--steel); }
+.mk-read strong { font-family: var(--display); font-weight: 500; font-size: 26px; }
+.mk-read strong.hot, .mk-zp.hot, .mk-verdict.hot { color: var(--trip); fill: var(--trip); }
+.mk-svg { width: 100%; height: auto; display: block; margin: 8px 0 14px; }
+.mk-bl { fill: #0c1a2d; font-size: 12px; font-weight: 700; }
+.mk-demand { stroke: var(--porcelain); stroke-width: 2; stroke-dasharray: 5 4; }
+.mk-dl { fill: var(--porcelain); font-size: 12px; }
+.mk-price { stroke: var(--trip); stroke-width: 1.5; }
+.mk-axis { stroke: rgba(139, 154, 176, 0.5); }
+.mk-ax { fill: var(--steel); font-size: 12px; }
+.mk-bar { cursor: pointer; }
+.mk-bar rect { fill: rgba(255, 176, 77, 0.45); transition: fill 0.2s; }
+.mk-bar rect.on { fill: var(--sodium); }
+.mk-bar rect.cap { fill: var(--trip); }
+.mk-bar:hover rect { fill: rgba(255, 176, 77, 0.8); }
+.mk-p { max-width: 75ch; line-height: 1.6; }
+.mk-zone { fill: rgba(134, 197, 218, 0.06); stroke: var(--rule); }
+.mk-zl { fill: var(--steel); font-size: 16px; }
+.mk-zp { fill: var(--porcelain); font-family: var(--display); font-weight: 500; font-size: 40px; }
+.mk-tie { stroke: var(--glaze, #86c5da); stroke-width: 5; }
+.mk-tie.full { stroke: var(--trip); }
+.mk-verdict { font-family: var(--display); font-weight: 500; font-size: 21px; margin: 0; }
+.market .hint { font-size: 13px; color: var(--steel); margin: 0; }
+.mk-foot { max-width: 80ch; }
