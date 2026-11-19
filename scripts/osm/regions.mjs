@@ -90,7 +90,10 @@ export const REGIONS = [
   {
     id: 'saopaulo', city: 'São Paulo', country: 'Brazil', scope: 'São Paulo and Paraná, Itaipu to the load, 765 to 440 kV',
     bbox: [-26.0, -55.0, -21.0, -45.0], minKV: 440, freq: 60, center: [-23.55, -46.63], seriesComp: 0.4,
-    demandMW: 22000, ext: { name: 'Rest of the Brazilian grid', MW: 40000, H: 4 },
+    // Itaipu's 50 Hz (Paraguayan) half reaches Sao Paulo over HVDC, which the AC model leaves out
+    acShare: { Itaipu: 0.5 },
+    // late-evening load at 22:13; the 345/230/138 kV networks that share the daytime peak are not modelled
+    demandMW: 16500, ext: { name: 'Rest of the Brazilian grid', MW: 40000, H: 4 },
     roads: 'motorway', rivers: true,
   },
   {
@@ -108,12 +111,16 @@ export const REGIONS = [
   {
     id: 'moscow', city: 'Moscow', country: 'Russia', scope: 'Moscow and the surrounding oblasts, 500 and 220 kV',
     bbox: [54.4, 36.0, 56.6, 39.6], minKV: 220, freq: 50, center: [55.756, 37.617],
+    // the dense 110 kV city network is not modelled and carries much of the local transfer
+    ratingScale: 1.8,
     demandMW: 13000, ext: { name: 'Unified Energy System of Russia', MW: 40000, H: 5 },
     roads: 'motorway|trunk', rivers: true,
   },
   {
     id: 'tashkent', city: 'Tashkent', country: 'Uzbekistan', scope: 'Central Asian Power System: Uzbekistan, Kyrgyzstan, south Kazakhstan, Tajikistan, 500 kV',
     bbox: [37.5, 64.0, 44.5, 80.0], minKV: 500, freq: 50, center: [41.31, 69.28],
+    // Rogun had only its first two small units running in early 2022
+    offline: ['Rogun'],
     demandMW: 15000, ext: { name: 'North Kazakhstan and Russia', MW: 20000, H: 4 },
     roads: 'motorway|trunk', rivers: true,
   },

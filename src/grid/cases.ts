@@ -1,4 +1,5 @@
 import { MORE_CASES } from './cases-more';
+import { REGION_CASES } from './cases-regions';
 // Case files: why each blackout happened, written from the investigation
 // reports listed with each event in events.ts. Where reports differ or are
 // still incomplete, the text says so.
@@ -341,6 +342,6 @@ export const CASES: CaseFile[] = [
   },
 ];
 
-CASES.push(...MORE_CASES);
+CASES.push(...MORE_CASES, ...REGION_CASES);
 
 export const caseById = (id: string) => CASES.find((c) => c.id === id);

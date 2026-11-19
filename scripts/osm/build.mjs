@@ -21,8 +21,10 @@ const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.
 let ep = Number(process.env.OVERPASS_START ?? 0) % ENDPOINTS.length;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Map layers are decoration: if Overpass cannot serve them, build without. */
+/** Map layers are decoration: if Overpass cannot serve them, build without. LAYERS=cached skips any not in the cache. */
+let layerOnly = false;
 async function optional(fn) {
+  layerOnly = process.env.LAYERS === 'cached';
   try {
     return await fn();
   } catch (e) {
@@ -32,8 +34,11 @@ async function optional(fn) {
 }
 
 async function overpass(key, query) {
+  const cachedOnly = layerOnly;
+  layerOnly = false;
   const file = path.join(CACHE, `${key}.json`);
   if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (cachedOnly) throw new Error(`${key} not cached`);
   for (let attempt = 0; attempt < 9; attempt++) {
     const url = ENDPOINTS[ep];
     let status = 'network error';
@@ -429,7 +434,7 @@ async function build(reg) {
   const out = {
     id: reg.id, city: reg.city, country: reg.country, scope: reg.scope, freq: reg.freq,
     center: reg.center, bbox: reg.bbox, extent: r2(extent), bounds: [r2(x0), r2(z0), r2(x1), r2(z1)],
-    seriesComp: reg.seriesComp, mustRun: reg.mustRun,
+    seriesComp: reg.seriesComp, mustRun: reg.mustRun, acShare: reg.acShare,
     demandMW: reg.demandMW, ext: { ...reg.ext, at: undefined, ties: undefined, bus: extBus, tieBuses },
     buses, branches, plants: PL, places: placesKept, roads: roadsOut, coast: coastOut, rivers: riversOut,
     source: 'OpenStreetMap contributors, ODbL',

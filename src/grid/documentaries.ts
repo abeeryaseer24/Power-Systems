@@ -1,5 +1,6 @@
 import { MORE_EPISODES } from './episodes-more';
 import { NUCLEAR_EPISODES } from './episodes-nuclear';
+import { REGION_EPISODES } from './episodes-regions';
 // Documentary episodes: the minute-by-minute lead-up to each blackout, told as
 // scenes. `simT` is the replay time (seconds) the map is advanced to for the scene.
 // `fx` drives the anatomy diagram: effects accumulate from scene to scene.
@@ -426,6 +427,8 @@ export const EPISODES: Episode[] = [
   },
 ];
 
-EPISODES.push(...MORE_EPISODES, ...NUCLEAR_EPISODES);
+EPISODES.push(...MORE_EPISODES, ...REGION_EPISODES, ...NUCLEAR_EPISODES);
+// numbered in running order, blackouts first, then the reactors
+EPISODES.forEach((e, i) => (e.number = i + 1));
 
 export const episodeById = (id: string) => EPISODES.find((e) => e.id === id);

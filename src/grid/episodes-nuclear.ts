@@ -8,7 +8,7 @@ const h = (x: number) => x * 3600;
 export const NUCLEAR_EPISODES: Episode[] = [
   {
     id: 'chernobyl-1986',
-    number: 19,
+    number: 25,
     plant: 'chernobyl',
     title: 'The Test at Reactor Four',
     tagline: '26 April 1986. An electrical test, a grid that needed power, and a reactor that fed on its own steam.',
@@ -41,7 +41,7 @@ export const NUCLEAR_EPISODES: Episode[] = [
   },
   {
     id: 'tmi-1979',
-    number: 20,
+    number: 26,
     plant: 'tmi',
     title: 'The Valve That Said Closed',
     tagline: '28 March 1979. Three Mile Island. A stuck valve, a lying light, and a core that boiled dry in plain sight.',
@@ -76,7 +76,7 @@ export const NUCLEAR_EPISODES: Episode[] = [
   },
   {
     id: 'fukushima-2011',
-    number: 21,
+    number: 27,
     plant: 'fukushima',
     title: 'Fifty Minutes to the Wave',
     tagline: '11 March 2011. Fukushima Daiichi. The earthquake took the grid. The tsunami took everything else.',
@@ -112,7 +112,7 @@ export const NUCLEAR_EPISODES: Episode[] = [
   },
   {
     id: 'forsmark-2006',
-    number: 22,
+    number: 28,
     plant: 'forsmark',
     title: 'Half the Lights Went Out',
     tagline: '25 July 2006. Forsmark, Sweden. One short circuit, four "independent" safety trains, and two that never came.',
@@ -147,7 +147,7 @@ export const NUCLEAR_EPISODES: Episode[] = [
   },
   {
     id: 'daini-2011',
-    number: 23,
+    number: 29,
     plant: 'fukushima-daini',
     title: 'The Line That Held',
     tagline: '11 March 2011. Twelve kilometres south of Daiichi. Same earthquake, same wave, and one surviving power line.',
@@ -177,7 +177,7 @@ export const NUCLEAR_EPISODES: Episode[] = [
   },
   {
     id: 'zaporizhzhia-2023',
-    number: 24,
+    number: 30,
     plant: 'zaporizhzhia',
     title: 'The Last Line',
     tagline: '9 March 2023. Europe’s largest nuclear plant, in a war zone, loses its last connection to the grid. Again.',

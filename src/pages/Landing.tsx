@@ -132,18 +132,18 @@ export default function Landing() {
         </Link>
         <Link to="/atlas" className="ch">
           <span className="ch-k">The atlas</span>
-          <span className="ch-t">Ten real grids from OpenStreetMap</span>
-          <span className="ch-d">Bangladesh, London, New York, Houston, Madrid, Delhi, Rome, Adelaide, Sapporo and Karachi, solved live with AC power flow and voltages.</span>
+          <span className="ch-t">Real grids, rebuilt from OpenStreetMap</span>
+          <span className="ch-d">From Bangladesh, London and New York to Venezuela, Brazil, Moscow and Central Asia, solved live with AC power flow and voltages.</span>
         </Link>
         <Link to="/blackouts" className="ch">
           <span className="ch-k">The blackouts</span>
-          <span className="ch-t">Eighteen nights the grid failed</span>
-          <span className="ch-d">From New York in 1977 to Iberia in 2025, rebuilt from the investigation reports. Watch them happen, then try to stop them.</span>
+          <span className="ch-t">The nights the grid failed</span>
+          <span className="ch-d">From New York in 1965 to Iberia in 2025, rebuilt from the investigation reports. Watch them happen, then try to stop them.</span>
         </Link>
         <Link to="/nuclear" className="ch">
           <span className="ch-k">The reactors</span>
           <span className="ch-t">Chernobyl, Three Mile Island, Fukushima, Rooppur</span>
-          <span className="ch-d">Point kinetics, decay heat and the electronics that protect a core, in four control rooms you can operate.</span>
+          <span className="ch-d">Point kinetics, decay heat and the electronics that protect a core, in seven control rooms you can operate.</span>
         </Link>
       </section>
     </main>

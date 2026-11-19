@@ -174,5 +174,69 @@
   "plants": 54,
   "genMW": 12930,
   "demandMW": 2300
+ },
+ {
+  "id": "caracas",
+  "city": "Caracas",
+  "country": "Venezuela",
+  "scope": "National grid of Venezuela, 765 and 400 kV",
+  "freq": 60,
+  "center": [
+   10.48,
+   -66.9
+  ],
+  "buses": 46,
+  "branches": 59,
+  "plants": 16,
+  "genMW": 23083,
+  "demandMW": 12500
+ },
+ {
+  "id": "saopaulo",
+  "city": "São Paulo",
+  "country": "Brazil",
+  "scope": "São Paulo and Paraná, Itaipu to the load, 765 to 440 kV",
+  "freq": 60,
+  "center": [
+   -23.55,
+   -46.63
+  ],
+  "buses": 63,
+  "branches": 81,
+  "plants": 37,
+  "genMW": 22304,
+  "demandMW": 16500
+ },
+ {
+  "id": "moscow",
+  "city": "Moscow",
+  "country": "Russia",
+  "scope": "Moscow and the surrounding oblasts, 500 and 220 kV",
+  "freq": 50,
+  "center": [
+   55.756,
+   37.617
+  ],
+  "buses": 476,
+  "branches": 570,
+  "plants": 32,
+  "genMW": 19040,
+  "demandMW": 13000
+ },
+ {
+  "id": "tashkent",
+  "city": "Tashkent",
+  "country": "Uzbekistan",
+  "scope": "Central Asian Power System: Uzbekistan, Kyrgyzstan, south Kazakhstan, Tajikistan, 500 kV",
+  "freq": 50,
+  "center": [
+   41.31,
+   69.28
+  ],
+  "buses": 66,
+  "branches": 75,
+  "plants": 33,
+  "genMW": 25955,
+  "demandMW": 15000
  }
 ]

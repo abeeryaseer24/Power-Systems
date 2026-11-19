@@ -23,7 +23,7 @@ export default function Atlas() {
     <main id="main" className="page atlas">
       <div className="page-head">
         <h1>The atlas of real grids</h1>
-        <p>Ten transmission systems rebuilt from OpenStreetMap, from the national grid of Bangladesh to the 345 kV ring around New York. Each one runs live: AC power flow, frequency, protection and all.</p>
+        <p>{index.length ? `${index.length} transmission systems` : 'Real transmission systems'} rebuilt from OpenStreetMap, from Venezuela’s 765 kV corridor to the 345 kV ring around New York and the national grid of Bangladesh. Each one runs live: AC power flow, frequency, protection and all.</p>
       </div>
       <figure className="worldmap">
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="World map of the modelled grids">

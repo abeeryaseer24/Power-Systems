@@ -27,6 +27,8 @@ export interface RegionData {
   seriesComp?: number;
   /** Plants (name fragments) that run regardless of merit order. */
   mustRun?: string[];
+  /** Share of a plant's capacity that feeds this AC model (name fragment -> fraction), e.g. the 60 Hz half of Itaipu. */
+  acShare?: Record<string, number>;
 }
 
 const KIND: Record<GenKind, { H: number; droop: number; Tg: number; ramp: number; minFrac: number; cost: number; sync: boolean }> = {
@@ -144,7 +146,11 @@ export class RegionSim {
     // series capacitors on long 765 kV lines cancel part of their reactance (copy so reloading does not compound it)
     const sc = data.seriesComp ?? 0;
     this.branches = data.branches.map((d) => ({ def: sc && d.kv >= 700 && d.km > 120 ? { ...d, x: d.x * (1 - sc) } : d, closed: true, P: 0, Q: 0, loading: 0, heat: 0 }));
-    this.gens = data.plants.map((def) => ({ def, online: !def.offline, sched: 0, gov: 0, p: 0, q: 0, avail: def.mw, vTimer: 0, tripReason: def.offline ? 'out of service' : undefined }));
+    const share = (def: RegionPlant) => Object.entries(data.acShare ?? {}).find(([n]) => def.name.toLowerCase().includes(n.toLowerCase()))?.[1] ?? 1;
+    this.gens = data.plants.map((d) => {
+      const def = share(d) < 1 ? { ...d, mw: Math.round(d.mw * share(d)) } : d;
+      return { def, online: !def.offline, sched: 0, gov: 0, p: 0, q: 0, avail: def.mw, vTimer: 0, tripReason: def.offline ? 'out of service' : undefined };
+    });
 
     // external equivalent
     const boundary = data.buses.map((b, i) => (b.boundary ? i : -1)).filter((i) => i >= 0);

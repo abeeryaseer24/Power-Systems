@@ -9,6 +9,7 @@
 
 import type { RegionSim } from './region';
 import { MORE_EVENTS } from './events-more';
+import { REGION_EVENTS } from './events-regions';
 
 export interface Step {
   t: number;
@@ -792,7 +793,7 @@ export const EVENTS: BlackoutEvent[] = [
   },
 ];
 
-EVENTS.push(...MORE_EVENTS);
+EVENTS.push(...MORE_EVENTS, ...REGION_EVENTS);
 for (const e of EVENTS) e.steps.sort((a, b) => a.t - b.t);
 
 export const eventById = (id: string) => EVENTS.find((e) => e.id === id);
