@@ -662,7 +662,7 @@ export class RegionSim {
       if (!res.converged) {
         const c = (this.divergeCount.get(k) ?? 0) + 1;
         this.divergeCount.set(k, c);
-        this.voltageEmergency(m, c);
+        this.voltageEmergency(m, c, res.V);
         return;
       }
       this.divergeCount.set(k, 0);
@@ -688,22 +688,34 @@ export class RegionSim {
     for (const br of this.branches) if (!br.closed) { br.P = br.Q = br.loading = 0; }
   }
 
-  private voltageEmergency(members: number[], count: number) {
-    // load flow has no solution: the island is past the nose of its PV curve
-    const worst = members.filter((b) => this.buses[b].live && this.buses[b].demand > 0).sort((a, b) => this.buses[a].V - this.buses[b].V);
-    const n = Math.max(1, Math.ceil(worst.length * 0.25));
+  private voltageEmergency(members: number[], count: number, Vtry: ArrayLike<number>) {
+    // load flow has no solution: part of the island is past the nose of its PV curve.
+    // Rank buses by the voltages of the failed solve to find the weak area.
+    const rank = members.map((b, i) => ({ b, v: Number.isFinite(Vtry[i]) ? Vtry[i] : 0 })).sort((x, y) => x.v - y.v);
+    const n = Math.max(1, Math.ceil(rank.length * 0.2));
+    const weak = rank.slice(0, n).map((x) => x.b);
     let shed = 0;
-    for (const b of worst.slice(0, n)) {
+    for (const b of weak) {
       const bs = this.buses[b];
-      const add = Math.min(0.2, 1 - bs.shed);
+      if (bs.demand <= 0) continue;
+      const add = Math.min(0.3, 1 - bs.shed);
       shed += bs.demand * bs.connected * add;
       bs.shed += add;
     }
-    if (count === 1) {
-      this.note('alarm', `Voltage collapse risk: load flow has no solution. Under-voltage relays shed ${Math.round(shed)} MW.`);
-      this.raise('Voltage collapse', `Reactive reserves are exhausted and voltages are falling away. ${Math.round(shed)} MW shed automatically.`, 'major');
+    // inverter plant in the weak area loses its voltage reference and cuts back
+    let cut = 0;
+    for (const g of this.gens) {
+      if (!g.online || KIND[g.def.kind].sync || !weak.includes(g.def.bus)) continue;
+      const lose = g.p * 0.35;
+      g.avail = Math.max(0, g.avail - lose);
+      g.sched = Math.min(g.sched, g.avail);
+      cut += lose;
     }
-    if (count >= 6) this.collapseIsland(members, 'voltage collapse');
+    if (count === 1) {
+      this.note('alarm', `Voltage collapse risk: load flow has no solution. Under-voltage relays shed ${Math.round(shed)} MW${cut > 5 ? `; inverter plant cut ${Math.round(cut)} MW` : ''}.`);
+      this.raise('Voltage collapse', `Voltages in the weak area are falling away. ${Math.round(shed)} MW of demand shed${cut > 5 ? ` and ${Math.round(cut)} MW of wind and solar lost` : ''}.`, 'major');
+    }
+    if (count >= 14) this.collapseIsland(members, 'voltage collapse');
   }
 
   private protect(dt: number) {
