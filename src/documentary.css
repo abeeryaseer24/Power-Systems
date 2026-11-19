@@ -88,3 +88,22 @@
 @media (prefers-reduced-motion: reduce) { .an-flow, .an-link.surge .an-base, .an-shock, .an-bolt, .an-split.fresh { animation: none; } }
 .doc-sound { background: none; border: 1px solid rgba(255, 255, 255, 0.2); color: #e9e2d4; border-radius: 999px; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; cursor: pointer; }
 .doc-sound svg { width: 16px; height: 16px; }
+
+/* nuclear episodes: the reactor core as the background */
+.doc-core { position: absolute; inset: 0; transition: filter 1.6s; }
+.core-view { width: 100%; height: 100%; display: block; }
+.mood-tension .doc-core { filter: contrast(1.1); }
+.mood-impact .doc-core { filter: contrast(1.25) saturate(1.2); }
+.mood-dark .doc-core { filter: brightness(0.55) contrast(1.2); }
+.mood-after .doc-core { filter: sepia(0.3) brightness(0.75); }
+
+.cv-panel { position: absolute; z-index: 2; top: calc(11vh + 20px); left: clamp(20px, 8vw, 120px); margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, auto)); gap: 10px 34px; }
+.cv-panel div { min-width: 0; }
+.cv-panel dt { font-size: 12px; color: #8b9ab0; }
+.cv-panel dd { margin: 2px 0 0; font-family: var(--display); font-weight: 300; font-size: clamp(20px, 2.2vw, 30px); color: #ece6d8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cv-panel dd.hot { color: #ff5b4f; }
+@media (max-width: 760px) { .cv-panel { grid-template-columns: repeat(2, auto); gap: 6px 20px; } .cv-panel div:nth-child(n + 5) { display: none; } }
+.doc-sub { margin-top: 72px; }
+.doc-sub h2 { font-family: var(--display); font-weight: 900; font-size: clamp(32px, 5vw, 56px); line-height: 0.95; margin: 0 0 10px; }
+.ep-list.nuclear a { background: linear-gradient(110deg, #08161c, #0a0f18 60%); border-color: rgba(134, 197, 218, 0.28); }
+.ep-list.nuclear .ep-n { color: #86c5da; }

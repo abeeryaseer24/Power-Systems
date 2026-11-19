@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { PLANTS, plantById } from '../nuclear/plants';
 import ReactorRoom from '../nuclear/ReactorRoom';
 import RooppurGrid from '../nuclear/RooppurGrid';
+import { EPISODES } from '../grid/documentaries';
 import '../nuclear.css';
 
 export default function Nuclear() {
@@ -74,6 +75,7 @@ function PlantPage({ id }: { id: string }) {
           {p.design.map((t, i) => <p key={i}>{t}</p>)}
           <h2>{p.id === 'rooppur' ? 'On the grid' : 'What happened'}</h2>
           {p.story.map((t, i) => <p key={i}>{t}</p>)}
+          {EPISODES.filter((e) => e.plant === p.id).map((e) => <p key={e.id}><Link to={`/documentary/${e.id}`}>Watch the documentary: {e.title}</Link></p>)}
           <h2>{p.id === 'rooppur' ? 'Why it matters' : 'What changed afterwards'}</h2>
           <ul>{p.lessons.map((t, i) => <li key={i}>{t}</li>)}</ul>
           <h2>Sources</h2>

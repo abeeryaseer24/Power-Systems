@@ -102,7 +102,11 @@ export const PLANTS: NuclearPlant[] = [
       r.rps = false;
     },
     steps: [
-      { t: 4, clock: '01:23:04', label: 'The test begins: turbine steam is cut. Four of the eight main pumps run down with the turbine.', operator: true, run: (r) => { r.tripTurbine('turbine rundown test'); [0, 1, 2, 3].forEach((i) => r.setPump(i, false)); } },
+      { t: 4, clock: '01:23:04', label: 'The test begins: turbine steam is cut. Four of the eight main pumps run down with the turbine.', operator: true, run: (r) => {
+        r.tripTurbine('turbine rundown test');
+        // the four pumps fed by the slowing generator lose speed gradually; model it as pumps dropping out one by one
+        [16, 24, 32].forEach((t, i) => r.at(t, (rr) => rr.setPump(i, false)));
+      } },
       { t: 40, clock: '01:23:40', label: 'AZ-5 is pressed. The rods start moving in from the top.', operator: true, run: (r) => r.scram('AZ-5 emergency button') },
     ],
   },
