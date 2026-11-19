@@ -42,6 +42,11 @@ export default function Nuclear() {
           </li>
         ))}
       </ol>
+      <Link to="/reactor-startup" className="inst-link">
+        <span className="pl-when">Minigame</span>
+        <span className="pl-name">Bring Rooppur to full power</span>
+        <span className="pl-hook">From cold shutdown to 1,200 MW: withdraw rods, watch the period, block the source range, synchronise the generator.</span>
+      </Link>
       <Link to="/nuclear/instrumentation" className="inst-link">
         <span className="pl-when">Electronics</span>
         <span className="pl-name">Instrumentation and control</span>

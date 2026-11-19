@@ -17,6 +17,7 @@ const Academy = lazy(() => import('./pages/Academy'));
 const Documentary = lazy(() => import('./pages/Documentary'));
 const WhatIf = lazy(() => import('./pages/WhatIf'));
 const BlackStart = lazy(() => import('./pages/BlackStart'));
+const ReactorStartup = lazy(() => import('./pages/ReactorStartup'));
 const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/academy/:id" element={<Academy />} />
           <Route path="/nuclear" element={<Nuclear />} />
           <Route path="/nuclear/instrumentation" element={<Instrumentation />} />
+          <Route path="/reactor-startup" element={<ReactorStartup />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />
           <Route path="*" element={<Landing />} />
         </Routes>
