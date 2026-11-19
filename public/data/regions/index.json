@@ -96,6 +96,22 @@
   "demandMW": 5000
  },
  {
+  "id": "rome",
+  "city": "Rome",
+  "country": "Italy",
+  "scope": "Lazio, 380 and 220 kV",
+  "freq": 50,
+  "center": [
+   41.903,
+   12.496
+  ],
+  "buses": 33,
+  "branches": 41,
+  "plants": 16,
+  "genMW": 2812,
+  "demandMW": 2400
+ },
+ {
   "id": "adelaide",
   "city": "Adelaide",
   "country": "Australia",
@@ -110,5 +126,37 @@
   "plants": 39,
   "genMW": 6792,
   "demandMW": 1900
+ },
+ {
+  "id": "sapporo",
+  "city": "Sapporo",
+  "country": "Japan",
+  "scope": "Hokkaido, 275 and 187 kV",
+  "freq": 50,
+  "center": [
+   43.062,
+   141.354
+  ],
+  "buses": 72,
+  "branches": 83,
+  "plants": 20,
+  "genMW": 7675,
+  "demandMW": 3100
+ },
+ {
+  "id": "karachi",
+  "city": "Karachi",
+  "country": "Pakistan",
+  "scope": "Karachi and lower Sindh, 500 and 220 kV",
+  "freq": 50,
+  "center": [
+   24.861,
+   67.01
+  ],
+  "buses": 43,
+  "branches": 46,
+  "plants": 54,
+  "genMW": 12930,
+  "demandMW": 2300
  }
 ]

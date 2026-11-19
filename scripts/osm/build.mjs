@@ -19,6 +19,16 @@ fs.mkdirSync(OUT, { recursive: true });
 const ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Map layers are decoration: if Overpass cannot serve them, build without. */
+async function optional(fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    console.warn('  layer skipped:', e.message);
+    return { elements: [] };
+  }
+}
+
 async function overpass(key, query) {
   const file = path.join(CACHE, `${key}.json`);
   if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -136,8 +146,8 @@ async function build(reg) {
   const subs = await overpass(`${reg.id}-subs${tag}`, `[out:json][timeout:240];${A}(node["power"="substation"]${F};way["power"="substation"]${F};relation["power"="substation"]${F};);out tags center qt;`);
   const plants = await overpass(`${reg.id}-plants${tag}`, `[out:json][timeout:240];${A}(node["power"="plant"]${F};way["power"="plant"]${F};relation["power"="plant"]${F};);out tags center qt;`);
   const places = await overpass(`${reg.id}-places2${tag}`, `[out:json][timeout:240];${A}node["place"~"^(city|town|suburb|village|quarter)$"]${F};out body qt;`);
-  const roads = await overpass(`${reg.id}-roads`, `[out:json][timeout:300];way["highway"~"^(${reg.roads})$"]${bb};out geom qt;`);
-  const coast = await overpass(`${reg.id}-coast`, `[out:json][timeout:300];way["natural"="coastline"]${bb};out geom qt;`);
+  const roads = await optional(() => overpass(`${reg.id}-roads`, `[out:json][timeout:300];way["highway"~"^(${reg.roads})$"]${bb};out geom qt;`));
+  const coast = await optional(() => overpass(`${reg.id}-coast`, `[out:json][timeout:300];way["natural"="coastline"]${bb};out geom qt;`));
   const rivers = reg.rivers ? await overpass(`${reg.id}-rivers`, `[out:json][timeout:300];way["waterway"="river"]["name"]${bb};out geom qt;`) : { elements: [] };
 
   const P = projector(reg.center[0], reg.center[1]);
@@ -314,7 +324,9 @@ async function build(reg) {
       }
     });
     if (best < 0) continue;
-    PL.push({ name: el.tags['name:en'] ?? el.tags.name ?? `${kind} plant`, kind, mw: Math.round(mw), bus: best, x: r2(x), z: r2(z), est: !parseMW(el.tags['plant:output:electricity']) || undefined });
+    const pname = el.tags['name:en'] ?? el.tags.name ?? `${kind} plant`;
+    const off = (reg.offline ?? []).some((o) => pname.toLowerCase().includes(o.toLowerCase())) || undefined;
+    PL.push({ offline: off, name: pname, kind, mw: Math.round(mw), bus: best, x: r2(x), z: r2(z), est: !parseMW(el.tags['plant:output:electricity']) || undefined });
   }
 
   // estimated-capacity plants only fill in until installed capacity is plausible

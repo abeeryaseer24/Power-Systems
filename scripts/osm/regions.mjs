@@ -61,7 +61,9 @@ export const REGIONS = [
   {
     id: 'sapporo', city: 'Sapporo', country: 'Japan', scope: 'Hokkaido, 275 and 187 kV',
     bbox: [41.35, 139.3, 45.6, 146.0], minKV: 187, freq: 50, center: [43.062, 141.354],
-    demandMW: 3100, ext: { name: 'Honshu (Hokkaido–Honshu HVDC)', MW: 600, H: 0, hvdc: true, at: [41.85, 140.72] },
+    demandMW: 3100, // Tomari has been shut since 2012 and was not running in 2018
+    offline: ['Tomari'],
+    ext: { name: 'Honshu (Hokkaido–Honshu HVDC)', MW: 600, H: 0, hvdc: true, at: [41.85, 140.72] },
     roads: 'motorway', rivers: false,
   },
   {

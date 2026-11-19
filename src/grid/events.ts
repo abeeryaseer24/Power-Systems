@@ -714,9 +714,20 @@ export const EVENTS: BlackoutEvent[] = [
     sources: ['OCCTO, Third-Party Verification Committee report on the Hokkaido blackout, December 2018.'],
     lead: 15,
     span: 1200,
-    setup: (s) => {
+    setup: (s, h) => {
       s.loadScale = 0.85;
+      // Tomato-Atsuma (OSM name in Japanese) was supplying about half of the island that night
+      const ta = h.plant('Tomato', 42.62, 141.82, 'coal');
+      if (ta >= 0) {
+        s.gens[ta].online = true;
+        s.gens[ta].tripReason = undefined;
+        s.gens[ta].sched = 1150;
+      }
       s.dispatch(300);
+      if (ta >= 0) {
+        s.gens[ta].online = true;
+        s.gens[ta].sched = 1150;
+      }
       s.settle(30);
     },
     steps: [

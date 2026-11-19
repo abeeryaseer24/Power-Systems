@@ -14,7 +14,7 @@ import { findIslands, type FlowLine, type Islands } from './loadflow';
 export interface RegionBus { x: number; z: number; name: string; kv: number; boundary?: boolean; load: number }
 export interface RegionBranch { a: number; b: number; kv: number; circuits: number; km: number; x: number; r: number; bc: number; mva: number; name?: string; pts: [number, number][] }
 export type GenKind = 'nuclear' | 'coal' | 'gas' | 'oil' | 'hydro' | 'wind' | 'solar' | 'bio';
-export interface RegionPlant { name: string; kind: GenKind; mw: number; bus: number; x: number; z: number; est?: boolean }
+export interface RegionPlant { name: string; kind: GenKind; mw: number; bus: number; x: number; z: number; est?: boolean; offline?: boolean }
 export interface RegionPlace { x: number; z: number; pop: number; name?: string; t: string }
 export interface RegionData {
   id: string; city: string; country: string; scope: string; freq: number;
@@ -135,7 +135,7 @@ export class RegionSim {
     this.loadScale = opts.loadScale ?? 1;
     this.buses = data.buses.map((def) => ({ def, V: 1, theta: 0, f: this.f0, rocof: 0, live: true, demand: def.load, served: def.load, shed: 0, connected: 1, uvTimer: 0 }));
     this.branches = data.branches.map((def) => ({ def, closed: true, P: 0, Q: 0, loading: 0, heat: 0 }));
-    this.gens = data.plants.map((def) => ({ def, online: true, sched: 0, gov: 0, p: 0, q: 0, avail: def.mw, vTimer: 0 }));
+    this.gens = data.plants.map((def) => ({ def, online: !def.offline, sched: 0, gov: 0, p: 0, q: 0, avail: def.mw, vTimer: 0, tripReason: def.offline ? 'out of service' : undefined }));
 
     // external equivalent
     const boundary = data.buses.map((b, i) => (b.boundary ? i : -1)).filter((i) => i >= 0);
