@@ -15,6 +15,7 @@ export default function TopBar() {
         <NavLink to="/atlas">Atlas</NavLink>
         <NavLink to="/blackouts">Blackouts</NavLink>
         <NavLink to="/academy">Case files</NavLink>
+        <NavLink to="/documentary">Documentaries</NavLink>
         <NavLink to="/nuclear">Nuclear</NavLink>
         <NavLink to="/learn">Learn</NavLink>
         <NavLink to="/about">About</NavLink>

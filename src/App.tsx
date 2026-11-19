@@ -14,6 +14,7 @@ const Blackouts = lazy(() => import('./pages/Blackouts'));
 const Replay = lazy(() => import('./pages/Replay'));
 const Nuclear = lazy(() => import('./pages/Nuclear'));
 const Academy = lazy(() => import('./pages/Academy'));
+const Documentary = lazy(() => import('./pages/Documentary'));
 const Instrumentation = lazy(() => import('./pages/Instrumentation'));
 
 export default function App() {
@@ -21,7 +22,7 @@ export default function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
-  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts)\/./.test(pathname);
+  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts|documentary)\/./.test(pathname);
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
@@ -39,6 +40,8 @@ export default function App() {
           <Route path="/atlas/:id" element={<RegionExplorer />} />
           <Route path="/blackouts" element={<Blackouts />} />
           <Route path="/blackouts/:id" element={<Replay />} />
+          <Route path="/documentary" element={<Documentary />} />
+          <Route path="/documentary/:id" element={<Documentary />} />
           <Route path="/academy" element={<Academy />} />
           <Route path="/academy/:id" element={<Academy />} />
           <Route path="/nuclear" element={<Nuclear />} />

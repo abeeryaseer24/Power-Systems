@@ -10,7 +10,7 @@ export default function Blackouts() {
     <main id="main" className="page blackouts">
       <div className="page-head">
         <h1>The nights the lights went out</h1>
-        <p>Twelve of the largest grid failures of the last fifty years, rebuilt on real network models from the investigation reports. Watch each one unfold second by second, or take the controls and try to stop it. The <Link to="/academy">case files</Link> explain why each one happened.</p>
+        <p>Twelve of the largest grid failures of the last fifty years, rebuilt on real network models from the investigation reports. Watch each one unfold second by second, or take the controls and try to stop it. The <Link to="/academy">case files</Link> explain why each one happened, and the <Link to="/documentary">documentaries</Link> tell the last minutes as a story.</p>
       </div>
       <ol className="bo-timeline">
         {list.map((e) => (
