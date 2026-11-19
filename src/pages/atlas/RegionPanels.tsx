@@ -4,7 +4,7 @@ import { KIND_COLOR } from '../../scene/RegionScene';
 import { mw, num } from '../../lib/format';
 
 const KIND_NAME: Record<string, string> = {
-  nuclear: 'Nuclear', coal: 'Coal', gas: 'Gas', oil: 'Oil', hydro: 'Hydro', wind: 'Wind', solar: 'Solar', bio: 'Biomass',
+  nuclear: 'Nuclear', coal: 'Coal', gas: 'Gas', oil: 'Oil', hydro: 'Hydro', wind: 'Wind', solar: 'Solar', bio: 'Biomass', battery: 'Battery',
 };
 
 export function HoverTip({ sim, hover }: { sim: RegionSim; hover: Hover | null }) {

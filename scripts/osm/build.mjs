@@ -16,7 +16,9 @@ const OUT = path.join(ROOT, 'public/data/regions');
 fs.mkdirSync(CACHE, { recursive: true });
 fs.mkdirSync(OUT, { recursive: true });
 
-const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+// public Overpass instances; a request that fails moves on to the next one
+const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+let ep = Number(process.env.OVERPASS_START ?? 0) % ENDPOINTS.length;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Map layers are decoration: if Overpass cannot serve them, build without. */
@@ -32,20 +34,28 @@ async function optional(fn) {
 async function overpass(key, query) {
   const file = path.join(CACHE, `${key}.json`);
   if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'User-Agent': 'blackstart-grid-model/0.1', Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'data=' + encodeURIComponent(query),
-    });
-    if (res.ok) {
-      const j = await res.json();
-      fs.writeFileSync(file, JSON.stringify(j));
-      await sleep(4000);
-      return j;
+  for (let attempt = 0; attempt < 9; attempt++) {
+    const url = ENDPOINTS[ep];
+    let status = 'network error';
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'User-Agent': 'blackstart-grid-model/0.1', Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query),
+      });
+      status = `HTTP ${res.status}`;
+      if (res.ok && (res.headers.get('content-type') ?? '').includes('json')) {
+        const j = await res.json();
+        fs.writeFileSync(file, JSON.stringify(j));
+        await sleep(3000);
+        return j;
+      }
+    } catch (e) {
+      status = e.message;
     }
-    console.warn(`  ${key}: HTTP ${res.status}, retrying`);
-    await sleep(15000 * (attempt + 1));
+    console.warn(`  ${key}: ${status} from ${new URL(url).host}, trying the next server`);
+    ep = (ep + 1) % ENDPOINTS.length;
+    await sleep(5000 * (1 + Math.floor(attempt / ENDPOINTS.length)));
   }
   throw new Error(`overpass failed for ${key}`);
 }
@@ -419,6 +429,7 @@ async function build(reg) {
   const out = {
     id: reg.id, city: reg.city, country: reg.country, scope: reg.scope, freq: reg.freq,
     center: reg.center, bbox: reg.bbox, extent: r2(extent), bounds: [r2(x0), r2(z0), r2(x1), r2(z1)],
+    seriesComp: reg.seriesComp, mustRun: reg.mustRun,
     demandMW: reg.demandMW, ext: { ...reg.ext, at: undefined, ties: undefined, bus: extBus, tieBuses },
     buses, branches, plants: PL, places: placesKept, roads: roadsOut, coast: coastOut, rivers: riversOut,
     source: 'OpenStreetMap contributors, ODbL',

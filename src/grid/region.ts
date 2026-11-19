@@ -13,7 +13,7 @@ import { findIslands, type FlowLine, type Islands } from './loadflow';
 
 export interface RegionBus { x: number; z: number; name: string; kv: number; boundary?: boolean; load: number }
 export interface RegionBranch { a: number; b: number; kv: number; circuits: number; km: number; x: number; r: number; bc: number; mva: number; name?: string; pts: [number, number][] }
-export type GenKind = 'nuclear' | 'coal' | 'gas' | 'oil' | 'hydro' | 'wind' | 'solar' | 'bio';
+export type GenKind = 'nuclear' | 'coal' | 'gas' | 'oil' | 'hydro' | 'wind' | 'solar' | 'bio' | 'battery';
 export interface RegionPlant { name: string; kind: GenKind; mw: number; bus: number; x: number; z: number; est?: boolean; offline?: boolean }
 export interface RegionPlace { x: number; z: number; pop: number; name?: string; t: string }
 export interface RegionData {
@@ -23,6 +23,10 @@ export interface RegionData {
   buses: RegionBus[]; branches: RegionBranch[]; plants: RegionPlant[]; places: RegionPlace[];
   roads: [number, number][][]; coast: [number, number][][]; rivers: [number, number][][];
   source: string; built: string;
+  /** Fraction of reactance cancelled by series capacitors on long 765 kV lines. */
+  seriesComp?: number;
+  /** Plants (name fragments) that run regardless of merit order. */
+  mustRun?: string[];
 }
 
 const KIND: Record<GenKind, { H: number; droop: number; Tg: number; ramp: number; minFrac: number; cost: number; sync: boolean }> = {
@@ -34,6 +38,9 @@ const KIND: Record<GenKind, { H: number; droop: number; Tg: number; ramp: number
   bio: { H: 4, droop: 0.05, Tg: 6, ramp: 0.03, minFrac: 0.4, cost: 90, sync: true },
   wind: { H: 0, droop: 0, Tg: 1, ramp: 1, minFrac: 0, cost: 0, sync: false },
   solar: { H: 0, droop: 0, Tg: 1, ramp: 1, minFrac: 0, cost: 0, sync: false },
+  // grid-forming battery: an inverter that behaves as a voltage source, with synthetic inertia and a
+  // very stiff, very fast droop; idle until frequency moves, and it can absorb as well as inject
+  battery: { H: 6, droop: 0.01, Tg: 0.15, ramp: 1, minFrac: 0, cost: 500, sync: true },
 };
 
 export interface GenState {
@@ -134,7 +141,9 @@ export class RegionSim {
     this.ufls = data.freq === 60 ? [59.3, 59.0, 58.7, 58.4, 58.1] : [48.8, 48.6, 48.4, 48.2, 48.0];
     this.loadScale = opts.loadScale ?? 1;
     this.buses = data.buses.map((def) => ({ def, V: 1, theta: 0, f: this.f0, rocof: 0, live: true, demand: def.load, served: def.load, shed: 0, connected: 1, uvTimer: 0 }));
-    this.branches = data.branches.map((def) => ({ def, closed: true, P: 0, Q: 0, loading: 0, heat: 0 }));
+    // series capacitors on long 765 kV lines cancel part of their reactance (copy so reloading does not compound it)
+    const sc = data.seriesComp ?? 0;
+    this.branches = data.branches.map((d) => ({ def: sc && d.kv >= 700 && d.km > 120 ? { ...d, x: d.x * (1 - sc) } : d, closed: true, P: 0, Q: 0, loading: 0, heat: 0 }));
     this.gens = data.plants.map((def) => ({ def, online: !def.offline, sched: 0, gov: 0, p: 0, q: 0, avail: def.mw, vTimer: 0, tripReason: def.offline ? 'out of service' : undefined }));
 
     // external equivalent
@@ -166,6 +175,12 @@ export class RegionSim {
     for (const br of this.branches) {
       this.reactorMin[br.def.a] -= 0.9 * (br.def.bc / 2);
       this.reactorMin[br.def.b] -= 0.9 * (br.def.bc / 2);
+      // long EHV lines (several hundred MVAr of charging) carry fixed line reactors at both ends,
+      // typically compensating about 70 % of the charging; without them the first solve has no answer
+      if (br.def.bc > 3) {
+        this.reactor[br.def.a] -= 0.7 * (br.def.bc / 2);
+        this.reactor[br.def.b] -= 0.7 * (br.def.bc / 2);
+      }
     }
     this.rebuild();
     // fragments of the OSM network with no path to the main system are not energised
@@ -254,7 +269,8 @@ export class RegionSim {
   dispatch(extImport?: number, margin = 1.12) {
     for (const b of this.buses) b.demand = b.def.load * this.loadScale;
     let need = this.demand * 1.02 - (extImport ?? (this.ext.hvdc ? this.ext.MW * 0.6 : 0));
-    const order = [...this.gens].sort((a, b) => KIND[a.def.kind].cost - KIND[b.def.kind].cost);
+    const must = (g: GenState) => !!this.data.mustRun?.some((n) => g.def.name.toLowerCase().includes(n.toLowerCase()));
+    const order = [...this.gens].sort((a, b) => KIND[a.def.kind].cost - (must(a) ? 100 : 0) - (KIND[b.def.kind].cost - (must(b) ? 100 : 0)));
     // unit commitment: cheapest plant first until demand plus a reserve margin is covered
     let committed = 0;
     for (const g of order) {
@@ -274,7 +290,7 @@ export class RegionSim {
       g.sched = 0;
       if (!g.online) continue;
       const k = KIND[g.def.kind];
-      const min = g.avail * k.minFrac;
+      const min = g.avail * (must(g) ? Math.max(0.6, k.minFrac) : k.minFrac);
       g.sched = min;
       need -= min;
     }
@@ -599,15 +615,16 @@ export class RegionSim {
       if (k.droop > 0) {
         const e = Math.abs(df) > 0.015 ? df - Math.sign(df) * 0.015 : 0;
         // only part of the fleet runs in frequency-sensitive mode with headroom held back
-        let target = -((g.def.mw * this.responseShare) / k.droop) * (e / this.f0);
-        target = Math.max(-g.sched, Math.min(g.avail - g.sched, target));
+        const batt = g.def.kind === 'battery';
+        let target = -((g.def.mw * (batt ? 1 : this.responseShare)) / k.droop) * (e / this.f0);
+        target = Math.max(batt ? -g.def.mw - g.sched : -g.sched, Math.min(g.avail - g.sched, target));
         g.gov += (target - g.gov) * (1 - Math.exp(-dt / k.Tg));
-        // secondary control nudges the schedule back toward nominal frequency
-        g.sched = Math.max(g.avail * k.minFrac, Math.min(g.avail, g.sched - 0.002 * g.def.mw * df * dt));
+        // secondary control nudges the schedule back toward nominal frequency; a battery stays at its set point
+        if (!batt) g.sched = Math.max(g.avail * k.minFrac, Math.min(g.avail, g.sched - 0.002 * g.def.mw * df * dt));
       }
       // limited frequency-sensitive mode: inverter plant backs off at high frequency
       if (!k.sync && df > 0.1) g.sched = Math.max(0, g.sched - 0.01 * g.def.mw * (df - 0.1) * dt * 10);
-      g.p = Math.max(0, g.sched + g.gov);
+      g.p = g.def.kind === 'battery' ? g.sched + g.gov : Math.max(0, g.sched + g.gov);
       pGen[this.islands.of[g.def.bus]] += g.p;
     }
     // external equivalent

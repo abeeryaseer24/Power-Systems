@@ -12,7 +12,7 @@ import { mulberry32, gaussian } from '../grid/profiles';
 import { glowTexture } from './builders';
 
 const KIND_COLOR: Record<string, string> = {
-  nuclear: '#c9b8ff', coal: '#a39e94', gas: '#f08a5d', oil: '#e2584d', hydro: '#4fa3d1', wind: '#a7e0ea', solar: '#ffd166', bio: '#9ccf7f',
+  nuclear: '#c9b8ff', coal: '#a39e94', gas: '#f08a5d', oil: '#e2584d', hydro: '#4fa3d1', wind: '#a7e0ea', solar: '#ffd166', bio: '#9ccf7f', battery: '#7cf0b4',
 };
 
 function kvColor(kv: number) {

@@ -78,4 +78,43 @@ export const REGIONS = [
     demandMW: 2300, ext: { name: 'NTDC national grid', MW: 9000, H: 4 },
     roads: 'motorway|trunk', rivers: false,
   },
+  {
+    id: 'caracas', city: 'Caracas', country: 'Venezuela', scope: 'National grid of Venezuela, 765 and 400 kV',
+    bbox: [0.6, -73.4, 12.3, -59.8], area: 'VE', minKV: 400, freq: 60, center: [10.48, -66.9],
+    // Venezuela runs essentially as an island; the small Colombia ties were out of service in 2019
+    // the Guri corridor is series compensated; some thermal plant near the load was running in 2019
+    seriesComp: 0.5, mustRun: ['Planta Centro', 'El Sitio', 'TermoCarabobo', 'José María España'],
+    demandMW: 12500, ext: { name: 'None (isolated grid)', MW: 1, H: 0, hvdc: true },
+    roads: 'motorway|trunk', rivers: true,
+  },
+  {
+    id: 'saopaulo', city: 'São Paulo', country: 'Brazil', scope: 'São Paulo and Paraná, Itaipu to the load, 765 to 440 kV',
+    bbox: [-26.0, -55.0, -21.0, -45.0], minKV: 440, freq: 60, center: [-23.55, -46.63], seriesComp: 0.4,
+    demandMW: 22000, ext: { name: 'Rest of the Brazilian grid', MW: 40000, H: 4 },
+    roads: 'motorway', rivers: true,
+  },
+  {
+    id: 'istanbul', city: 'Istanbul', country: 'Türkiye', scope: 'National grid of Türkiye, 400 kV',
+    bbox: [35.8, 25.6, 42.2, 44.9], area: 'TR', minKV: 380, freq: 50, center: [41.01, 28.98],
+    demandMW: 32200, ext: { name: 'Continental Europe (Bulgaria and Greece ties)', MW: 30000, H: 5, ties: [[41.75, 26.55], [41.3, 26.45]] },
+    roads: 'motorway', rivers: false,
+  },
+  {
+    id: 'colombo', city: 'Colombo', country: 'Sri Lanka', scope: 'National grid of Sri Lanka, 220 and 132 kV',
+    bbox: [5.8, 79.5, 9.95, 82.0], area: 'LK', minKV: 132, freq: 50, center: [6.93, 79.85],
+    demandMW: 1900, ext: { name: 'None (isolated grid)', MW: 1, H: 0, hvdc: true },
+    roads: 'motorway|trunk', rivers: false,
+  },
+  {
+    id: 'moscow', city: 'Moscow', country: 'Russia', scope: 'Moscow and the surrounding oblasts, 500 and 220 kV',
+    bbox: [54.4, 36.0, 56.6, 39.6], minKV: 220, freq: 50, center: [55.756, 37.617],
+    demandMW: 13000, ext: { name: 'Unified Energy System of Russia', MW: 40000, H: 5 },
+    roads: 'motorway|trunk', rivers: true,
+  },
+  {
+    id: 'tashkent', city: 'Tashkent', country: 'Uzbekistan', scope: 'Central Asian Power System: Uzbekistan, Kyrgyzstan, south Kazakhstan, Tajikistan, 500 kV',
+    bbox: [37.5, 64.0, 44.5, 80.0], minKV: 500, freq: 50, center: [41.31, 69.28],
+    demandMW: 15000, ext: { name: 'North Kazakhstan and Russia', MW: 20000, H: 4 },
+    roads: 'motorway|trunk', rivers: true,
+  },
 ];

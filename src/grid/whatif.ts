@@ -88,6 +88,19 @@ export const WHAT_IFS: WhatIf[] = [
     }),
   },
   {
+    id: 'battery', title: 'Grid-forming batteries',
+    blurb: 'Batteries worth 8 % of demand at the four biggest load centres, holding frequency and voltage like a power station. Stack it with a disaster.',
+    apply: (s) => {
+      const total = s.demand * 0.08;
+      const sites = s.data.buses.map((b, i) => ({ b, i })).filter((x) => x.b.load > 0 && s.buses[x.i].live).sort((a, c) => c.b.load - a.b.load).slice(0, 4);
+      for (const [k, x] of sites.entries()) {
+        const mw = Math.round(total / sites.length);
+        s.addPlant({ name: `Grid-forming battery ${k + 1}`, kind: 'battery', mw, bus: x.i, x: x.b.x, z: x.b.z }, 0);
+      }
+      s.note('info', `Grid-forming batteries online: ${Math.round(total)} MW at ${sites.length} sites, idle until frequency moves.`);
+    },
+  },
+  {
     id: 'rooppur', title: 'Rooppur comes online, then trips', blurb: 'A 1,200 MW unit at Rooppur joins the grid, then trips: the largest single loss Bangladesh has ever faced.',
     regions: ['dhaka'],
     apply: (s) => {
