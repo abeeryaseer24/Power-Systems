@@ -16,6 +16,22 @@
   "demandMW": 11200
  },
  {
+  "id": "dhaka-metro",
+  "city": "Dhaka metro",
+  "country": "Bangladesh",
+  "scope": "Greater Dhaka, 230 and 132 kV",
+  "freq": 50,
+  "center": [
+   23.81,
+   90.41
+  ],
+  "buses": 64,
+  "branches": 78,
+  "plants": 38,
+  "genMW": 7622,
+  "demandMW": 5200
+ },
+ {
   "id": "london",
   "city": "London",
   "country": "United Kingdom",
