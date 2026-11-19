@@ -628,7 +628,10 @@ export const EVENTS: BlackoutEvent[] = [
       {
         t: 170, clock: '03:26', kind: 'consequence', label: 'Generators across Italy trip early as frequency falls.',
         cond: (s) => lowF(s, 48.5),
-        run: (s, h) => h.extLoss(3000, 'early generator trips on under-frequency'),
+        run: (s, h) => {
+          h.extLoss(7000, 'early generator trips on under-frequency across Italy');
+          s.gens.map((g, i) => ({ g, i })).filter((x) => x.g.online).sort((a, b) => b.g.p - a.g.p).slice(0, 3).forEach((x) => s.tripGen(x.i, 'under-frequency protection'));
+        },
       },
     ],
   },
