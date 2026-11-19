@@ -138,38 +138,38 @@ export default function Protection() {
         <p>Every high-voltage line is watched by a distance relay at each end. It divides voltage by current and asks one question: is that impedance small enough to be a fault on my line? Put a fault anywhere and see what each relay sees.</p>
       </div>
 
-      <section className="pr-line" aria-label="Line diagram">
-        <svg viewBox="0 0 1000 170" className="pr-svg">
-          <line x1="20" y1="80" x2="60" y2="80" className="pr-src" />
-          <line x1="940" y1="80" x2="980" y2="80" className="pr-src" />
-          <circle cx="16" cy="80" r="12" className="pr-gen" />
-          <circle cx="984" cy="80" r="12" className="pr-gen" />
-          <line x1={kmToPx(0)} y1="80" x2={kmToPx(AB)} y2="80" className={`pr-ln ${faultSide === 'AB' ? 'faulted' : ''}`} />
-          <line x1={kmToPx(AB)} y1="80" x2={kmToPx(L)} y2="80" className={`pr-ln ${faultSide === 'BC' ? 'faulted' : ''}`} />
+      <section className="rl-line" aria-label="Line diagram">
+        <svg viewBox="0 0 1000 170" className="rl-svg">
+          <line x1="20" y1="80" x2="60" y2="80" className="rl-src" />
+          <line x1="940" y1="80" x2="980" y2="80" className="rl-src" />
+          <circle cx="16" cy="80" r="12" className="rl-gen" />
+          <circle cx="984" cy="80" r="12" className="rl-gen" />
+          <line x1={kmToPx(0)} y1="80" x2={kmToPx(AB)} y2="80" className={`rl-ln ${faultSide === 'AB' ? 'faulted' : ''}`} />
+          <line x1={kmToPx(AB)} y1="80" x2={kmToPx(L)} y2="80" className={`rl-ln ${faultSide === 'BC' ? 'faulted' : ''}`} />
           {[['A', 0], ['B', AB], ['C', L]].map(([n, km]) => (
             <g key={n as string} transform={`translate(${kmToPx(km as number)} 80)`}>
-              <rect x="-5" y="-34" width="10" height="68" className="pr-bus" />
-              <text y="62" className="pr-busl">{n}</text>
+              <rect x="-5" y="-34" width="10" height="68" className="rl-bus" />
+              <text y="62" className="rl-busl">{n}</text>
             </g>
           ))}
           {RELAYS.map((r) => {
             const px = kmToPx(r.at) + r.dir * 26;
             const z = zoneOf(seen(r, x, rf), r);
             return (
-              <g key={r.id} transform={`translate(${px} 80)`} className={`pr-brk ${opened.has(r.id) ? 'open' : ''} ${stuck === r.id ? 'stuck' : ''} ${eye === r.id ? 'eye' : ''}`}
+              <g key={r.id} transform={`translate(${px} 80)`} className={`rl-brk ${opened.has(r.id) ? 'open' : ''} ${stuck === r.id ? 'stuck' : ''} ${eye === r.id ? 'eye' : ''}`}
                 onClick={() => setEye(r.id)} role="button" aria-label={`Show what relay ${r.label} sees`}>
                 <rect x="-9" y="-9" width="18" height="18" />
-                <path d={`M ${r.dir * 12} -26 l ${r.dir * 14} 0 l ${-r.dir * 5} -5 M ${r.dir * 26} -26 l ${-r.dir * 5} 5`} className="pr-arrow" />
-                <text y="-36" className="pr-rl">{r.label}</text>
-                {z > 0 && <text y="34" className="pr-zl">Z{z}</text>}
+                <path d={`M ${r.dir * 12} -26 l ${r.dir * 14} 0 l ${-r.dir * 5} -5 M ${r.dir * 26} -26 l ${-r.dir * 5} 5`} className="rl-arrow" />
+                <text y="-36" className="rl-rl">{r.label}</text>
+                {z > 0 && <text y="34" className="rl-zl">Z{z}</text>}
               </g>
             );
           })}
-          <g transform={`translate(${kmToPx(x)} 80)`} className="pr-fault">
+          <g transform={`translate(${kmToPx(x)} 80)`} className="rl-fault">
             <path d="M -2 -40 L 8 -16 L -4 -12 L 6 12 L -10 -14 L 2 -18 Z" />
           </g>
-          <text x={kmToPx(AB / 2)} y="140" className="pr-km">{AB} km</text>
-          <text x={kmToPx(AB + BC / 2)} y="140" className="pr-km">{BC} km</text>
+          <text x={kmToPx(AB / 2)} y="140" className="rl-km">{AB} km</text>
+          <text x={kmToPx(AB + BC / 2)} y="140" className="rl-km">{BC} km</text>
         </svg>
         <div className="w-controls">
           <label className="w-slider">Fault position <output>{x < AB ? `${x} km from A` : `${x - AB} km past B`}</output>
@@ -181,46 +181,46 @@ export default function Protection() {
               <option value="">None</option>
               {RELAYS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select></label>
-          <label className="pr-check"><input type="checkbox" checked={bf} onChange={(e) => setBf(e.target.checked)} /> Breaker-failure protection</label>
+          <label className="rl-check"><input type="checkbox" checked={bf} onChange={(e) => setBf(e.target.checked)} /> Breaker-failure protection</label>
         </div>
       </section>
 
-      <div className="pr-grid">
-        <section className="pr-rx" aria-label="Impedance plane">
+      <div className="rl-grid">
+        <section className="rl-rx" aria-label="Impedance plane">
           <h2>What relay {rl.label} sees</h2>
           <p className="hint">Resistance across, reactance up. Each circle is a zone. Click a breaker on the diagram to look through its relay.</p>
-          <svg viewBox={`0 0 ${PX.w} ${PX.h}`} className="pr-svg">
-            <line x1={sx(PX.r0)} y1={sy(0)} x2={sx(PX.r1)} y2={sy(0)} className="pr-axis" />
-            <line x1={sx(0)} y1={sy(PX.x0)} x2={sx(0)} y2={sy(PX.x1)} className="pr-axis" />
-            <text x={sx(PX.r1) - 6} y={sy(0) - 8} className="pr-axl" textAnchor="end">R, Ω</text>
-            <text x={sx(0) + 8} y={sy(PX.x1) + 16} className="pr-axl">X, Ω</text>
+          <svg viewBox={`0 0 ${PX.w} ${PX.h}`} className="rl-svg">
+            <line x1={sx(PX.r0)} y1={sy(0)} x2={sx(PX.r1)} y2={sy(0)} className="rl-axis" />
+            <line x1={sx(0)} y1={sy(PX.x0)} x2={sx(0)} y2={sy(PX.x1)} className="rl-axis" />
+            <text x={sx(PX.r1) - 6} y={sy(0) - 8} className="rl-axl" textAnchor="end">R, Ω</text>
+            <text x={sx(0) + 8} y={sy(PX.x1) + 16} className="rl-axl">X, Ω</text>
             {reaches(rl).map((z, k) => (
-              <circle key={k} cx={sx(z.r / 2)} cy={sy(z.x / 2)} r={sk(Math.hypot(z.r, z.x) / 2)} className={`pr-zone z${k + 1} ${zone === k + 1 ? 'hit' : ''}`} />
+              <circle key={k} cx={sx(z.r / 2)} cy={sy(z.x / 2)} r={sk(Math.hypot(z.r, z.x) / 2)} className={`rl-zone z${k + 1} ${zone === k + 1 ? 'hit' : ''}`} />
             )).reverse()}
-            <line x1={sx(0)} y1={sy(0)} x2={sx(zAt(rl.own).r)} y2={sy(zAt(rl.own).x)} className="pr-own" />
-            <text x={sx(zAt(rl.own).r) + 8} y={sy(zAt(rl.own).x)} className="pr-axl">own line</text>
+            <line x1={sx(0)} y1={sy(0)} x2={sx(zAt(rl.own).r)} y2={sy(zAt(rl.own).x)} className="rl-own" />
+            <text x={sx(zAt(rl.own).r) + 8} y={sy(zAt(rl.own).x)} className="rl-axl">own line</text>
             {eye === 'A' && (
               <>
-                <polyline points={swingPath} className="pr-swingpath" />
+                <polyline points={swingPath} className="rl-swingpath" />
                 {zLoad.r < PX.r1 - 4 ? (
                   <>
-                    <circle cx={sx(zLoad.r)} cy={sy(zLoad.x)} r="7" className={`pr-load ${loadZone ? 'in' : ''}`} />
-                    <text x={sx(zLoad.r) + 10} y={sy(zLoad.x) + 4} className="pr-axl">load</text>
+                    <circle cx={sx(zLoad.r)} cy={sy(zLoad.x)} r="7" className={`rl-load ${loadZone ? 'in' : ''}`} />
+                    <text x={sx(zLoad.r) + 10} y={sy(zLoad.x) + 4} className="rl-axl">load</text>
                   </>
                 ) : (
-                  <text x={PX.w - 8} y={sy(Math.min(PX.x1 - 5, zLoad.x * ((PX.r1 - 4) / zLoad.r)))} className="pr-axl pr-offplot" textAnchor="end">load, {Math.round(zLoad.r)} Ω →</text>
+                  <text x={PX.w - 8} y={sy(Math.min(PX.x1 - 5, zLoad.x * ((PX.r1 - 4) / zLoad.r)))} className="rl-axl rl-offplot" textAnchor="end">load, {Math.round(zLoad.r)} Ω →</text>
                 )}
-                {swingNow && <circle cx={sx(swingNow.r)} cy={sy(swingNow.x)} r="7" className="pr-swing" />}
+                {swingNow && <circle cx={sx(swingNow.r)} cy={sy(swingNow.x)} r="7" className="rl-swing" />}
               </>
             )}
-            {zf && <g transform={`translate(${sx(zf.r)} ${sy(zf.x)})`} className="pr-zf"><circle r="8" /><text x="12" y="4">fault</text></g>}
+            {zf && <g transform={`translate(${sx(zf.r)} ${sy(zf.x)})`} className="rl-zf"><circle r="8" /><text x="12" y="4">fault</text></g>}
           </svg>
-          <p className="pr-verdict">
+          <p className="rl-verdict">
             {!zf ? 'The fault is behind this relay. It does not trip.' : zone === 1 ? 'Zone 1: inside 80 % of its own line. Trips at once.' : zone === 2 ? 'Zone 2: near the far end or just beyond it. Waits 300 ms in case the next relay clears it first.' : zone === 3 ? 'Zone 3: far backup. Waits a full second.' : 'Outside every zone. This relay does nothing.'}
           </p>
         </section>
 
-        <section className="pr-seq" aria-label="Clearing sequence">
+        <section className="rl-seq" aria-label="Clearing sequence">
           <h2>What happens</h2>
           <ol>
             <li><b>0 ms</b> Fault {x < AB ? `on line A–B, ${x} km from A` : `on line B–C, ${x - AB} km from B`}.</li>
@@ -233,7 +233,7 @@ export default function Protection() {
         </section>
       </div>
 
-      <section className="pr-encroach">
+      <section className="rl-encroach">
         <h2>When heavy load looks like a fault</h2>
         <p>Load also has an impedance: voltage squared divided by power. On a normal day it sits far out to the right of the circles. Push the power up, let the voltage sag and add reactive flow, and it walks into zone 3. That is how the Sammis–Star line tripped in the{' '}
           <Link to="/academy/northeast-2003">2003 Northeast blackout</Link>: no fault at all, just a heavily loaded line at low voltage.</p>
@@ -242,22 +242,22 @@ export default function Protection() {
           <label className="w-slider">Reactive power, share of real <output>{Math.round(qShare * 100)} %</output><input type="range" min={0} max={0.8} step={0.05} value={qShare} onChange={(e) => { setEye('A'); setQShare(Number(e.target.value)); }} /></label>
           <label className="w-slider">Voltage <output>{volt.toFixed(2)} pu</output><input type="range" min={0.7} max={1.05} step={0.01} value={volt} onChange={(e) => { setEye('A'); setVolt(Number(e.target.value)); }} /></label>
         </div>
-        <p className={`pr-verdict ${loadZone ? 'bad' : ''}`}>{loadZone ? `The load point is inside zone ${loadZone}. Relay A would trip a healthy line.` : `Load impedance ${Math.round(Math.hypot(zLoad.r, zLoad.x))} Ω. Safely outside the zones.`}</p>
+        <p className={`rl-verdict ${loadZone ? 'bad' : ''}`}>{loadZone ? `The load point is inside zone ${loadZone}. Relay A would trip a healthy line.` : `Load impedance ${Math.round(Math.hypot(zLoad.r, zLoad.x))} Ω. Safely outside the zones.`}</p>
       </section>
 
-      <section className="pr-encroach">
+      <section className="rl-encroach">
         <h2>Power swings</h2>
         <p>After a big disturbance, the generators at the two ends swing against each other. The impedance the relay sees sweeps across the plane along the dashed line. If it passes through the circles, the relay may trip a healthy line in the middle of the swing, which is how a grid tears apart. Power-swing blocking tells the relay to hold off when the impedance moves slowly rather than jumping.</p>
         <div className="w-buttons">
           <button className="btn" onClick={() => { setEye('A'); setSwing(0.35); }} disabled={swing !== null}>Start a swing</button>
-          <label className="pr-check"><input type="checkbox" checked={psb} onChange={(e) => setPsb(e.target.checked)} /> Power-swing blocking</label>
+          <label className="rl-check"><input type="checkbox" checked={psb} onChange={(e) => setPsb(e.target.checked)} /> Power-swing blocking</label>
         </div>
-        <p className={`pr-verdict ${swingZone && !psb ? 'bad' : ''}`}>
+        <p className={`rl-verdict ${swingZone && !psb ? 'bad' : ''}`}>
           {swing === null ? 'Angle between the two ends: steady.' : `Angle ${Math.round((swing * 180) / Math.PI)}°. ${swingZone ? (psb ? `Inside zone ${swingZone}, but blocked: the line stays in.` : `Inside zone ${swingZone}: relay A trips a healthy line.`) : 'Outside the zones.'}`}
         </p>
       </section>
 
-      <p className="hint pr-foot">Simplified: a single-phase picture with mho characteristics, ignoring infeed from the far end (which makes real relays under-reach on resistive faults) and fault type. Line constants are typical of a 400 kV double-bundle line.</p>
+      <p className="hint rl-foot">Simplified: a single-phase picture with mho characteristics, ignoring infeed from the far end (which makes real relays under-reach on resistive faults) and fault type. Line constants are typical of a 400 kV double-bundle line.</p>
     </main>
   );
 }
