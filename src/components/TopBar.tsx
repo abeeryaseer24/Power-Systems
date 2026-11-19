@@ -20,8 +20,14 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
       { to: '/documentary', label: 'Documentaries', note: 'The last minutes, told as a story' },
       { to: '/academy', label: 'Case files', note: 'Why each one happened' },
       { to: '/predictor', label: 'Predictor', note: 'Would an AI have seen it coming?' },
+    ],
+  },
+  {
+    label: 'Engineering',
+    items: [
       { to: '/protection', label: 'Protection', note: 'Look through a distance relay’s eyes' },
       { to: '/market', label: 'Markets', note: 'How the last megawatt sets the price' },
+      { to: '/oscillations', label: 'Oscillations', note: 'When half a grid swings against the other' },
     ],
   },
 ];

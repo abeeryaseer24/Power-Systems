@@ -1,0 +1,26 @@
+/* when half a grid swings */
+.oscillations { max-width: 1100px; }
+.os-stage, .os-controls { padding: 22px; border-radius: 14px; background: rgba(7, 18, 34, 0.7); border: 1px solid var(--rule); margin-bottom: 18px; }
+.os-svg { width: 100%; height: auto; display: block; margin-bottom: 8px; }
+.os-area { fill: rgba(134, 197, 218, 0.04); stroke: var(--rule); }
+.os-al { fill: var(--steel); font-size: 14px; }
+.os-gen { fill: #08121f; stroke: rgba(236, 230, 216, 0.35); stroke-width: 2; }
+.os-gl { fill: var(--porcelain); font-family: var(--display); font-weight: 700; font-size: 16px; text-anchor: middle; }
+.os-tie { stroke: var(--porcelain); stroke-width: 3; transition: stroke 0.2s; }
+.os-tie.out { stroke: rgba(255, 91, 79, 0.35); stroke-dasharray: 6 6; }
+.os-tie.flt { stroke: #ffd27a; filter: drop-shadow(0 0 6px #ff9a3c); }
+.os-flow { fill: var(--sodium); font-family: var(--display); font-weight: 500; font-size: 20px; font-variant-numeric: tabular-nums; }
+.os-axis { stroke: rgba(139, 154, 176, 0.4); }
+.os-dist { stroke: rgba(255, 91, 79, 0.4); stroke-dasharray: 3 4; }
+.os-ax { fill: var(--steel); font-size: 12px; }
+.os-trace { fill: none; stroke-width: 1.8; }
+.os-verdict { font-family: var(--display); font-weight: 500; font-size: 22px; line-height: 1.25; margin: 6px 0 0; }
+.os-verdict.bad { color: var(--trip); }
+.os-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 28px; }
+.os-toggles { display: grid; gap: 10px; font-size: 14px; color: var(--steel); }
+.os-toggles input { accent-color: var(--sodium); margin-right: 6px; }
+.os-toggles select { display: block; margin-top: 4px; background: var(--panel-solid, #0c1a2d); color: var(--porcelain); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.os-text { max-width: 75ch; }
+.os-text h2 { font-family: var(--display); font-weight: 700; font-size: 28px; margin: 10px 0 8px; }
+.os-text p { line-height: 1.65; }
+.oscillations .hint { font-size: 13px; color: var(--steel); }
