@@ -191,7 +191,7 @@ function ReplayView({ ev }: { ev: BlackoutEvent }) {
                 <ul>{ev.lessons.map((c, i) => <li key={i}>{c}</li>)}</ul>
                 <h2>Sources</h2>
                 <ul className="sources">{ev.sources.map((c, i) => <li key={i}>{c}</li>)}</ul>
-                <div className="brief-cta"><button className="btn primary" onClick={() => setAbout(false)} autoFocus>Back to the replay</button></div>
+                <div className="brief-cta"><button className="btn primary" onClick={() => setAbout(false)} autoFocus>Back to the replay</button><Link className="btn ghost" to={`/academy/${ev.id}`}>Read the full case file</Link></div>
               </div>
             </div>
           )}
