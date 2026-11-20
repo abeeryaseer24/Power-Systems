@@ -195,10 +195,11 @@ button { font: inherit; color: inherit; }
 .nav-menu span { font-size: 12px; color: var(--steel); }
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; gap: 8px; }
-  .topbar nav { margin-left: 0; width: 100%; overflow-x: auto; overflow-y: visible; }
-  .nav-menu { position: fixed; left: 12px; right: 12px; top: 96px; width: auto; }
-  /* six menus no longer fit at phone width: keep each label on one line and let the row scroll */
-  .topbar nav { gap: 16px; padding-bottom: 2px; padding-right: 24px; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  /* six menus at phone width: wrap onto two lines; a scrolling or masked row would clip the open menu */
+  .topbar nav { margin-left: 0; width: 100%; flex-wrap: wrap; gap: 2px 16px; overflow: visible; }
   .nav-group, .topbar nav > a { flex: none; }
-  .nav-trigger, .topbar nav a { white-space: nowrap; font-size: 14px; }
+  .nav-trigger, .topbar nav a { white-space: nowrap; font-size: 14px; padding: 6px 0; }
+  .page { padding-top: 150px; }
+  .topbar { background: linear-gradient(180deg, rgba(5, 11, 22, 0.96) 70%, rgba(5, 11, 22, 0)); }
+  .nav-menu { position: fixed; left: 12px; right: 12px; top: 128px; width: auto; max-height: calc(100vh - 144px); overflow-y: auto; }
 }

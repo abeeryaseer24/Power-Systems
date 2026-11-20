@@ -47,47 +47,120 @@ function EpisodeLink({ e }: { e: Ep }) {
   );
 }
 
-/** Scene clock, typewriter timestamp, auto-advance and sound moods shared by both kinds of episode. */
+/**
+ * The episode as a sequence of beats, one thing on screen at a time:
+ * intro card, then for each scene a cut to black, the timestamp typing, the title, the narration
+ * sentence by sentence, the "what failed" diagram if the scene changes it, a held moment and a fade out;
+ * then an end card.
+ */
+type Beat = 'cut' | 'clock' | 'title' | 'body' | 'diagram' | 'hold' | 'out';
+const sentences = (t?: string) => (t ? t.split(/(?<=[.!?])\s+/).filter(Boolean) : []);
+
 function usePlayer(ep: Ep, started: boolean) {
+  const [phase, setPhase] = useState<'intro' | 'scenes' | 'end'>('intro');
   const [i, setI] = useState(0);
+  const [beat, setBeat] = useState<Beat>('cut');
   const [typed, setTyped] = useState('');
+  const [lines, setLines] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [run, setRun] = useState(0);
   const scene = ep.scenes[i];
+  const parts = sentences(scene.body);
+  const pausedRef = useRef(false);
+  pausedRef.current = paused;
 
   useEffect(() => () => sfx.quiet(), []);
 
-  useEffect(() => {
-    if (!started) return;
-    setTyped('');
-    let k = 0;
-    const iv = setInterval(() => {
-      k++;
-      setTyped(scene.clock.slice(0, k));
-      if (scene.clock[k - 1] && scene.clock[k - 1] !== ' ') sfx.tick();
-      if (k >= scene.clock.length) clearInterval(iv);
-    }, 90);
-    return () => clearInterval(iv);
-  }, [i, started, scene.clock]);
+  // a pausable timer: resolves after ms of unpaused time
+  const wait = (ms: number, alive: () => boolean) => new Promise<void>((res) => {
+    let left = ms;
+    let last = performance.now();
+    const tick = () => {
+      if (!alive()) return;
+      const now = performance.now();
+      if (!pausedRef.current) left -= now - last;
+      last = now;
+      if (left <= 0) res();
+      else setTimeout(tick, 40);
+    };
+    setTimeout(tick, 40);
+  });
 
   useEffect(() => {
-    if (started && i === ep.scenes.length - 1) markDone(`doc:${ep.id}`);
-  }, [started, i, ep]);
-
-  useEffect(() => {
-    if (!started || i >= ep.scenes.length - 1) return;
-    const t = setTimeout(() => setI(i + 1), scene.hold * 1000);
-    return () => clearTimeout(t);
-  }, [i, started, scene.hold, ep.scenes.length]);
-
-  useEffect(() => {
-    if (!started) return;
-    const level = { calm: 0.25, tension: 0.55, impact: 0.9, dark: 0.4, after: 0.15 }[scene.mood ?? 'calm'];
-    sfx.setDrone(level);
-    if (scene.mood === 'impact') sfx.boom();
-    if (scene.mood === 'dark' && ep.scenes[i - 1]?.mood !== 'dark') sfx.powerDown();
+    if (!started || phase !== 'intro') return;
+    let alive = true;
+    sfx.setDrone(0.2);
+    wait(3400, () => alive).then(() => alive && setPhase('scenes'));
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i, started]);
+  }, [started, phase]);
 
-  return { i, setI, typed, scene };
+  useEffect(() => {
+    if (!started || phase !== 'scenes') return;
+    let alive = true;
+    const ok = () => alive;
+    const impact = scene.mood === 'impact';
+    (async () => {
+      setBeat('cut');
+      setTyped('');
+      setLines(0);
+      const level = { calm: 0.25, tension: 0.55, impact: 0.9, dark: 0.4, after: 0.15 }[scene.mood ?? 'calm'];
+      // a held silence before each impact
+      sfx.setDrone(impact ? 0.06 : level);
+      await wait(impact ? 1200 : 650, ok);
+      if (!alive) return;
+      if (impact) sfx.boom();
+      if (scene.mood === 'dark' && ep.scenes[i - 1]?.mood !== 'dark') sfx.powerDown();
+      sfx.setDrone(level);
+      setBeat('clock');
+      for (let k = 1; k <= scene.clock.length; k++) {
+        await wait(85, ok);
+        if (!alive) return;
+        setTyped(scene.clock.slice(0, k));
+        if (scene.clock[k - 1] !== ' ') sfx.tick();
+      }
+      await wait(650, ok);
+      if (!alive) return;
+      setBeat('title');
+      await wait(1500, ok);
+      if (!alive) return;
+      setBeat('body');
+      for (let k = 1; k <= parts.length; k++) {
+        setLines(k);
+        // reading time: about 3.4 words a second, never under 1.8 s a sentence
+        await wait(Math.max(1800, (parts[k - 1].split(' ').length / 3.4) * 1000), ok);
+        if (!alive) return;
+      }
+      if (scene.fx?.length) {
+        setBeat('diagram');
+        await wait(3400, ok);
+        if (!alive) return;
+      }
+      setBeat('hold');
+      await wait(Math.max(1000, scene.hold * 1000 - 6000), ok);
+      if (!alive) return;
+      setBeat('out');
+      await wait(800, ok);
+      if (!alive) return;
+      if (i >= ep.scenes.length - 1) {
+        markDone(`doc:${ep.id}`);
+        setPhase('end');
+      } else setI(i + 1);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i, started, phase, run]);
+
+  const go = (k: number) => {
+    setPhase('scenes');
+    setI(Math.max(0, Math.min(ep.scenes.length - 1, k)));
+    setRun((r) => r + 1);
+  };
+  return { phase, i, go, beat, typed, lines, parts, scene, paused, setPaused };
 }
 
 function Shell({ ep, started, onStart, ready, readyLabel, player, more, children }: {
@@ -100,38 +173,96 @@ function Shell({ ep, started, onStart, ready, readyLabel, player, more, children
   more: ReactNode;
   children: ReactNode;
 }) {
-  const { i, setI, typed, scene } = player;
+  const { phase, i, go, beat, typed, lines, parts, scene, paused, setPaused } = player;
+  const [chrome, setChrome] = useState(true);
+  const [diagramOpen, setDiagramOpen] = useState(false);
+  const hideTimer = useRef(0);
+  // controls show on movement or touch, then fade away
+  const wake = () => {
+    setChrome(true);
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setChrome(false), 3500);
+  };
+  useEffect(() => {
+    if (!started) return;
+    wake();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        e.preventDefault();
+        setPaused(!paused);
+        wake();
+      }
+      if (e.key === 'ArrowRight') go(i + 1);
+      if (e.key === 'ArrowLeft') go(i - 1);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, paused, i]);
+  const order: Beat[] = ['cut', 'clock', 'title', 'body', 'diagram', 'hold', 'out'];
+  const at = (b: Beat) => order.indexOf(beat) >= order.indexOf(b);
+  const showDiagram = phase === 'scenes' && beat !== 'out' && (diagramOpen || (!!scene.fx?.length && at('diagram')));
+  const next = EPISODES[EPISODES.findIndex((e) => e.id === ep.id) + 1];
+  const black = started && (phase !== 'scenes' || beat === 'cut' || beat === 'out');
   return (
-    <main id="main" className={`doc ${ep.plant ? 'doc-nuclear' : ''} mood-${started ? scene.mood ?? 'calm' : 'calm'}`}>
+    <main id="main" className={`doc ${ep.plant ? 'doc-nuclear' : ''} mood-${started && phase === 'scenes' ? scene.mood ?? 'calm' : 'calm'} ${chrome ? 'chrome' : ''} ${paused ? 'paused' : ''} ${started ? 'playing' : ''}`}
+      onPointerMove={started ? wake : undefined} onPointerDown={started ? wake : undefined}>
       {children}
       <div className="doc-grade" aria-hidden="true" />
+      {started && phase === 'scenes' && scene.mood === 'impact' && beat !== 'cut' && <div className="doc-hit" key={`hit-${i}`} aria-hidden="true" />}
+      <div className={`doc-black ${black ? 'on' : ''}`} aria-hidden="true" />
       <div className="doc-grain" aria-hidden="true" />
       <i className="doc-bar top" aria-hidden="true" />
       <i className="doc-bar bottom" aria-hidden="true" />
-      {!started ? (
+      {!started && (
         <div className="doc-title-card">
           <span className="doc-ep">Episode {ep.number}</span>
           <h1>{ep.title}</h1>
           <p>{ep.tagline}</p>
           <button className="btn primary" onClick={() => { sfx.unlock(); onStart(); }} disabled={!ready}>{ready ? 'Play' : readyLabel}</button>
+          <span className="doc-note">Best with sound. Reconstructed from the investigation reports on a simulated grid.</span>
         </div>
-      ) : (
+      )}
+      {started && phase === 'intro' && (
+        <div className="doc-intro" aria-live="polite">
+          <span>A Blackstart documentary</span>
+          <strong>{ep.title}</strong>
+        </div>
+      )}
+      {started && phase === 'scenes' && (
         <>
-          <Anatomy ep={ep} upto={i} />
-          <section className="doc-scene" key={i} aria-live="polite">
-            <span className="doc-clock">{typed}<b className="caret" aria-hidden="true" /></span>
-            <h2>{scene.title}</h2>
-            {scene.body && <p>{scene.body}</p>}
+          {showDiagram && <Anatomy ep={ep} upto={i} />}
+          <section className={`doc-scene ${beat === 'out' ? 'leaving' : ''}`} key={i} aria-live="polite">
+            {at('clock') && <span className="doc-clock">{typed}<b className="caret" aria-hidden="true" /></span>}
+            {at('title') && <h2>{scene.title}</h2>}
+            {at('body') && parts.length > 0 && (
+              <p>{parts.slice(0, lines).map((t, k) => <span key={k} className="doc-line">{t} </span>)}</p>
+            )}
           </section>
-          <nav className="doc-controls" aria-label="Episode controls">
-            <button onClick={() => setI(Math.max(0, i - 1))} disabled={i === 0}>Previous</button>
-            <span>{i + 1} / {ep.scenes.length}</span>
-            <button onClick={() => setI(Math.min(ep.scenes.length - 1, i + 1))} disabled={i === ep.scenes.length - 1}>Next</button>
-            <SoundToggle className="doc-sound" />
-            {more}
-            <Link to="/documentary">All episodes</Link>
-          </nav>
         </>
+      )}
+      {started && phase === 'end' && (
+        <div className="doc-end">
+          <span className="doc-ep">End of episode {ep.number}</span>
+          <h2>{ep.title}</h2>
+          <div className="doc-end-cta">
+            {next && <Link className="btn primary" to={`/documentary/${next.id}`}>Next: {next.title}</Link>}
+            <button className="btn ghost" onClick={() => go(0)}>Watch again</button>
+            {more}
+            <Link className="btn ghost" to="/documentary">All episodes</Link>
+          </div>
+        </div>
+      )}
+      {started && (
+        <nav className="doc-controls" aria-label="Episode controls">
+          <button onClick={() => go(i - 1)} disabled={phase !== 'scenes' || i === 0} aria-label="Previous scene">‹</button>
+          <button onClick={() => setPaused(!paused)}>{paused ? 'Resume' : 'Pause'}</button>
+          <button onClick={() => go(i + 1)} disabled={phase === 'scenes' && i === ep.scenes.length - 1} aria-label="Next scene">›</button>
+          <span className="doc-progress" aria-hidden="true">{ep.scenes.map((_, k) => <i key={k} className={k < i || phase === 'end' ? 'done' : k === i && phase === 'scenes' ? 'now' : ''} />)}</span>
+          <button className={`doc-what ${diagramOpen ? 'on' : ''}`} onClick={() => setDiagramOpen(!diagramOpen)}>What failed</button>
+          <SoundToggle className="doc-sound" />
+          <Link to="/documentary">All episodes</Link>
+        </nav>
       )}
     </main>
   );
