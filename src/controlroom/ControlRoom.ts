@@ -51,12 +51,13 @@ export class ControlRoom {
   private dead = false;
   private trace: number[] = [];
   private litCount = 0;
+  private dirty = true;
   private boomed = false;
 
   constructor(private host: HTMLElement, public rp: Replay) {
     this.pal = PAL[rp.style];
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.62;
     host.appendChild(this.renderer.domElement);
@@ -145,6 +146,7 @@ export class ControlRoom {
       this.scene.add(pl);
       this.lamps.push(pl);
     }
+    this.addDetails();
     // the shift supervisor's desk behind the operators
     const desk = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.75, 0.9), new THREE.MeshStandardMaterial({ color: '#6e5a44', roughness: 0.7 }));
     desk.position.set(0, 0.375, 2.3);
@@ -174,6 +176,147 @@ export class ControlRoom {
     }
   }
 
+  private clockCv = document.createElement('canvas');
+  private clockTex!: THREE.CanvasTexture;
+  private crtCv = document.createElement('canvas');
+  private crtTex!: THREE.CanvasTexture;
+
+  /** Furniture and fittings: what makes it read as a room people worked in. */
+  private addDetails() {
+    const p = this.pal, sov = this.rp.style === 'rbmk';
+    const metal = new THREE.MeshStandardMaterial({ color: '#4a4d50', roughness: 0.45, metalness: 0.6 });
+    const black = new THREE.MeshStandardMaterial({ color: '#1b1b1c', roughness: 0.6 });
+    // carpet / linoleum with a worn path in front of the board
+    const fc = document.createElement('canvas');
+    fc.width = fc.height = 512;
+    const fx = fc.getContext('2d')!;
+    fx.fillStyle = p.floor;
+    fx.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 9000; i++) { fx.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},${Math.random() * 0.05})`; fx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
+    if (sov) { fx.strokeStyle = 'rgba(0,0,0,0.18)'; for (let k = 0; k < 512; k += 64) { fx.beginPath(); fx.moveTo(k, 0); fx.lineTo(k, 512); fx.moveTo(0, k); fx.lineTo(512, k); fx.stroke(); } }
+    const ft = new THREE.CanvasTexture(fc);
+    ft.wrapS = ft.wrapT = THREE.RepeatWrapping;
+    ft.repeat.set(6, 6);
+    ft.colorSpace = THREE.SRGBColorSpace;
+    const floor = this.scene.children.find((o) => (o as THREE.Mesh).geometry?.type === 'CircleGeometry') as THREE.Mesh;
+    if (floor) (floor.material as THREE.MeshStandardMaterial).map = ft;
+    // ceiling tile grid
+    const grid: number[] = [];
+    for (let k = -8; k <= 8; k += 0.6) grid.push(k, 3.59, -8.5, k, 3.59, 8.5, -8.5, 3.59, k, 8.5, 3.59, k);
+    const gg = new THREE.BufferGeometry();
+    gg.setAttribute('position', new THREE.Float32BufferAttribute(grid, 3));
+    this.scene.add(new THREE.LineSegments(gg, new THREE.LineBasicMaterial({ color: '#8f8b82' })));
+    // cable trays above the board
+    for (let i = 0; i < 7; i++) {
+      const a = (i - 3) * 0.34;
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.08, 0.4), metal);
+      tray.position.set(Math.sin(a) * (R - 0.6), 3.45, -Math.cos(a) * (R - 0.6));
+      tray.rotation.y = -a;
+      this.scene.add(tray);
+    }
+    // J-handle switches on the benchboards, in 3D so they catch the light
+    const jh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.018, 0.022, 0.07, 8), black, 7 * 12);
+    const handle = new THREE.InstancedMesh(new THREE.BoxGeometry(0.02, 0.016, 0.07), new THREE.MeshStandardMaterial({ color: sov ? '#202020' : '#c23b2b', roughness: 0.5 }), 7 * 12);
+    let n = 0;
+    for (let i = 0; i < 7; i++) {
+      const a = (i - 3) * 0.34;
+      for (let k = 0; k < 12; k++) {
+        const lx = -0.82 + (k % 6) * 0.33, row = Math.floor(k / 6);
+        const local = new THREE.Vector3(lx, 0.98 - row * 0.1, -R + 0.5 + row * 0.12);
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-1.05 + Math.PI / 2, -a, 0, 'YXZ'));
+        const pos = local.applyAxisAngle(new THREE.Vector3(0, 1, 0), -a);
+        const m = new THREE.Matrix4().compose(pos, q, new THREE.Vector3(1, 1, 1));
+        jh.setMatrixAt(n, m);
+        handle.setMatrixAt(n, m.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.045, 0)).multiply(new THREE.Matrix4().makeRotationY(((k * 37) % 5) * 0.5 - 1)));
+        n++;
+      }
+    }
+    this.scene.add(jh, handle);
+    // swivel chairs at the bench
+    const seat = new THREE.MeshStandardMaterial({ color: sov ? '#5a3a2a' : '#3c4a5c', roughness: 0.8 });
+    for (const [i, rr] of [[1.4, 4.2], [5.1, 4.1], [5.9, 4.25]] as const) {
+      const a = (i - 3) * 0.34;
+      const c = new THREE.Group();
+      c.position.set(Math.sin(a) * rr, 0, -Math.cos(a) * rr);
+      c.rotation.y = -a + Math.PI + (i - 3.5) * 0.3;
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.48), seat); s.position.y = 0.48;
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.55, 0.07), seat); b.position.set(0, 0.8, 0.22);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.42, 8), metal); post.position.y = 0.24;
+      const star = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.03, 5), metal); star.position.y = 0.04;
+      c.add(s, b, post, star);
+      this.scene.add(c);
+    }
+    // the supervisor's desk: two CRT terminals, phones, binders, papers
+    this.crtCv.width = 512; this.crtCv.height = 384;
+    this.crtTex = new THREE.CanvasTexture(this.crtCv);
+    const crtM = new THREE.MeshStandardMaterial({ color: '#111', emissive: '#ffffff', emissiveMap: this.crtTex, emissiveIntensity: 1.2, roughness: 0.2 });
+    const beige = new THREE.MeshStandardMaterial({ color: sov ? '#b9b49c' : '#d5ccb4', roughness: 0.6 });
+    for (const x of [-0.55, 0.55]) {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.42, 0.45), beige);
+      body.position.set(x, 0.96, 2.35);
+      body.rotation.y = Math.PI + x * 0.3;
+      const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.29), crtM);
+      scr.position.set(0, 0.01, -0.23);
+      scr.rotation.y = Math.PI;
+      body.add(scr);
+      this.scene.add(body);
+    }
+    for (const [x, col] of [[-1.0, '#2a2a2a'], [0.95, '#b33a2a']] as const) {
+      const ph = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.18), new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }));
+      ph.position.set(x, 0.79, 2.15);
+      this.scene.add(ph);
+    }
+    for (let k = 0; k < 5; k++) {
+      const bd = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.24), new THREE.MeshStandardMaterial({ color: ['#2b4a7a', '#7a2b2b', '#2b6a3a', '#7a6a2b', '#444'][k], roughness: 0.7 }));
+      bd.position.set(-0.95 + k * 0.07, 0.9, 2.55);
+      this.scene.add(bd);
+    }
+    const paper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.01, 0.42), new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.9 }));
+    paper.position.set(0.15, 0.755, 2.05);
+    paper.rotation.y = 0.2;
+    this.scene.add(paper);
+    // wall clock above the centre board, running on replay time
+    this.clockCv.width = this.clockCv.height = 256;
+    this.clockTex = new THREE.CanvasTexture(this.clockCv);
+    this.clockTex.colorSpace = THREE.SRGBColorSpace;
+    const clock = new THREE.Mesh(new THREE.CircleGeometry(0.28, 40), new THREE.MeshStandardMaterial({ map: this.clockTex, roughness: 0.4, emissive: '#ffffff', emissiveMap: this.clockTex, emissiveIntensity: 0.15 }));
+    clock.position.set(0, 3.55 - 0.1, -R + 0.06);
+    this.scene.add(clock);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.025, 8, 40), black);
+    rim.position.copy(clock.position);
+    this.scene.add(rim);
+  }
+
+  private drawFittings() {
+    const c = this.clockCv.getContext('2d')!;
+    const s = this.rp.start + this.t;
+    c.fillStyle = '#f2efe6'; c.fillRect(0, 0, 256, 256);
+    c.strokeStyle = '#111';
+    for (let k = 0; k < 60; k++) {
+      const a = (k / 60) * Math.PI * 2;
+      c.lineWidth = k % 5 ? 2 : 6;
+      const r0 = k % 5 ? 112 : 100;
+      c.beginPath(); c.moveTo(128 + Math.sin(a) * r0, 128 - Math.cos(a) * r0); c.lineTo(128 + Math.sin(a) * 122, 128 - Math.cos(a) * 122); c.stroke();
+    }
+    const hand = (a: number, l: number, w: number, col = '#111') => { c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(128, 128); c.lineTo(128 + Math.sin(a) * l, 128 - Math.cos(a) * l); c.stroke(); };
+    hand((((s / 3600) % 12) / 12) * Math.PI * 2, 62, 9);
+    hand((((s / 60) % 60) / 60) * Math.PI * 2, 92, 6);
+    hand(((s % 60) / 60) * Math.PI * 2, 104, 2, '#c0261c');
+    this.clockTex.needsUpdate = true;
+    // CRT: the plant computer's alarm summary, green on black, scan lines
+    const g = this.crtCv.getContext('2d')!;
+    g.fillStyle = '#031208'; g.fillRect(0, 0, 512, 384);
+    g.font = '18px "Courier New", monospace';
+    g.fillStyle = '#5cff8a';
+    g.textAlign = 'left';
+    g.fillText(this.rp.style === 'rbmk' ? 'СКАЛА  ' + this.clock2() : 'PLANT COMPUTER  ' + this.clock2(), 16, 30);
+    const lit = this.alarmLitAt.map((tl, n) => [tl, n]).filter(([tl]) => tl <= this.t).slice(-14);
+    lit.forEach(([, n], k) => g.fillText(`${String(n).padStart(3, '0')} ${this.rp.alarms[n % this.rp.alarms.length]}`, 16, 60 + k * 22));
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let y = 0; y < 384; y += 3) g.fillRect(0, y, 512, 1);
+    this.crtTex.needsUpdate = true;
+  }
+
   // ---------------------------------------------------------------- drawing
 
   private v(id: string) {
@@ -195,6 +338,7 @@ export class ControlRoom {
     }
     if (this.rp.style === 'us70s') this.drawTMI(c, b);
     else this.drawRBMK(c, b);
+    this.drawFittings();
     // the board dims and flickers when the building is hit
     const blast = at(this.rp.extra.blast ?? [[0, 0]], this.t);
     if (blast > 0) {
@@ -497,6 +641,7 @@ export class ControlRoom {
   // ---------------------------------------------------------------- control
 
   seek(t: number) {
+    this.dirty = true;
     this.t = Math.max(0, Math.min(this.rp.end, t));
     this.trace = [];
     this.evIdx = -1;
@@ -555,8 +700,10 @@ export class ControlRoom {
     this.ceiling.emissiveIntensity = 0.9 * flick;
     for (const l of this.lamps) l.intensity = 3.2 * flick;
     this.acc += dt;
-    if (this.acc > 1 / 15) {
+    // redraw the boards at 12 Hz while playing, and only on change when paused
+    if (this.acc > 1 / 12 && (this.playing || this.dirty)) {
       this.acc = 0;
+      this.dirty = false;
       const g = this.rp.gauges[0];
       if (this.playing) { this.trace.push(at(this.rp.gauges.find((q) => q.id === 'rcs')?.curve ?? g.curve, this.t)); if (this.trace.length > 200) this.trace.shift(); }
       this.draw();

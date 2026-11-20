@@ -85,6 +85,7 @@ export const DRAX: SiteDef = {
     k.line(new THREE.Vector2(180, -460), new THREE.Vector2(2600, -3800), 380, 52);
     for (let i = 0; i < 6; i++) for (const tx of [-1, 1]) k.transformer(tx * (60 + i * 30), -110, 0, 1.2);
     k.apron(0, 60, 1260, 620);
+    k.perimeter(0, 210, 1360, 1060, 's');
     k.road([[-3000, 760], [-500, 760], [600, 760], [3000, 700]], 9);
     k.road([[-500, 760], [-500, 300]], 8);
     k.parking(-560, 380, 30, 5, Math.PI / 2);

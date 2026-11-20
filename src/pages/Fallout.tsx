@@ -42,7 +42,7 @@ function Map({ d }: { d: FalloutDef }) {
   useEffect(() => {
     const el = host.current!, lab = labels.current!;
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
     el.appendChild(renderer.domElement);
@@ -171,11 +171,16 @@ function Map({ d }: { d: FalloutDef }) {
       return e;
     });
 
-    let cur = 0;
+    let cur = 0, lastSi = -1;
+    const soft = document.createElement('canvas');
+    soft.width = soft.height = 512;
+    const sc = soft.getContext('2d')!;
     const set = (tt: number) => {
       cur = tt;
-      const si = Math.min(run.snaps.length - 1, Math.floor(tt / run.snapEvery));
+      const si = Math.max(0, Math.min(run.snaps.length - 1, Math.floor(tt / run.snapEvery)));
       const g = run.snaps[si];
+      if (si !== lastSi) {
+      lastSi = si;
       for (let k = 0; k < N * N; k++) {
         const v = g[k] * run.scale;
         let band = -1;
@@ -186,12 +191,14 @@ function Map({ d }: { d: FalloutDef }) {
       }
       dc.putImageData(di, 0, 0);
       ctx.drawImage(base, 0, 0);
+      sc.clearRect(0, 0, 512, 512);
+      sc.filter = 'blur(2px)';
+      sc.drawImage(dose, 0, 0, 512, 512);
+      sc.filter = 'none';
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.filter = 'blur(7px)';
-      ctx.drawImage(dose, 0, 0, 2048, 2048);
-      ctx.filter = 'none';
+      ctx.drawImage(soft, 0, 0, 2048, 2048);
       tex.needsUpdate = true;
+      }
       const fr = run.puffs[Math.min(run.puffs.length - 1, Math.round(tt / STEP))];
       const n = Math.min(MAXP, fr.length / 3);
       for (let k = 0; k < n; k++) {

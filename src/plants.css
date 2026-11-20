@@ -216,3 +216,7 @@
 .pv-more a { display: grid; gap: 2px; padding: 16px 18px; text-decoration: none; color: var(--porcelain); font-family: var(--display); font-weight: 700; font-size: 20px; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); }
 .pv-more a span { font-weight: 500; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sodium); }
 .pv-more a:hover, .pv-more a:focus-visible { background: rgba(134, 197, 218, 0.06); }
+
+.pv-moon { all: unset; cursor: pointer; margin-left: 8px; vertical-align: middle; font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: 0.04em; padding: 3px 10px; border: 1px solid rgba(236, 230, 216, 0.55); background: rgba(8, 16, 28, 0.4); }
+.pv-moon.on { background: var(--sodium); color: var(--night); border-color: var(--sodium); }
+.pv-moon:focus-visible { outline: 2px solid var(--sodium); }

@@ -65,6 +65,8 @@ export class Kit {
   private inst = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material; m: THREE.Matrix4[]; c: THREE.Color[]; shadow: boolean }>();
   private mats = new Map<string, THREE.Material>();
   R = rng(77);
+  /** Only trees near the plant are worth a shadow; set per site. */
+  treeShadows = true;
 
   constructor(groundY: (x: number, z: number) => number = () => 0) {
     this.groundY = groundY;
@@ -91,7 +93,7 @@ export class Kit {
     return this.memo(key, () => {
       const t = windows({ cols: opts.cols ?? 8, rows: opts.rows ?? 8, wall, lit: opts.lit, seed: opts.seed, glass: opts.glass, band: opts.band });
       const m = new THREE.MeshStandardMaterial({ map: t.map, emissiveMap: t.emissive, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0, roughness: 0.6, metalness: 0.1 });
-      this.nightMats.push({ m, k: 2.2 });
+      this.nightMats.push({ m, k: 3 });
       return m;
     }) as THREE.MeshStandardMaterial;
   }
@@ -203,6 +205,15 @@ export class Kit {
     }
     this.colliders.push({ x, z, hw: w / 2, hd: d / 2, rot: opts.rot ?? 0 });
     this.jobs.push({ x, z, hw: w / 2 + 2, hd: d / 2 + 2, rot: opts.rot ?? 0, kind: 'hall' });
+    // stair tower at one end, louvred vents along the roof
+    {
+      const p = V(-w / 2 - 2.5, 0, -d / 2 + 4).applyAxisAngle(V(0, 1, 0), opts.rot ?? 0);
+      this.box(x + p.x, z + p.z, 5, 6, h + 3, this.win('#8d969a', { cols: 1, rows: 10, lit: 0.9, seed: 31, band: true }), { rot: opts.rot, tile: 6, parapet: false, collide: false });
+      for (let k = 0; k < Math.floor(w / 18); k++) {
+        const v = V(-w / 2 + 9 + k * 18, 0, 0).applyAxisAngle(V(0, 1, 0), opts.rot ?? 0);
+        this.instance('vent', this.unitBox, this.clad('#7f878b', 9), new THREE.Matrix4().compose(V(x + v.x, grp.position.y + h + d * 0.06 + 0.8, z + v.z), new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), opts.rot ?? 0), V(4, 1.6, 2.4)));
+      }
+    }
     // atmospheric dump / relief valve stacks on the roof: silent until a trip
     for (const s of [-0.3, 0.3]) {
       const p = V(s * w, 0, 0).applyAxisAngle(V(0, 1, 0), opts.rot ?? 0);
@@ -393,7 +404,7 @@ export class Kit {
     const m = new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), q, V(t, len, t));
     this.instance(key + mat.uuid, this.unitBox, mat, m);
   }
-  private unitBox = new THREE.BoxGeometry(1, 1, 1);
+  unitBox = new THREE.BoxGeometry(1, 1, 1);
 
   instance(key: string, geo: THREE.BufferGeometry, mat: THREE.Material, m: THREE.Matrix4, color?: THREE.Color, shadow = true) {
     let e = this.inst.get(key);
@@ -587,6 +598,45 @@ export class Kit {
     this.add(mesh);
   }
 
+  /**
+   * Nuclear-style double security fence round a rectangle: posts every 4 m,
+   * three strands and a barbed top on each line, 6 m apart, a guardhouse and
+   * a boom barrier at the gate (gate on the side given, centred).
+   */
+  perimeter(x: number, z: number, w: number, d: number, gate: 'n' | 's' | 'e' | 'w' = 'w') {
+    const post = this.steel('#8d9294');
+    const wire: number[] = [];
+    for (const off of [0, 6]) {
+      const hw = w / 2 + off, hd = d / 2 + off;
+      const corners: [number, number][] = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd], [-hw, -hd]];
+      for (let c = 0; c < 4; c++) {
+        const [ax, az] = corners[c], [bx, bz] = corners[c + 1];
+        const L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 4);
+        const gateSide = (gate === 'n' && c === 0) || (gate === 'e' && c === 1) || (gate === 's' && c === 2) || (gate === 'w' && c === 3);
+        for (let i = 0; i < n; i++) {
+          const t0 = i / n, t1 = (i + 1) / n;
+          if (gateSide && Math.abs(t0 - 0.5) < 0.012) continue;
+          const px = x + ax + (bx - ax) * t0, pz = z + az + (bz - az) * t0;
+          const qx = x + ax + (bx - ax) * t1, qz = z + az + (bz - az) * t1;
+          const gy = this.groundY(px, pz), gq = this.groundY(qx, qz);
+          this.instance('fpost', this.unitBox, post, new THREE.Matrix4().compose(V(px, gy + 1.6, pz), new THREE.Quaternion(), V(0.1, 3.2, 0.1)), undefined, false);
+          for (const hgt of [0.6, 1.5, 2.4, 3.1]) wire.push(px, gy + hgt, pz, qx, gq + hgt, qz);
+        }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
+    this.add(new THREE.LineSegments(g, this.memo('fwire', () => new THREE.LineBasicMaterial({ color: '#7d8386', transparent: true, opacity: 0.55 }))));
+    // guardhouse and barrier at the gate
+    const gx = gate === 'e' ? x + w / 2 + 12 : gate === 'w' ? x - w / 2 - 12 : x;
+    const gz = gate === 'n' ? z - d / 2 - 12 : gate === 's' ? z + d / 2 + 12 : z;
+    this.box(gx, gz + (gate === 'e' || gate === 'w' ? 14 : 0), 8, 6, 3.4, this.win('#d8d4ca', { cols: 3, rows: 1, lit: 1, seed: 21 }), { tile: 8, parapet: false });
+    const boom = this.mesh(new THREE.BoxGeometry(0.18, 0.18, 9), this.plain('#d33a2c', 0.5), gx, this.groundY(gx, gz) + 1.1, gz);
+    if (gate === 'n' || gate === 's') boom.rotation.y = Math.PI / 2;
+    this.lamps.push(V(gx, this.groundY(gx, gz) + 6, gz + 4));
+    this.floods.push({ pos: V(gx, this.groundY(gx, gz), gz), r: 22 });
+  }
+
   /** A paved apron under a group of buildings. */
   apron(x: number, z: number, w: number, d: number, rot = 0) {
     const m = this.memo('apron', () => {
@@ -648,8 +698,8 @@ export class Kit {
       const q = new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), R() * 6.28);
       const m = new THREE.Matrix4().compose(V(x, y, z), q, V(s, s * (0.9 + R() * 0.4), s));
       const c = isPine ? new THREE.Color().setHSL(0.26 + R() * 0.05, 0.5, 0.045 + R() * 0.035) : new THREE.Color().setHSL(0.19 + R() * 0.08, 0.55, 0.06 + R() * 0.06);
-      this.instance(isPine ? 'pine' : 'broad', isPine ? pineG : broadG, leaf, m, c);
-      this.instance('trunk', trunkG, bark, m);
+      this.instance(isPine ? 'pine' : 'broad', isPine ? pineG : broadG, leaf, m, c, this.treeShadows);
+      this.instance('trunk', trunkG, bark, m, undefined, false);
     }
   }
   private geos = new Map<string, THREE.BufferGeometry>();

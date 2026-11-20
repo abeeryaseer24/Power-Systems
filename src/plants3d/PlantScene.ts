@@ -88,6 +88,7 @@ export class PlantScene {
   private beaconPts!: THREE.Points;
   private floods!: THREE.InstancedMesh;
   private stars!: THREE.Points;
+  private nightSky!: THREE.Mesh;
   private spots: THREE.SpotLight[] = [];
   private envScene = new THREE.Scene();
   private pmrem: THREE.PMREMGenerator;
@@ -103,6 +104,14 @@ export class PlantScene {
   private disposed = false;
   private sunDir = new THREE.Vector3();
   private propsState: 'idle' | 'loading' | 'done' = 'idle';
+  private dpr = 1;
+  private dprMax = 1;
+  private frameMs = 16;
+  private slowFor = 0;
+  private fastFor = 0;
+  private shadowAt = new THREE.Vector3(1e9, 0, 0);
+  private shadowDirty = true;
+  private shadowClock = 0;
   private stress: StressState | null = null;
   private arcs: THREE.Sprite[] = [];
   private arcLight = new THREE.PointLight('#bfd8ff', 0, 900, 1.6);
@@ -121,12 +130,16 @@ export class PlantScene {
 
   constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef) {
     const mobile = matchMedia('(max-width: 760px)').matches;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    this.dprMax = Math.min(devicePixelRatio, mobile ? 1.25 : 1.5);
+    this.dpr = this.dprMax;
+    this.renderer.setPixelRatio(this.dpr);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.55;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // the shadow map is only redrawn when the view pans or the sun moves
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.localClippingEnabled = true;
     host.appendChild(this.renderer.domElement);
 
@@ -140,9 +153,9 @@ export class PlantScene {
     this.sky = new Sky();
     this.sky.scale.setScalar(30000);
     const su = this.sky.material.uniforms;
-    su.turbidity.value = 4;
-    su.rayleigh.value = 1.4;
-    su.mieCoefficient.value = 0.004;
+    su.turbidity.value = 1.8;
+    su.rayleigh.value = 1.05;
+    su.mieCoefficient.value = 0.0016;
     su.mieDirectionalG.value = 0.82;
     this.scene.add(this.sky);
     const envSky = new THREE.Mesh(this.sky.geometry, this.sky.material);
@@ -154,12 +167,12 @@ export class PlantScene {
     // light
     const S = site.shadow ?? 420;
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(mobile ? 2048 : 4096, mobile ? 2048 : 4096);
+    this.sun.shadow.mapSize.set(mobile ? 1536 : 3072, mobile ? 1536 : 3072);
     Object.assign(this.sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 6000 });
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.6;
     this.scene.add(this.sun, this.sun.target, this.moon, this.moon.target, this.hemi);
-    this.scene.fog = new THREE.FogExp2('#b8c4cf', site.fog ?? 0.00011);
+    this.scene.fog = new THREE.FogExp2('#9fb1c4', (site.fog ?? 0.00011) * 0.72);
 
     // world
     this.kit = new Kit(site.groundY);
@@ -221,7 +234,9 @@ export class PlantScene {
     this.scene.add(this.walker.figure);
 
     // post
-    this.composer = new EffectComposer(this.renderer);
+    // 4x MSAA in the HDR target: clean edges on towers and lattice without a post AA pass
+    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: mobile ? 0 : 4 });
+    this.composer = new EffectComposer(this.renderer, rt);
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.25, 0.6, 0.85);
@@ -236,7 +251,12 @@ export class PlantScene {
         void main(){
           vec3 c = texture2D(tDiffuse, vUv).rgb;
           vec2 q = vUv - 0.5;
-          c *= 1.0 - dot(q, q) * (0.55 + 0.35 * uNight);
+          c *= 1.0 - dot(q, q) * (0.42 + 0.35 * uNight);
+          // a little contrast and saturation so the frame does not read as washed out
+          float g = dot(c, vec3(0.299,0.587,0.114));
+          c = mix(vec3(g), c, 1.16 + 0.08 * uNight);
+          c = (c - 0.5) * 1.09 + 0.5;
+          c = max(c - 0.012, 0.0) * 1.012;
           // filmic split-tone: cool shadows, warm highlights
           float l = dot(c, vec3(0.299,0.587,0.114));
           c = mix(c, c * vec3(0.93, 0.98, 1.06), (1.0 - l) * 0.35);
@@ -263,8 +283,21 @@ export class PlantScene {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-    this.stars = new THREE.Points(g, new THREE.PointsMaterial({ color: '#dfe7ff', size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+    this.stars = new THREE.Points(g, new THREE.PointsMaterial({ color: '#e6ecff', size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
     this.scene.add(this.stars);
+    this.nightSky = new THREE.Mesh(new THREE.SphereGeometry(14500, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, transparent: true, depthWrite: false, fog: false,
+      uniforms: { uNight: { value: 0 } },
+      vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: `uniform float uNight; varying vec3 vD;
+        void main(){ float y = max(vD.y, 0.0);
+          vec3 zen = vec3(0.012, 0.022, 0.06), hor = vec3(0.05, 0.075, 0.13);
+          vec3 c = mix(hor, zen, pow(y, 0.5));
+          c += vec3(0.28, 0.14, 0.05) * exp(-y * 14.0) * 0.55;
+          gl_FragColor = vec4(c, uNight); }`,
+    }));
+    this.nightSky.renderOrder = -1;
+    this.scene.add(this.nightSky);
   }
 
   private buildLights() {
@@ -282,7 +315,7 @@ export class PlantScene {
     this.floods.frustumCulled = false;
     this.scene.add(this.floods);
     // architectural uplighting: a handful of real spotlights washing the big shells
-    for (const u of k.uplights.slice(0, 14)) {
+    for (const u of k.uplights.slice(0, 22)) {
       const s = new THREE.SpotLight('#ffd2a0', 0, 700, 0.42, 0.85, 2);
       s.position.copy(u.pos);
       s.target.position.copy(u.at);
@@ -313,25 +346,29 @@ export class PlantScene {
     if (H > 0) az = Math.PI * 2 - az;
     this.sunDir.set(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
     this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
+    this.shadowDirty = true;
     const elD = THREE.MathUtils.radToDeg(el);
     this.night = 1 - THREE.MathUtils.smoothstep(elD, -7, 3);
     const low = 1 - THREE.MathUtils.smoothstep(elD, 2, 28);
     const day = 1 - this.night;
-    this.sun.intensity = 4.2 * THREE.MathUtils.smoothstep(elD, -1, 8);
+    this.sun.intensity = 5.2 * THREE.MathUtils.smoothstep(elD, -1, 8);
     this.sun.color.setRGB(1, 0.93 - low * 0.32, 0.84 - low * 0.55);
-    this.moon.intensity = 1.1 * this.night;
-    this.hemi.intensity = 0.06 + 0.12 * day + 0.1 * this.night;
-    this.hemi.color.setRGB(0.55 + 0.2 * day, 0.62 + 0.2 * day, 0.8 + 0.1 * day);
+    this.moon.intensity = 1.7 * this.night;
+    this.hemi.intensity = 0.07 + 0.13 * day + 0.2 * this.night;
+    this.hemi.color.setRGB(0.55 + 0.25 * day - 0.15 * this.night, 0.62 + 0.22 * day - 0.08 * this.night, 0.8 + 0.12 * day + 0.1 * this.night);
     const fog = this.scene.fog as THREE.FogExp2;
-    const dayFog = new THREE.Color('#a7b4c0').lerp(new THREE.Color('#d9b48e'), low * 0.8);
-    fog.color.copy(dayFog).lerp(new THREE.Color('#0a121e'), this.night);
-    this.renderer.toneMappingExposure = 0.4 + 0.5 * this.night;
-    this.bloom.strength = 0.12 + 0.8 * this.night;
-    this.bloom.threshold = 2.6 - 1.9 * this.night;
+    const dayFog = new THREE.Color('#9db0c4').lerp(new THREE.Color('#d6a77e'), low * 0.8);
+    fog.color.copy(dayFog).lerp(new THREE.Color('#0d1828'), this.night);
+    this.renderer.toneMappingExposure = 0.46 + 0.5 * this.night;
+    // bloom is for lamps and windows at night; by day it smears the bright sky over the whole frame
+    this.bloom.enabled = this.night > 0.05;
+    this.bloom.strength = 0.85 * this.night;
+    this.bloom.threshold = 0.7 + 0.6 * (1 - this.night);
     this.applyNight();
-    (this.stars.material as THREE.PointsMaterial).opacity = this.night * 0.9;
+    (this.stars.material as THREE.PointsMaterial).opacity = this.night;
+    (this.nightSky.material as THREE.ShaderMaterial).uniforms.uNight.value = this.night;
     this.grade.uniforms.uNight.value = this.night;
-    this.plumes.setLight(this.sun.color.clone().multiplyScalar(this.sun.intensity / 4.2), this.night, this.sunDir);
+    this.plumes.setLight(this.sun.color.clone().multiplyScalar(this.sun.intensity / 5.2), this.night, this.sunDir);
     if (Math.abs(h - this.lastEnvHour) > 0.25) this.updateEnv();
   }
 
@@ -340,7 +377,7 @@ export class PlantScene {
     for (const { m, k } of this.kit.nightMats) m.emissiveIntensity = k * n;
     (this.lampPts.material as THREE.PointsMaterial).opacity = n;
     (this.floods.material as THREE.MeshBasicMaterial).opacity = n * 0.32;
-    for (const s of this.spots) s.intensity = 160000 * n;
+    for (const s of this.spots) s.intensity = 210000 * n;
   }
 
   private updateEnv() {
@@ -348,7 +385,7 @@ export class PlantScene {
     this.envRT?.dispose();
     this.envRT = this.pmrem.fromScene(this.envScene, 0, 0.1, 200);
     this.scene.environment = this.envRT.texture;
-    this.scene.environmentIntensity = 0.1 + 0.12 * (1 - this.night);
+    this.scene.environmentIntensity = 0.08 + 0.1 * (1 - this.night) + 0.06 * this.night;
   }
 
   setMode(m: Mode) {
@@ -402,6 +439,7 @@ export class PlantScene {
       for (const m of c.mats) { m.clippingPlanes = on ? [c.plane] : []; m.clipShadows = true; m.needsUpdate = true; }
       c.inside.visible = on;
     }
+    this.dirtyShadows();
   }
 
   setEra(id: string) {
@@ -410,6 +448,7 @@ export class PlantScene {
   }
 
   private applyEra() {
+    this.shadowDirty = true;
     for (const [name, g] of this.kit.eras) g.visible = name === this.era;
     this.kit.emitters.forEach((e) => { e.base = e.tag === 'dump' ? 0 : this.steamRule ? (this.steamRule(e.tag, this.era) ? 1 : 0) : 1; });
     this.applyRates();
@@ -475,6 +514,7 @@ export class PlantScene {
     if (p !== null && this.buildP === null) this.plumes.clear();
     this.buildP = p;
     this.lapseObj?.set(p);
+    this.dirtyShadows();
     this.sun.castShadow = p === null;
     this.onBuild?.(p);
     this.applyRates();
@@ -500,6 +540,8 @@ export class PlantScene {
 
   private resize = () => {
     const w = this.host.clientWidth, h = this.host.clientHeight;
+    this.renderer.setPixelRatio(this.dpr);
+    this.composer.setPixelRatio(this.dpr);
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
     this.camera.aspect = w / h;
@@ -512,8 +554,10 @@ export class PlantScene {
   private loop = () => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
-    const dt = Math.min(this.clock.getDelta(), 0.05);
+    const raw = this.clock.getDelta();
+    const dt = Math.min(raw, 0.05);
     const t = this.clock.elapsedTime;
+    this.adapt(raw);
     if (this.mode === 'walk') this.walker.update(dt, this.camera);
     else this.controls.update();
     // keep the shadow frustum centred on what we look at
@@ -522,6 +566,14 @@ export class PlantScene {
     this.sun.position.copy(focus).addScaledVector(this.sunDir.y > 0 ? this.sunDir : tmp.set(0, 1, 0), 2500);
     this.moon.target.position.copy(focus);
     this.moon.position.copy(focus).add(tmp.set(-800, 1600, 600));
+    this.shadowClock += dt;
+    // the walker's own shadow is refreshed four times a second
+    if (this.mode === 'walk' && this.shadowClock > 0.25) { this.shadowClock = 0; this.shadowDirty = true; }
+    if (this.shadowDirty || focus.distanceToSquared(this.shadowAt) > 64) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.shadowAt.copy(focus);
+      this.shadowDirty = false;
+    }
     this.plumes.update(dt, this.active);
     this.soundAcc += dt;
     if (this.soundAcc > 0.1) {
@@ -552,6 +604,22 @@ export class PlantScene {
 
   private wake = () => { this.sound.start(); };
 
+  /** Adaptive resolution: drop the pixel ratio when frames run long, recover when there is headroom. */
+  private adapt(raw: number) {
+    if (raw <= 0 || raw > 0.5) return;
+    this.frameMs += (raw * 1000 - this.frameMs) * 0.08;
+    if (this.frameMs > 21) { this.slowFor += raw; this.fastFor = 0; } else if (this.frameMs < 13) { this.fastFor += raw; this.slowFor = 0; } else { this.slowFor = 0; this.fastFor = 0; }
+    let next = this.dpr;
+    if (this.slowFor > 0.8 && this.dpr > 0.6) next = Math.max(0.6, this.dpr * 0.85);
+    if (this.fastFor > 4 && this.dpr < this.dprMax) next = Math.min(this.dprMax, this.dpr * 1.1);
+    if (next !== this.dpr) { this.dpr = next; this.slowFor = this.fastFor = 0; this.resize(); }
+  }
+
+  /** Anything that changes what casts shadows calls this. */
+  private dirtyShadows() {
+    this.shadowDirty = true;
+  }
+
   /** Third-person or first-person walking. */
   setFirstPerson(on: boolean) {
     this.walker.fp = on;
@@ -560,7 +628,7 @@ export class PlantScene {
   private loadProps() {
     this.propsState = 'loading';
     import('./props').then(({ loadProps }) => loadProps(this.kit.props, this.site.groundY, this.kit.root))
-      .then(() => { this.propsState = 'done'; })
+      .then(() => { this.propsState = 'done'; this.dirtyShadows(); })
       .catch(() => { this.propsState = 'done'; });
   }
 
@@ -604,7 +672,7 @@ export class PlantScene {
 
 // ------------------------------------------------------------------ steam
 
-const MAXP: Record<Emitter['kind'], number> = { steam: 170, smoke: 90, spray: 260, jet: 70 };
+const MAXP: Record<Emitter['kind'], number> = { steam: 120, smoke: 70, spray: 180, jet: 50 };
 
 class Plumes {
   points: THREE.Points;
@@ -630,7 +698,8 @@ class Plumes {
     let o = 0;
     em.forEach((e, k) => { for (let i = 0; i < MAXP[e.kind]; i++) this.owner[o++] = k; });
     // pre-age so plumes are already standing when the page opens
-    for (let i = 0; i < n; i++) { this.age[i] = -this.R() * 20; this.life[i] = 14 + this.R() * 8; }
+    // staggered start; a zero life forces a proper spawn the moment each particle wakes
+    for (let i = 0; i < n; i++) { this.age[i] = -this.R() * 14; this.life[i] = 0; }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     g.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1));
@@ -642,7 +711,9 @@ class Plumes {
       vertexShader: /* glsl */ `
         attribute float aSize; attribute float aAlpha; uniform float uScale; varying float vA; varying float vH;
         void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv;
-          gl_PointSize = clamp(aSize * uScale / -mv.z, 1.0, 900.0); vA = aAlpha; vH = position.y; }`,
+          float ps = aSize * uScale / -mv.z; gl_PointSize = clamp(ps, 1.0, 320.0);
+          // fade sprites the camera is inside: they cost the most and read as fog
+          vA = aAlpha * smoothstep(900.0, 260.0, ps); vH = position.y; }`,
       fragmentShader: /* glsl */ `
         uniform sampler2D uMap; uniform vec3 uSun; uniform float uNight; varying float vA; varying float vH;
         void main(){ vec4 t = texture2D(uMap, gl_PointCoord);
@@ -712,7 +783,7 @@ class Plumes {
         this.vel[i3 + 1] = up + d.y * (0.7 + this.R() * 0.6);
         this.vel[i3 + 2] = d.z * (0.7 + this.R() * 0.6) + (this.R() - 0.5) * 1.5;
         this.age[i] = 0;
-        this.life[i] = e.kind === 'spray' ? 4 + this.R() * 3 : e.kind === 'jet' ? 3 + this.R() * 2.5 : 13 + this.R() * 8;
+        this.life[i] = e.kind === 'spray' ? 4 + this.R() * 3 : e.kind === 'jet' ? 3 + this.R() * 2.5 : e.kind === 'smoke' ? 12 + this.R() * 6 : 8 + this.R() * 5;
       }
       const t = this.age[i] / this.life[i];
       const k = e.kind;
@@ -724,9 +795,9 @@ class Plumes {
       this.pos[i3 + 1] += this.vel[i3 + 1] * dt;
       this.pos[i3 + 2] += (this.vel[i3 + 2] + this.wind.z * drift) * dt;
       const base = k === 'spray' ? e.radius * 0.6 : e.radius;
-      this.size[i] = k === 'jet' ? 2 + t * 26 : base * (k === 'spray' ? 0.8 + t * 2 : 0.9 + t * 2.4);
+      this.size[i] = k === 'jet' ? 2 + t * 26 : base * (k === 'spray' ? 0.8 + t * 2 : 0.85 + t * 1.5);
       const fadeIn = Math.min(1, t * 8);
-      this.alpha[i] = fadeIn * Math.pow(1 - t, 1.6) * (k === 'smoke' ? 0.35 : k === 'spray' ? 0.5 : k === 'jet' ? 0.9 : 0.8);
+      this.alpha[i] = fadeIn * Math.pow(1 - t, k === 'steam' ? 2.2 : 1.6) * (k === 'smoke' ? 0.35 : k === 'spray' ? 0.5 : k === 'jet' ? 0.9 : 0.85);
     }
     const g = this.points.geometry;
     (g.attributes.position as THREE.BufferAttribute).needsUpdate = true;

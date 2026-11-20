@@ -54,6 +54,7 @@ export const TMI: SiteDef = {
     k.line(new THREE.Vector2(-360, -80), new THREE.Vector2(-2600, -900), 380, 52);
     k.line(new THREE.Vector2(-360, 80), new THREE.Vector2(-2600, 1100), 380, 52);
     k.apron(-30, 0, 330, 700);
+    k.perimeter(-50, 0, 350, 760, 'w');
     k.road([[-250, -1500], [-250, -500], [-230, 0], [-250, 600], [-250, 1700]], 8);
     k.road([[-250, -560], [700, -620], [1300, -640]], 9);
     k.mesh(new THREE.BoxGeometry(1000, 2, 12), k.concrete('#9a958b', 20, 4), 430, 6, -600);
@@ -139,6 +140,7 @@ export const ROOPPUR: SiteDef = {
     k.towerCrane(40, 160, 110, 70, 2.2);
     k.towerCrane(-40, 60, 95, 60, 0.4);
     k.apron(80, 0, 520, 760);
+    k.perimeter(110, 0, 560, 900, 'w');
     k.road([[-500, -700], [-300, -380], [-200, 0], [-300, 420], [-500, 900]], 9);
     k.road([[-200, 0], [700, 0], [1400, 260]], 9);
     k.parking(-280, -200, 26, 5, Math.PI / 2);
@@ -281,6 +283,7 @@ export const FUKUSHIMA: SiteDef = {
     k.line(new THREE.Vector2(-560, -300), new THREE.Vector2(-3200, -800), 400, 55);
     k.line(new THREE.Vector2(-560, -220), new THREE.Vector2(-3200, 400), 400, 55);
     k.apron(80, -100, 250, 380);
+    k.perimeter(40, -100, 300, 420, 'w');
     k.apron(80, -600, 250, 210);
     k.road([[-1200, -260], [-560, -180], [-110, -150], [-110, 120], [-60, 300]], 9);
     k.road([[-110, -150], [-110, -700]], 8);
@@ -440,6 +443,7 @@ export const CHERNOBYL: SiteDef = {
     k.line(new THREE.Vector2(-450, -510), new THREE.Vector2(-1800, -3600), 420, 60);
     k.line(new THREE.Vector2(-150, -510), new THREE.Vector2(800, -3600), 420, 60);
     k.apron(-200, 0, 820, 280);
+    k.perimeter(-160, -60, 900, 420, 'n');
     k.road([[-3000, -260], [-700, -200], [400, -200], [1500, -60], [1700, 400]], 9);
     k.road([[-700, -200], [-1400, -1200], [-2400, -2200]], 9);
     k.parking(-600, 80, 20, 3, 0, 0.3);

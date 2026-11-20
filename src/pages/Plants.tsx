@@ -186,6 +186,7 @@ function Viewer({ site }: { site: SiteDef }) {
       <header className="pv-title">
         <Link to="/plants" className="pv-back">All plants</Link>
         <SoundToggle className="pv-sound" />
+        <button className={`pv-moon ${night ? 'on' : ''}`} onClick={() => setHour(night ? 10.5 : 22.5)} aria-pressed={night} aria-label={night ? 'Switch to day' : 'Switch to night'}>{night ? '☀ Day' : '☾ Night'}</button>
         <h1>{s.name}</h1>
         <p>{s.kind} · {s.place}</p>
       </header>
