@@ -234,6 +234,7 @@ function Viewer({ site }: { site: SiteDef }) {
             {s.eras.map((e) => <button key={e.id} className={era === e.id ? 'on' : ''} onClick={() => setEra(e.id)}>{e.label}</button>)}
           </div>
         )}
+        {(s.id === 'fukushima' || s.id === 'chernobyl') && <Link className="pv-cut pv-room-btn" to={`/fallout/${s.id}`}>Fallout map</Link>}
         {(s.id === 'tmi' || s.id === 'chernobyl') && <Link className="pv-cut pv-room-btn" to={`/control-room/${s.id}`}>Control room</Link>}
         {s.flood && <button className={`pv-cut pv-flood-btn ${flood ? 'on' : ''}`} onClick={openFlood} aria-pressed={flood}>Flood</button>}
         {s.lapse && <button className={`pv-cut pv-lapse-btn ${lapse ? 'on' : ''}`} onClick={openLapse} aria-pressed={lapse}>Time-lapse</button>}
@@ -253,7 +254,7 @@ function StressPanel({ grid, eng, onClose }: { grid: GridDef; eng: React.RefObje
   useEffect(() => {
     let last = performance.now(), n = 0, raf = 0;
     const loop = (now: number) => {
-      const dt = Math.min(0.1, (now - last) / 1000) * speed;
+      const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)) * speed;
       last = now;
       for (let i = 0; i < 4; i++) sim.current.step(dt / 4);
       eng.current?.setStress(sim.current.s);
@@ -319,7 +320,7 @@ function LapsePanel({ lapse, eng, onClose }: { lapse: Lapse; eng: React.RefObjec
     if (!run) return;
     let last = performance.now(), raf = 0;
     const loop = (now: number) => {
-      const dt = (now - last) / 1000;
+      const dt = Math.max(0, (now - last) / 1000);
       last = now;
       setP((x) => {
         const n = Math.min(1, x + dt / 45);
@@ -368,7 +369,7 @@ function FloodPanel({ flood, eng, onClose }: { flood: FloodDef; eng: React.RefOb
     if (!run || !sc) return;
     let last = performance.now(), raf = 0;
     const loop = (now: number) => {
-      const dt = (now - last) / 1000;
+      const dt = Math.max(0, (now - last) / 1000);
       last = now;
       setT((x) => {
         const n = Math.min(70, (x ?? 0) + dt);

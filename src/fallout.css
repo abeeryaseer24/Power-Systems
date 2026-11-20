@@ -1,0 +1,34 @@
+/* Fallout maps (fo- prefix) */
+.fo-index ul { list-style: none; padding: 0; display: grid; gap: 10px; }
+.fo-index a { font-family: var(--display); font-size: 28px; color: var(--porcelain); }
+.fo-map { position: fixed; inset: 0; background: #081320; color: var(--porcelain); overflow: hidden; }
+.fo-canvas { position: absolute; inset: 0; }
+.fo-canvas canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.fo-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.fo-tag { position: absolute; left: 0; top: 0; font-size: 12px; color: var(--porcelain); white-space: nowrap; text-shadow: 0 1px 4px #000, 0 0 2px #000; margin: -18px 0 0 8px; transition: opacity 0.4s; }
+.fo-tag.big { font-family: var(--display); font-weight: 700; font-size: 16px; }
+.fo-tag.zone { color: var(--arc); font-family: var(--display); font-weight: 600; letter-spacing: 0.04em; }
+.fo-head { position: absolute; top: 16px; left: 20px; text-shadow: 0 1px 8px #000; max-width: calc(100% - 300px); }
+.fo-head h1 { font-family: var(--display); font-weight: 900; font-size: clamp(30px, 4.5vw, 54px); line-height: 0.95; margin: 6px 0 2px; }
+.fo-head p { margin: 0; color: var(--steel); }
+.fo-legend { position: absolute; top: 16px; right: 20px; width: 240px; padding: 12px 14px; background: rgba(8, 16, 28, 0.78); backdrop-filter: blur(8px); border-top: 2px solid var(--sodium); }
+.fo-legend h2 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0; }
+.fo-legend > p { margin: 0 0 6px; color: var(--steel); font-size: 13px; }
+.fo-legend ol { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column-reverse; gap: 3px; }
+.fo-legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.fo-legend i { width: 22px; height: 12px; display: inline-block; }
+.fo-legend .fo-note { color: var(--dim); font-size: 12px; line-height: 1.4; margin: 0; }
+.fo-ev { position: absolute; left: 50%; bottom: 82px; transform: translateX(-50%); width: min(760px, calc(100% - 28px)); margin: 0; padding: 10px 16px; text-align: center; background: rgba(6, 8, 12, 0.8); font-size: 17px; line-height: 1.45; animation: pv-in 0.5s ease both; }
+.fo-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(760px, calc(100% - 28px)); display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: rgba(8, 16, 28, 0.78); border: 1px solid var(--rule-strong); }
+.fo-bar button { all: unset; cursor: pointer; font-size: 14px; padding: 4px 10px; border: 1px solid var(--rule-strong); }
+.fo-bar strong { font-family: var(--display); font-weight: 700; font-size: 20px; min-width: 130px; font-variant-numeric: tabular-nums; }
+.fo-bar input { flex: 1; accent-color: var(--sodium); }
+.fo-bar span { color: var(--steel); font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+@media (max-width: 760px) {
+  .fo-head { max-width: calc(100% - 40px); }
+  .fo-head p { display: none; }
+  .fo-legend { top: auto; bottom: 150px; right: 10px; width: 170px; padding: 8px 10px; }
+  .fo-legend .fo-note { display: none; }
+  .fo-ev { bottom: 70px; font-size: 14px; }
+  .fo-bar strong { font-size: 16px; min-width: 100px; }
+}
