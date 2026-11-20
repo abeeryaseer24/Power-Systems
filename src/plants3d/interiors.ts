@@ -195,7 +195,7 @@ export function rbmk(k: Kit, labels: Label[], ruined = false) {
   const stack = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 7, 48), k.plain('#2b2b2c', 0.9, 0.1));
   stack.position.y = 12;
   g.add(stack);
-  cherenkov(k, g, 12, 6.6, 6.4);
+  if (!ruined) cherenkov(k, g, 12, 6.6, 6.4);
   const lower = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 8.5, 2, 48), st);
   lower.position.y = 7.5;
   g.add(lower);

@@ -125,6 +125,8 @@ function Viewer({ site }: { site: SiteDef }) {
   const [fp, setFp] = useState(false);
   const [live, setLive] = useState(false);
   const [weather, setWeather] = useState<Weather>('clear');
+  const [rad, setRad] = useState(false);
+  const [dose, setDose] = useState(0);
   const [film, setFilm] = useState<{ i: number; p: number } | null>(null);
   const [filmPaused, setFilmPaused] = useState(false);
   const [card, setCard] = useState(true);
@@ -145,6 +147,7 @@ function Viewer({ site }: { site: SiteDef }) {
       e.onFp = setFp;
       e.onFilm = (i, p) => setFilm({ i, p });
       e.onPin = () => setCard(true);
+      e.onDose = setDose;
       eng.current = e;
       if (import.meta.env.DEV) (window as unknown as { __pv: PlantScene }).__pv = e;
       setReady(true);
@@ -189,6 +192,12 @@ function Viewer({ site }: { site: SiteDef }) {
   useEffect(() => { if (mode === 'tour') setSeen((x) => new Set(x).add(stop)); }, [stop, mode]);
   useEffect(() => { eng.current?.setEra(era); }, [era, ready]);
   useEffect(() => { if (ready) eng.current?.setWeather(weather); }, [weather, ready]);
+  useEffect(() => {
+    if (!ready) return;
+    eng.current?.setRadiation(rad);
+    if (rad && site.radiation?.era) setEra(site.radiation.era);
+    if (rad) setDose(eng.current?.doseHere() ?? 0);
+  }, [rad, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { eng.current?.setCutaway(cut); }, [cut, ready]);
   useEffect(() => {
     if (!play) return;
@@ -289,6 +298,18 @@ function Viewer({ site }: { site: SiteDef }) {
           onExit={() => go('orbit')} onExplore={() => go('tour')} />
       )}
 
+      {rad && s.radiation && (
+        <aside className={`pv-dose ${dose >= 10 ? 'hot' : dose >= 1 ? 'warm' : ''}`} aria-live="polite">
+          <span>Dose rate here</span>
+          <strong>{dose < 10 ? dose.toFixed(2) : dose.toFixed(0)} <small>µSv/h</small></strong>
+          <em>{dose < 0.35 ? 'about natural background' : `${Math.round(dose / 0.12)} × natural background`}</em>
+          <ol className="pv-dose-key">
+            {[['0.3', '#ffec8c'], ['1', '#ffbe46'], ['10', '#f06e32'], ['100', '#c81e3c'], ['1000', '#aa28c8']].map(([v, c]) => <li key={v}><i style={{ background: c }} />{v}</li>)}
+          </ol>
+          <p>{s.radiation.note} Walk the site with sound on to hear the counter. For scale: a chest X-ray is about 20 µSv, and the Elephant’s Foot gave about 100,000,000 µSv/h in 1986.</p>
+        </aside>
+      )}
+
       {mode === 'walk' && (
         <p className="pv-hint">{touch ? 'Drag the pad to walk, drag the view to look' : 'WASD to walk · Shift to run · drag to look · V for first person · Esc to leave'}</p>
       )}
@@ -323,6 +344,7 @@ function Viewer({ site }: { site: SiteDef }) {
         )}
         {(s.id === 'fukushima' || s.id === 'chernobyl') && <Link className="pv-cut pv-room-btn" to={`/fallout/${s.id}`}>Fallout map</Link>}
         {(s.id === 'tmi' || s.id === 'chernobyl') && <Link className="pv-cut pv-room-btn" to={`/control-room/${s.id}`}>Control room</Link>}
+        {s.radiation && <button className={`pv-cut pv-rad-btn ${rad ? 'on' : ''}`} onClick={() => { setRad(!rad); setFacts(false); }} aria-pressed={rad}>Radiation</button>}
         {s.flood && <button className={`pv-cut pv-flood-btn ${flood ? 'on' : ''}`} onClick={openFlood} aria-pressed={flood}>Flood</button>}
         {s.lapse && <button className={`pv-cut pv-lapse-btn ${lapse ? 'on' : ''}`} onClick={openLapse} aria-pressed={lapse}>Time-lapse</button>}
         {s.grid && <button className={`pv-cut pv-stress-btn ${stress ? 'on' : ''}`} onClick={openStress} aria-pressed={stress}>Stress test</button>}

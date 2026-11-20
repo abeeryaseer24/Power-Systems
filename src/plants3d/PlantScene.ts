@@ -48,6 +48,8 @@ export type SiteDef = {
   grid?: GridDef;
   lapse?: Lapse;
   flood?: FloodDef;
+  /** Ambient gamma dose rate today, µSv/h (illustrative pattern after published surveys). */
+  radiation?: { dose: (x: number, z: number) => number; span: number; era?: string; note: string };
   focus: [number, number, number];
   cam: [number, number, number];
   spawn: [number, number];
@@ -101,6 +103,10 @@ export class PlantScene {
   private rain: THREE.LineSegments | null = null;
   private rainPos: Float32Array | null = null;
   private terrainMats: THREE.MeshStandardMaterial[] = [];
+  private radMesh: THREE.Mesh | null = null;
+  radiation = false;
+  onDose?: (uSvh: number) => void;
+  private doseAcc = 0;
   private lampPts!: THREE.Points;
   private beaconPts!: THREE.Points;
   private floods!: THREE.InstancedMesh;
@@ -437,6 +443,59 @@ export class PlantScene {
     this.envRT = this.pmrem.fromScene(this.envScene, 0, 0.1, 200);
     this.scene.environment = this.envRT.texture;
     this.scene.environmentIntensity = 0.08 + 0.1 * (1 - this.night) + 0.06 * this.night;
+  }
+
+  /** Ambient dose-rate map draped over the ground, with a dosimeter and Geiger clicks. */
+  setRadiation(on: boolean) {
+    const R = this.site.radiation;
+    if (!R) return;
+    this.radiation = on;
+    if (on && !this.radMesh) {
+      const S = R.span * 2, N = 160;
+      const g = new THREE.PlaneGeometry(S, S, N, N);
+      g.rotateX(-Math.PI / 2);
+      const pa = g.attributes.position as THREE.BufferAttribute;
+      const cx = this.site.focus[0], cz = this.site.focus[2];
+      for (let i = 0; i < pa.count; i++) pa.setY(i, this.site.groundY(pa.getX(i) + cx, pa.getZ(i) + cz) + 1.2);
+      const c = document.createElement('canvas');
+      c.width = c.height = 768;
+      const ctx = c.getContext('2d')!, img = ctx.createImageData(768, 768);
+      const stops: [number, [number, number, number]][] = [[0.3, [255, 236, 140]], [1, [255, 190, 70]], [10, [240, 110, 50]], [100, [200, 30, 60]], [1000, [170, 40, 200]]];
+      for (let j = 0; j < 768; j++) for (let i = 0; i < 768; i++) {
+        const x = cx - R.span + ((i + 0.5) / 768) * S, z = cz - R.span + ((j + 0.5) / 768) * S;
+        const d = R.dose(x, z);
+        const k = (j * 768 + i) * 4;
+        if (d < 0.3) { img.data[k + 3] = 0; continue; }
+        // colour blended in log space between the decade stops
+        const lg = Math.log10(d);
+        let q = 0;
+        while (q < stops.length - 2 && lg > Math.log10(stops[q + 1][0])) q++;
+        const f = Math.min(1, Math.max(0, (lg - Math.log10(stops[q][0])) / (Math.log10(stops[q + 1][0]) - Math.log10(stops[q][0]))));
+        const A = stops[q][1], B = stops[q + 1][1];
+        const l = Math.min(1, Math.log10(d / 0.3) / 2.5);
+        img.data[k] = A[0] + (B[0] - A[0]) * f; img.data[k + 1] = A[1] + (B[1] - A[1]) * f; img.data[k + 2] = A[2] + (B[2] - A[2]) * f;
+        img.data[k + 3] = Math.min(200, 8 + l * 170) * Math.min(1, (d - 0.3) / 0.4);
+        // a fine contour at each decade
+        const dec = ((lg % 1) + 1) % 1;
+        if (d > 0.9 && (dec < 0.012 || dec > 0.988)) img.data[k + 3] = 230;
+      }
+      ctx.putImageData(img, 0, 0);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      this.radMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -6 }));
+      this.radMesh.position.set(cx, 0, cz);
+      this.radMesh.renderOrder = 2;
+      this.scene.add(this.radMesh);
+    }
+    if (this.radMesh) this.radMesh.visible = on;
+  }
+
+  doseHere() {
+    const R = this.site.radiation;
+    if (!R) return 0;
+    const p = this.mode === 'walk' ? this.walker.figure.position : this.mode === 'film' && this.film ? this.film.look : this.controls.target;
+    return R.dose(p.x, p.z);
   }
 
   /** Clear, rain or mist. Rain wets the ground, roughens the water and leans the plumes. */
@@ -782,6 +841,16 @@ export class PlantScene {
     }
     this.plumes.update(dt, this.active);
     this.soundAcc += dt;
+    if (this.radiation) {
+      this.doseAcc += dt;
+      const d = this.doseHere();
+      // Geiger counter: Poisson clicks at about 2 per second per µSv/h, saturating
+      const rate = Math.min(90, 0.4 + d * 2);
+      let n = 0, L = Math.exp(-rate * dt), pr = Math.random();
+      while (pr > L && n < 6) { n++; pr *= Math.random(); }
+      for (let i = 0; i < n; i++) this.sound.click(Math.random() * dt);
+      if (this.doseAcc > 0.25) { this.doseAcc = 0; this.onDose?.(d); }
+    }
     if (this.soundAcc > 0.1) {
       this.soundAcc = 0;
       const lp = this.mode === 'walk' ? this.walker.figure.position : this.camera.position;
@@ -812,6 +881,11 @@ export class PlantScene {
     bm.opacity = (0.25 + 0.75 * this.night) * (Math.sin(t * 3.2) > 0.2 ? 1 : 0.05);
     this.grade.uniforms.uTime.value = t % 10;
     if (this.cut) { this.aimCuts(); this.placeLabels(); }
+    if (this.radMesh?.visible) {
+      // fade the ground map when you are down among the buildings or inside the arch
+      const p = this.active.position, h = p.y - this.site.groundY(p.x, p.z);
+      (this.radMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, Math.max(0.08, (h - 25) / 140));
+    }
     else for (const el of this.labelEls) el.style.opacity = '0';
     this.composer.render();
   };

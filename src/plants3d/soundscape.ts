@@ -128,6 +128,25 @@ export class Soundscape {
     o.stop(t + 0.25);
   }
 
+  /** One Geiger-counter click, `delay` seconds from now. */
+  click(delay = 0) {
+    if (!this.ok || !this.ctx || !this.out) return;
+    const a = sfx.audio();
+    if (!a) return;
+    const t = this.ctx.currentTime + delay;
+    const s = this.ctx.createBufferSource();
+    s.buffer = a.noise;
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 2500;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
+    s.connect(f).connect(g).connect(this.out);
+    s.start(t, Math.random());
+    s.stop(t + 0.015);
+  }
+
   setRain(on: boolean) {
     this.raining = on;
     this.set('weather', on ? 0.28 : 0);

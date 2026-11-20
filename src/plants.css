@@ -293,3 +293,19 @@
 }
 
 .pv-label::before { content: ''; position: absolute; left: 0; bottom: 50%; width: 1px; height: var(--lead, 0px); background: var(--porcelain); opacity: 0.8; transform: translateY(100%); }
+
+/* ---------------------------------------------------------------- radiation */
+.pv-rad-btn { border-color: #ffd34d; color: #ffd34d; }
+.pv-rad-btn.on { background: #ffd34d; color: var(--night); }
+.pv-dose { position: absolute; right: 22px; bottom: calc(var(--bar-h, 60px) + 28px); width: 290px; padding: 12px 14px; background: rgba(8,16,28,0.84); backdrop-filter: blur(8px); border-top: 2px solid #ffd34d; }
+.pv-dose span { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--steel); }
+.pv-dose strong { display: block; font-family: var(--display); font-weight: 900; font-size: 44px; line-height: 1; margin: 4px 0 2px; color: #ffe27a; font-variant-numeric: tabular-nums; }
+.pv-dose small { font-size: 16px; font-weight: 600; color: var(--porcelain); }
+.pv-dose.warm strong { color: #ff9a3c; }
+.pv-dose.hot strong { color: #ff4a5c; }
+.pv-dose em { font-style: normal; font-size: 13px; color: var(--porcelain); }
+.pv-dose-key { display: flex; gap: 8px; list-style: none; padding: 0; margin: 10px 0 6px; font-size: 11px; color: var(--steel); }
+.pv-dose-key li { display: flex; align-items: center; gap: 3px; }
+.pv-dose-key i { width: 12px; height: 8px; display: inline-block; }
+.pv-dose p { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--dim); }
+@media (max-width: 760px) { .pv-dose { left: 10px; right: 10px; width: auto; } .pv-dose p { display: none; } }

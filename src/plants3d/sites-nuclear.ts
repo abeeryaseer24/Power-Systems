@@ -197,6 +197,17 @@ export const FUKUSHIMA: SiteDef = {
   eras: [{ id: 'built', label: 'Before 2011' }, { id: 'today', label: 'Today' }],
   cutaway: 'Open Unit 2',
   lapse: { from: 1966, to: 1979.5, marks: [[0, '1966: the 35 m bluff is cut down to 10 m'], [0.12, 'Unit 1 reactor building rises'], [0.35, 'Unit 1 online, March 1971'], [0.7, 'Units 2 to 5 follow, 1974–78'], [0.97, 'Unit 6 online, October 1979']] },
+  radiation: {
+    span: 2600, era: 'today',
+    note: 'Illustrative dose-rate pattern after TEPCO site surveys and the NRA airborne maps: hotspots by units 1 to 3, the paved site at a few µSv/h, the start of the north-west band.',
+    dose: (x, z) => {
+      const nw = (-x - z) * 0.7071, perp = (x - z) * 0.7071;
+      const band = nw > 0 ? 6 * Math.exp(-nw / 5000) * Math.exp(-(perp * perp) / (2 * (380 + 0.15 * nw) ** 2)) : 0;
+      const site = x > -150 && x < 230 && z > -720 && z < 160 ? 2.5 : 0;
+      const units = 140 * Math.exp(-(x * x + (z + 75) ** 2) / (2 * 50 * 50));
+      return 0.12 + band + site + units;
+    },
+  },
   flood: {
     from: 'east', normal: 0, max: 16, start: 900, finish: -350,
     marks: [[5.7, 'Design tsunami, 1966'], [10, 'Site grade, units 1–4'], [13, 'Site grade, units 5–6'], [14.5, '11 March 2011 inundation']],
@@ -337,6 +348,17 @@ export const CHERNOBYL: SiteDef = {
   facts: [['Units', '4 × RBMK-1000'], ['Each', '1,000 MWe, 3,200 MWt'], ['Turbine hall', '~800 m long'], ['New Safe Confinement', '257 m span, 108 m high'], ['Cooling', '22 km² pond']],
   eras: [{ id: 'today', label: 'Today' }, { id: '1985', label: '1985' }],
   cutaway: 'Open units 3 and 4',
+  radiation: {
+    span: 3000, era: 'today',
+    note: 'Illustrative dose-rate pattern after published exclusion-zone surveys: the Red Forest hotspot west of the plant, the western trace, and the field around the arch.',
+    dose: (x, z) => {
+      const red = 45 * Math.exp(-((x + 2100) ** 2) / (2 * 700 * 700) - ((z - 200) ** 2) / (2 * 330 * 330));
+      const west = x < 0 ? 2.5 * Math.exp(x / 1800) * Math.exp(-((z - 0.12 * x) ** 2) / (2 * (280 + 0.2 * Math.abs(x)) ** 2)) : 0;
+      const arch = 6 * Math.exp(-((x - 90) ** 2 + z * z) / (2 * 170 * 170));
+      const plant = x > -620 && x < 300 && z > -260 && z < 160 ? 0.8 : 0;
+      return 0.11 + red + west + arch + plant;
+    },
+  },
   lapse: { from: 1970, to: 2016.9, end: 0.3, marks: [[0, '1970: construction begins beside the Pripyat'], [0.08, 'Unit 1 online, 1977'], [0.29, 'Unit 4 online, December 1983'], [0.33, '26 April 1986: unit 4 explodes'], [0.86, '2010–16: the arch is assembled to the west'], [0.94, 'November 2016: 36,000 t slid 327 m into place']] },
   grid: { name: 'Soviet unified grid, Kyiv region', f0: 50, loadMW: 26000, H: 6, unitMW: 1000, units: 4, kind: 'rbmk', era: '1985', largestOther: 1000 },
   focus: [-100, 30, 0],
@@ -432,6 +454,40 @@ export const CHERNOBYL: SiteDef = {
     }
     const ruin = rbmk(k, labels, true);
     shelter.add(ruin);
+    // room 217/2: a steam-distribution corridor below the reactor, where the corium set
+    const room = new THREE.Group();
+    room.position.set(8, 1.2, 14);
+    shelter.add(room);
+    const conc = k.concrete('#77726a', 6, 51);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(9, 0.4, 7), conc);
+    slab.position.y = -0.2;
+    const wallA = new THREE.Mesh(new THREE.BoxGeometry(9, 4.5, 0.5), conc);
+    wallA.position.set(0, 2.25, -3.5);
+    const wallB = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.5, 7), conc);
+    wallB.position.set(-4.5, 2.25, 0);
+    const pipeR = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 9, 12), k.steel('#5b5d5a'));
+    pipeR.rotation.z = Math.PI / 2;
+    pipeR.position.set(0, 4.0, -2.6);
+    room.add(slab, wallA, wallB, pipeR);
+    // the mass itself: a flared, wrinkled flow, glassy black-brown
+    const fg = new THREE.CylinderGeometry(1.0, 1.75, 2.2, 64, 24);
+    const fp = fg.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < fp.count; i++) {
+      const x = fp.getX(i), y = fp.getY(i), z = fp.getZ(i);
+      const r = Math.hypot(x, z);
+      if (r < 0.01) continue;
+      const a = Math.atan2(z, x), h = (y + 1.1) / 2.2;
+      const fold = 0.09 * Math.sin(a * 9 + y * 4) + 0.06 * Math.sin(a * 23 - y * 7) + 0.05 * Math.sin(y * 13 + a * 3);
+      const sag = (1 - h) * (1 - h) * 0.45 * (0.6 + 0.4 * Math.sin(a * 5 + 1.3));
+      const k2 = (r + fold + sag) / r;
+      fp.setXYZ(i, x * k2, y + 0.08 * Math.sin(a * 6) * (1 - h), z * k2);
+    }
+    fg.computeVertexNormals();
+    const foot = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({ color: '#2a201a', roughness: 0.32, metalness: 0.18 }));
+    foot.position.set(0.6, 1.1, 0);
+    foot.castShadow = true;
+    room.add(foot);
+    labels.push({ text: 'Elephant\u2019s Foot: corium, room 217/2', obj: foot, at: V(0, 1.6, 0) });
     const nscIn = new THREE.Group();
     nscIn.add(shelter);
     nscIn.position.set(90, chY(90, 0), 0);
@@ -478,6 +534,7 @@ export const CHERNOBYL: SiteDef = {
         { title: 'Chernobyl Nuclear Power Plant', body: 'Four RBMK-1000 reactors in a single building nearly a kilometre long, cooled by a 22 km² artificial pond. Units 5 and 6 were half-built when unit 4 exploded.', cam: [900, 380, 1100], look: [-150, 30, 0] },
         { title: 'The New Safe Confinement', body: 'Assembled away from the reactor and slid 327 m into place on rails in November 2016. It is 257 m across, 108 m high and weighs 36,000 tonnes, designed to last a century and to let the ruin beneath be taken apart.', cam: [360, 70, 260], look: [90, 50, 0] },
         { title: 'Inside the arch', body: 'Open the cutaway. Under the arch is the Shelter, the concrete sarcophagus built in 206 days in 1986, with its stepped cascade wall. In the ruin, the 2,000-tonne upper shield "Elena" still sits nearly on edge, where the explosion dropped it.', cam: [150, 60, 170], look: [90, 30, 0] },
+        { title: 'The Elephant\u2019s Foot', body: 'Below the reactor, in a steam corridor known as room 217/2, lies a frozen flow of corium: fuel, cladding, sand, concrete and steel that melted together and ran down through the building. It was found eight months after the accident, and was so radioactive that it was first photographed with a camera pushed in on wheels.', cam: [116, 6.5, 30], look: [98, 2.4, 14] },
         { title: 'Unit 3 reactor hall', body: 'The same design, intact. The floor of the central hall is the top of the reactor: 1,661 fuel and control channels under removable caps. The refuelling machine could change fuel at full power, which suited plutonium production as well as electricity.', cam: [-70, 50, 110], look: [-70, 20, 0] },
         { title: 'The turbine hall', body: 'One continuous hall for all eight turbines. The 1986 test was about whether a coasting-down turbine could power the pumps for the 40 s before the diesels took load. The fire on its roof was fought on the night of the explosion.', cam: [-300, 60, -230], look: [-280, 20, -80] },
         { title: 'Units 5 and 6', body: 'Construction stopped in 1989. One cooling tower is complete and has never held water. The other stops at 62 % of its height with the cranes still on site.', cam: [1150, 80, 540], look: [1480, 70, 180] },
