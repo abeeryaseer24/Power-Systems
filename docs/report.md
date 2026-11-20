@@ -292,3 +292,72 @@ Each blackout and plant event lists its sources on its case-file or plant page. 
 For the Bangladesh, Pakistan, Venezuela, Moscow and Central Asia events, no full public investigation report was available. Those replays rest on official statements and probe-committee findings as reported in the press (The Daily Star, Dhaka Tribune, bdnews24.com, Dawn, Kommersant, RIA Novosti, Reuters and others), and are correspondingly less certain. Each case file names its sources.
 
 The nuclear plant pages cite their own sources, chiefly IAEA reports (including INSAG-7 on Chernobyl), the Kemeny Commission report on Three Mile Island, Swedish Nuclear Power Inspectorate reports on Forsmark, TEPCO's Fukushima accident investigation report, and IAEA statements on Zaporizhzhia.
+
+## Appendix A. Software architecture and performance
+
+The application is a single-page React app built with Vite. Each page is loaded on demand, so the landing page does not download the simulators. The code is split by responsibility:
+
+| Folder | Contents |
+|---|---|
+| src/grid | Halvern engine and network, real-grid simulator (region.ts), AC power flow (acflow.ts), replays, case files, documentary scripts, What-if modifiers |
+| src/nuclear | Reactor model, plant definitions and scenarios, control-room components |
+| src/ai | Feature extraction, inference and explanation for the predictor, and the training script |
+| src/scene | three.js scenes: the Halvern city and the night-light map used for real grids |
+| src/pages, src/components | One page per task, plus shared panels (frequency dial, traces, anatomy diagram, core view, co-pilot, weather) |
+| scripts/osm | Region definitions and the OpenStreetMap build pipeline |
+| api | The serverless proxy for EIA data |
+| public/data | Built region files, the trained predictor and the world outline |
+
+The real-grid simulator runs in the main thread inside the map's animation loop. Each frame spends at most about 8 ms on simulation, so the map stays smooth; when the requested speed cannot be reached in that budget, the page reports the speed actually achieved. The largest model (Moscow, 476 buses) completes its 3-minute replay test in about 4.5 s of computation. The decoupled load flow factorises its two matrices only when the set of PV and PQ buses changes, which keeps repeated solves cheap.
+
+The night-light map draws each bus as a light whose brightness follows the demand it is serving, using a data texture updated from the simulator, so a collapsing island visibly goes dark. Traffic and ships are decorative.
+
+## Appendix B. Learning and presentation layer
+
+The simulators are wrapped in material meant to teach rather than only to show:
+
+- Power Systems 101: fifteen chapters from electricity basics to markets and grid operation, each ending in a short quiz, with ten interactive widgets spread through them.
+- Case files: for each blackout, a one-sentence verdict, the system state before the event, a timed sequence, the physical mechanisms with links to the relevant course chapter, causes sorted by kind (trigger, protection, people, planning, design, weather), key numbers and aftermath.
+- Documentaries: each episode plays one beat at a time over the live simulation (timestamp, title, narration sentence by sentence, and a schematic of what failed), with a held silence before each impact. Nuclear episodes use a cross-section of the reactor driven by the reactor model instead of the map.
+- Career: six ranks earned by finishing chapters, shifts, replays, restorations and episodes across the site, stored in the browser.
+- Trailer generator: a different cut each time of two blackouts and one reactor sequence, recorded to a video file if the user chooses.
+- Sound and weather: synthesised sound (drone, breaker clunks, alarms, the power-down sweep) and weather drawn over the map for the events where it mattered.
+
+The visual design uses a fixed palette (night blue, porcelain, steel, sodium orange for power, red for trips) and two typefaces, Big Shoulders Display for headings and Atkinson Hyperlegible Next for text, chosen for legibility at small sizes. Pages honour reduced-motion settings.
+
+## Appendix C. Study regions
+
+| Region | Scope | Buses | Branches | Mapped generation (MW) | Demand (MW) | Frequency (Hz) |
+|---|---|---|---|---|---|---|
+| Dhaka | National grid of Bangladesh | 101 | 117 | 22,801 | 11,200 | 50 |
+| Dhaka metro | Greater Dhaka, 230 and 132 kV | 64 | 78 | 7,622 | 5,200 | 50 |
+| London | South and east England, 400 and 275 kV | 345 | 403 | 37,490 | 14,000 | 50 |
+| New York | New York City and surroundings, 345 and 230 kV | 194 | 228 | 22,696 | 11,000 | 60 |
+| Houston | Greater Houston, ERCOT 345 kV | 78 | 86 | 38,535 | 15,000 | 60 |
+| Madrid | Madrid region, 400 and 220 kV | 135 | 150 | 4,605 | 4,200 | 50 |
+| Delhi | National Capital Region, 400 and 220 kV | 270 | 317 | 6,775 | 5,000 | 50 |
+| Rome | Lazio, 380 and 220 kV | 33 | 41 | 2,812 | 2,400 | 50 |
+| Adelaide | South Australia, 275 and 132 kV | 119 | 140 | 6,792 | 1,900 | 50 |
+| Sapporo | Hokkaido, 275 and 187 kV | 72 | 83 | 7,675 | 3,100 | 50 |
+| Karachi | Karachi and lower Sindh, 500 and 220 kV | 43 | 46 | 12,930 | 2,300 | 50 |
+| Caracas | National grid of Venezuela, 765 and 400 kV | 46 | 59 | 23,083 | 12,500 | 60 |
+| São Paulo | São Paulo and Paraná, 765 to 440 kV | 63 | 81 | 22,304 | 16,500 | 60 |
+| Istanbul | National grid of Türkiye, 400 kV | 288 | 360 | 75,344 | 32,200 | 50 |
+| Colombo | National grid of Sri Lanka, 220 and 132 kV | 86 | 102 | 3,817 | 1,900 | 50 |
+| Moscow | Moscow and surrounding oblasts, 500 and 220 kV | 476 | 570 | 19,040 | 13,000 | 50 |
+| Tashkent | Central Asian Power System, 500 kV | 66 | 75 | 25,955 | 15,000 | 50 |
+
+Bus counts include junctions created where lines meet away from a substation. Mapped generation is the sum of mapped plant capacity before any availability limits, so it exceeds what can run at once.
+
+## Appendix D. Reproducing the builds
+
+```
+npm install
+npm run dev                                   # local site at http://localhost:5173
+npm test                                      # 81 tests
+node scripts/osm/build.mjs <region ids>       # rebuild regions; downloads are cached in scripts/osm/.cache
+LAYERS=cached node scripts/osm/build.mjs <id> # rebuild using only cached map layers
+TRAIN=1 RUNS=400 npx vitest run src/ai/train.test.ts   # retrain the predictor
+```
+
+The Overpass servers are often busy, so the build rotates between three public instances and retries. A full download of a national region can take an hour; rebuilding from the cache takes seconds. The live United States page needs an EIA API key set as an environment variable on the hosting service.
