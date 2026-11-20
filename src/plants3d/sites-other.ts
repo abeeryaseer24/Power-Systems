@@ -85,6 +85,8 @@ export const DRAX: SiteDef = {
     k.road([[-3000, 760], [-500, 760], [600, 760], [3000, 700]], 9);
     k.road([[-500, 760], [-500, 300]], 8);
     k.parking(-560, 380, 30, 5, Math.PI / 2);
+    k.barriers(-532, 700, -512, 700);
+    k.barriers(-488, 700, -468, 700);
     for (let i = 0; i < 14; i++) k.mast(-560 + (i % 7) * 186, -150 + Math.floor(i / 7) * 400, 32);
     townBlocks(k, -2400, 1800, 30, 900, [1, 3]);
     // English field boundaries: hedgerows with trees
@@ -164,6 +166,8 @@ export const THREE_GORGES: SiteDef = {
     const para = k.concrete('#d2cdc2', 10, 62);
     for (const s of [-1, 1]) k.mesh(new THREE.BoxGeometry(0.6, 1.2, L), para, s * 9.7, CREST + 0.6, (DAM_Z0 + DAM_Z1) / 2);
     for (let z = DAM_Z0 + 20; z < DAM_Z1; z += 40) k.lampPost(8.5, z, CREST, 8);
+    k.barriers(-8, 1130, 8, 1130);
+    for (let i = 0; i < 6; i++) k.prop('utility_box_02', 7.5, -400 + i * 160, -Math.PI / 2);
     // spillway: piers on the crest, outlets in the face
     const dark = k.plain('#151515', 1);
     for (let i = 0; i <= 22; i++) {

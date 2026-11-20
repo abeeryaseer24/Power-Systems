@@ -57,6 +57,8 @@ export const TMI: SiteDef = {
     k.mesh(new THREE.BoxGeometry(1000, 2, 12), k.concrete('#9a958b', 20, 4), 430, 6, -600);
     for (let x = 0; x < 900; x += 90) k.mesh(new THREE.BoxGeometry(4, 10, 8), k.concrete('#8b867c', 8, 4), x - 20, 0, -600);
     k.parking(-280, -330, 30, 4, 0);
+    k.barriers(-278, -500, -262, -500);
+    k.barriers(-238, -500, -222, -500);
     k.parking(-280, 330, 24, 4, 0);
     for (let i = 0; i < 10; i++) k.mast(-260 + (i % 2) * 360, -380 + Math.floor(i / 2) * 190, 28);
     const avoid = (x: number, z: number) => tmiY(x, z) < 1.5 || (Math.abs(x) < 380 && Math.abs(z) < 720);
@@ -125,6 +127,8 @@ export const ROOPPUR: SiteDef = {
     k.road([[-500, -700], [-300, -380], [-200, 0], [-300, 420], [-500, 900]], 9);
     k.road([[-200, 0], [700, 0], [1400, 260]], 9);
     k.parking(-280, -200, 26, 5, Math.PI / 2);
+    k.barriers(-232, -34, -232, -10);
+    k.barriers(-232, 10, -232, 34);
     for (let i = 0; i < 12; i++) k.mast(-180 + (i % 3) * 260, -360 + Math.floor(i / 3) * 240, 30);
     trussBridge(k, -2700, -900, 2600, 18, 15, 16);
     trussBridge(k, -2700, -900, 2800, 22, 17, 0.1);
@@ -236,6 +240,7 @@ export const FUKUSHIMA: SiteDef = {
     k.road([[-1200, -260], [-560, -180], [-110, -150], [-110, 120], [-60, 300]], 9);
     k.road([[-110, -150], [-110, -700]], 8);
     k.parking(-200, 120, 30, 4, 0);
+    k.barriers(-136, -210, -136, -180);
     // treated-water tanks: more than a thousand of them by 2023
     k.tankFarm(-520, 120, 24, 12, 6, 12, 2, '#d3d7d6', today);
     k.tankFarm(-380, 420, 20, 10, 6, 12, 2, '#c7ccca', today);
@@ -389,6 +394,9 @@ export const CHERNOBYL: SiteDef = {
     k.road([[-3000, -260], [-700, -200], [400, -200], [1500, -60], [1700, 400]], 9);
     k.road([[-700, -200], [-1400, -1200], [-2400, -2200]], 9);
     k.parking(-600, 80, 20, 3, 0, 0.3);
+    k.barriers(-650, -236, -650, -210);
+    k.barriers(-650, -190, -650, -164);
+    for (let i = 0; i < 14; i++) k.prop('covered_car', -560 + i * 3.4, 150, (k.R() - 0.5) * 0.3);
     // Pripyat on the horizon
     townBlocks(k, -2400, -2300, 34, 1000, [9, 16]);
     for (let i = 0; i < 10; i++) k.mast(-560 + i * 80, 120, 26);

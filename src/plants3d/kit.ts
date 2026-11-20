@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { PropId, PropSpot } from './props';
 import { bands, cladding, concrete, glow, ground, rng, roadLines, waterNormal, windows } from './textures';
 
 // The building kit. Units are metres, +y up, north is -z, east is +x.
@@ -32,6 +33,26 @@ export class Kit {
   floods: { pos: THREE.Vector3; r: number }[] = [];
   beacons: THREE.Vector3[] = [];
   uplights: { pos: THREE.Vector3; at: THREE.Vector3 }[] = [];
+  props: PropSpot[] = [];
+
+  /** Place a downloaded prop (loaded later, when the viewer is close). */
+  prop(id: PropId, x: number, z: number, rot = this.R() * Math.PI * 2, s?: number) {
+    this.props.push({ id, x, z, rot, s });
+  }
+
+  /** Drums and crates stacked by a doorway: the clutter of a working plant. */
+  clutter(x: number, z: number, n = 6) {
+    for (let i = 0; i < n; i++) {
+      const a = this.R() * 6.28, r = 1 + this.R() * 4;
+      this.prop(this.R() < 0.6 ? 'Barrel_01' : 'wooden_crate_02', x + Math.cos(a) * r, z + Math.sin(a) * r);
+    }
+  }
+
+  /** Jersey barriers in a line, e.g. at a security gate. */
+  barriers(x0: number, z0: number, x1: number, z1: number) {
+    const L = Math.hypot(x1 - x0, z1 - z0), n = Math.floor(L / 3.2), rot = Math.atan2(-(z1 - z0), x1 - x0);
+    for (let i = 0; i <= n; i++) this.prop('concrete_road_barrier_02', x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n, rot);
+  }
   nightMats: { m: THREE.MeshStandardMaterial; k: number }[] = [];
   cutaways: Cutaway[] = [];
   eras = new Map<string, THREE.Group>();
@@ -175,6 +196,10 @@ export class Kit {
       r.rotation.y = Math.PI / 2;
     }
     this.colliders.push({ x, z, hw: w / 2, hd: d / 2, rot: opts.rot ?? 0 });
+    for (const s of [-1, 1]) {
+      const p = V(s * (w / 2 + 6), 0, d * 0.3).applyAxisAngle(V(0, 1, 0), opts.rot ?? 0);
+      this.clutter(x + p.x, z + p.z, 5);
+    }
     return grp;
   }
 
@@ -379,6 +404,9 @@ export class Kit {
       for (let j = 0; j < 7; j++) this.mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.18, 12), this.plain('#7a4a2e', 0.4), -3 + k * 3, 8.6 + j * 0.65, 1, grp, false);
     }
     this.colliders.push({ x, z, hw: 7 * s, hd: 4 * s, rot });
+    const off = V(0, 0, 6.5 * s).applyAxisAngle(V(0, 1, 0), rot);
+    this.prop('utility_box_02', x + off.x, z + off.z, rot);
+    this.prop('utility_box_02', x + off.x + 1.2 * Math.cos(rot), z + off.z - 1.2 * Math.sin(rot), rot);
   }
 
   /** Switchyard: bays of gantries, breakers, insulator posts and busbars. */
@@ -547,6 +575,10 @@ export class Kit {
     const p = this.mesh(g, m, x, this.groundY(x, z) + 0.04, z, undefined, false);
     p.rotation.x = -Math.PI / 2;
     p.rotation.z = rot;
+    if (w > 120) for (let t = -w / 2; t < w / 2; t += 32) for (const s of [-1, 1]) {
+      const q = V(t + this.R() * 10, 0, s * (d / 2 + 3)).applyAxisAngle(V(0, 1, 0), rot);
+      this.prop('shrub_03', x + q.x, z + q.z, undefined, 1.4 + this.R());
+    }
   }
 
   lampPost(x: number, z: number, y = this.groundY(x, z), h = 10) {
@@ -604,20 +636,42 @@ export class Kit {
 
   /** Parked cars in rows. */
   parking(x: number, z: number, cols: number, rows: number, rot = 0, fill = 0.75) {
-    const body = this.memo2('car', () => {
-      const a = new THREE.BoxGeometry(4.4, 0.9, 1.8); a.translate(0, 0.75, 0);
-      const b = new THREE.BoxGeometry(2.4, 0.7, 1.6); b.translate(-0.2, 1.5, 0);
-      return mergeSimple([a, b]);
+    // sedan side profile extruded across its width, bevelled so it catches light
+    const extrude = (pts: [number, number][], w: number, bevel: number) => {
+      const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([a, b]) => new THREE.Vector2(a, b))), { depth: w - 2 * bevel, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2 });
+      g.translate(0, 0, -(w - 2 * bevel) / 2);
+      return g;
+    };
+    const body = this.memo2('car', () => extrude([[-2.2, 0.32], [-2.25, 0.78], [-1.25, 0.92], [-0.72, 1.38], [0.62, 1.4], [1.25, 0.96], [2.22, 0.84], [2.2, 0.32]], 1.76, 0.07));
+    const glass = this.memo2('carGlass', () => extrude([[-1.16, 0.93], [-0.68, 1.33], [0.58, 1.35], [1.16, 0.97]], 1.8, 0));
+    const wheels = this.memo2('carWheels', () => {
+      const ws: THREE.BufferGeometry[] = [];
+      for (const wx of [-1.38, 1.4]) for (const wz of [-0.78, 0.78]) {
+        const c = new THREE.CylinderGeometry(0.33, 0.33, 0.22, 14);
+        c.rotateX(Math.PI / 2);
+        c.translate(wx, 0.33, wz);
+        ws.push(c);
+      }
+      return mergeSimple(ws);
     });
+    const glassM = this.plain('#0e1418', 0.08, 0.6);
+    const tyre = this.plain('#121212', 0.9);
     const paint = this.memo('paint', () => new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.6 }));
     const pal = ['#d9d9d6', '#1b1c1e', '#7c8186', '#9b1d1d', '#2a3c5c', '#e8e4da', '#4d5a4a'];
     const R = new THREE.Matrix4().makeRotationY(rot);
     this.apron(x, z, cols * 2.8 + 6, rows * 6 + 4, -rot);
+    for (let a = 0; a < Math.min(cols, 8); a++) {
+      const p = V((a - cols / 2) * 2.8, 0, (rows / 2 + 0.2) * 6).applyMatrix4(R);
+      this.prop('covered_car', x + p.x, z + p.z, rot + (this.R() - 0.5) * 0.12);
+    }
     for (let a = 0; a < cols; a++) for (let b = 0; b < rows; b++) {
       if (this.R() > fill) continue;
       const p = V((a - cols / 2) * 2.8, 0, (b - rows / 2) * 6).applyMatrix4(R).add(V(x, this.groundY(x, z), z));
       const q = new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), rot + Math.PI / 2 + (b % 2 ? Math.PI : 0));
-      this.instance('car', body, paint, new THREE.Matrix4().compose(p, q, V(1, 1, 1)), new THREE.Color(pal[Math.floor(this.R() * pal.length)]));
+      const cm = new THREE.Matrix4().compose(p, q, V(1, 1, 1));
+      this.instance('car', body, paint, cm, new THREE.Color(pal[Math.floor(this.R() * pal.length)]));
+      this.instance('carGlass', glass, glassM, cm, undefined, false);
+      this.instance('carWheels', wheels, tyre, cm, undefined, false);
     }
   }
 

@@ -30,7 +30,7 @@ export default function Plants() {
           </li>
         ))}
       </ol>
-      <p className="pv-note">Every building, tower and reactor is made in code, from published dimensions and site layouts. Plans are true to scale and orientation. Small details are simplified.</p>
+      <p className="pv-note">Every building, tower and reactor is made in code, from published dimensions and site layouts. Plans are true to scale and orientation. Small details are simplified. Close-up props (covered cars, barriers, drums, crates, cabinets, shrubs) are CC0 models from <a href="https://polyhaven.com">Poly Haven</a>.</p>
     </main>
   );
 }

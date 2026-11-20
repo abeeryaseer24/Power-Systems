@@ -81,6 +81,7 @@ export class PlantScene {
   private tourIdx = 0;
   private disposed = false;
   private sunDir = new THREE.Vector3();
+  private propsState: 'idle' | 'loading' | 'done' = 'idle';
 
   constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef) {
     const mobile = matchMedia('(max-width: 760px)').matches;
@@ -378,6 +379,7 @@ export class PlantScene {
     this.moon.target.position.copy(focus);
     this.moon.position.copy(focus).add(tmp.set(-800, 1600, 600));
     this.plumes.update(dt, this.active);
+    if (this.propsState === 'idle' && (this.mode === 'walk' || this.camera.position.distanceTo(this.controls.target) < 500)) this.loadProps();
     for (const m of this.water) if (m.normalMap) { m.normalMap.offset.x = t * 0.004; m.normalMap.offset.y = t * 0.006; }
     const bm = this.beaconPts.material as THREE.PointsMaterial;
     bm.opacity = (0.25 + 0.75 * this.night) * (Math.sin(t * 3.2) > 0.2 ? 1 : 0.05);
@@ -386,6 +388,13 @@ export class PlantScene {
     else for (const el of this.labelEls) el.style.opacity = '0';
     this.composer.render();
   };
+
+  private loadProps() {
+    this.propsState = 'loading';
+    import('./props').then(({ loadProps }) => loadProps(this.kit.props, this.site.groundY, this.kit.root))
+      .then(() => { this.propsState = 'done'; })
+      .catch(() => { this.propsState = 'done'; });
+  }
 
   private placeLabels() {
     const w = this.host.clientWidth, h = this.host.clientHeight;
