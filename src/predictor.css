@@ -36,3 +36,6 @@
 .pr-d-bar i.calm { background: var(--ok, #3fd28b); }
 .pr-d-s { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
 @media (max-width: 700px) { .pr-drivers li { grid-template-columns: 1fr auto; } .pr-d-bar { grid-column: 1 / -1; } }
+.pr-pick { flex-wrap: wrap; }
+.pr-pick select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+@media (max-width: 600px) { .pr-pick select { width: 100%; } }
