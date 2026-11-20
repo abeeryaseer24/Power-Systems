@@ -1,30 +1,33 @@
 # Blackstart
 
-Run the power grid of a city through a heatwave, a storm and a total blackout, and keep it at 50 hertz.
+A power system simulator that runs in the browser. It starts with a fictional city whose lights depend on the grid you operate, and goes on to 17 real transmission networks, 24 historical blackouts, seven reactor models and six power stations in 3D.
 
-Blackstart is a real-time power system simulator in the browser. Halvern, a fictional coastal city of 1.4 million people, is drawn at night in 3D. Every lit window depends on the grid you are operating: when frequency collapses, the districts go dark.
+Live: https://power-systems-dusky.vercel.app
 
-## What you do
+## What is in it
 
-- **Shifts.** Seven scenarios, from an ordinary Tuesday (with a cup-final kettle surge at 21:45) to a heatwave with derated lines, the trip of the largest unit on the system, a windless winter peak, a storm that shuts down the offshore wind farm, and a full black start from a single hydro unit.
-- **Control room.** Start and stop units with realistic start-up times, move setpoints, choose which plants follow AGC, open and close line breakers, curtail renewables, charge the battery, import or export over the HVDC link, and reconnect districts block by block. Major protection events slow the simulation to real time.
-- **Debrief.** A grade from demand served, time inside 49.8–50.2 Hz and cost, with the generation mix and the frequency envelope for the whole shift.
-- **Learn.** Five interactive lessons: the swing equation, DC load flow, cascading line trips, merit-order pricing and black start.
+Halvern is a fictional coastal city of 1.4 million people, drawn at night. You run its 275 kV grid through seven shifts, from an ordinary evening with a cup-final kettle surge to a storm, a heatwave and a black start from one hydro unit. When frequency collapses, the districts go dark.
 
-## The model
+The atlas has 17 reduced transmission models built from OpenStreetMap: Bangladesh, London, New York, Houston, Madrid, Delhi, Rome, South Australia, Hokkaido, Karachi, Venezuela, São Paulo, Türkiye, Sri Lanka, Moscow, Central Asia and greater Dhaka. Each one solves an AC power flow and can be operated live. On these networks, 24 blackouts are replayed from their investigation reports, from New York 1965 to Iberia 2025. You can watch each one, or take control and try to save the grid. Each event also has a case file and a narrated documentary.
+
+The nuclear section runs a point-kinetics reactor with xenon, void and Doppler feedback for seven plants, including Chernobyl, Three Mile Island and Fukushima, plus a start-up exercise for Rooppur.
+
+The plants section has 3D models of Rooppur, Chernobyl, Fukushima Daiichi, Three Mile Island, Drax and the Three Gorges Dam, built to published dimensions. You can orbit, take a guided tour or walk the site, switch between day and night, and open the containment to see the reactor. Each plant can be tripped on a model of its own grid, built up from an empty site in a time-lapse, or flooded (Fukushima replays the 2011 tsunami). Two control rooms replay TMI-2 in 1979 and Chernobyl-4 in 1986 from the operator's chair, and two fallout maps show where the Chernobyl and Fukushima releases went.
+
+There is more: sandboxes for stacking contingencies, rebuilding a grid from darkness and planning a night of load shedding in Dhaka; tools for distance protection, merit-order markets and inter-area oscillations; a small neural network that estimates the risk of collapse; live data from Great Britain and the United States; and a 15-chapter course that explains each idea from scratch.
+
+## The models
 
 | Piece | Implementation |
 | --- | --- |
-| Network | 13 buses, 19 lines, 275 kV, reactances in per unit on 100 MVA |
-| Power flow | DC load flow per electrical island, solved at 10–20 Hz of simulated time |
-| Frequency | Aggregated swing equation per island, `df/dt = f0 (Pgen − Pload) / 2Ek` |
-| Primary control | Droop governors (3–5 %) with first-order lags and deadbands; battery fast frequency response |
-| Secondary control | AGC integrator weighted by ramp rate, with anti-windup |
-| Protection | Inverse-time thermal line trips, distance trip above 230 %, five-stage UFLS from 48.8 Hz, RoCoF loss-of-mains trip of rooftop solar, generator trips below 47.5 Hz, auto-reclose |
-| Weather | Seeded Ornstein–Uhlenbeck processes for wind, cloud and demand noise; temperature-dependent demand and line ratings |
-| Plants | Nuclear, coal, CCGT, OCGT, pumped hydro (black-start capable), offshore wind with storm cut-out, solar, battery, HVDC link |
+| Halvern | 13 buses, 19 lines, DC load flow per island, aggregate swing equation, droop governors, ramp-weighted AGC, thermal trips, five-stage UFLS, RoCoF trip of rooftop solar |
+| Real networks | OpenStreetMap topology, typical impedances per voltage class, fast decoupled AC load flow with Newton-Raphson fallback, generator reactive limits, switched shunts, external equivalent, distance and out-of-step protection, UVLS |
+| Reactor | Point kinetics with six delayed groups, xenon and iodine, void and Doppler feedback, decay heat, one-node fuel and coolant, hydrogen above about 1200 °C |
+| Plant on its grid | One swing equation per grid with real frequency, demand and inertia, 5 % droop, AGC, UFLS scaled for 50 or 60 Hz, decay heat after scram |
+| Fallout | Lagrangian puffs on reconstructed release histories and hourly winds, dry and wet deposition, scaled against the published Cs-137 maps |
+| Predictor | Multilayer perceptron (12-16-8-1) trained on 400 simulated disturbance runs; AUC 0.80 on held-out runs |
 
-Simplifications: no voltage or reactive power, lossless lines, no intra-island machine angles.
+All of these are teaching models. Line parameters are typical values, dynamics are aggregated, the blackout replays mix report-driven steps with simulated physics, and nothing has been validated against recorded measurements. The [technical report](docs/report.md) ([PDF](docs/report.pdf)) sets out every model, assumption and limitation.
 
 ## Running it
 
@@ -41,15 +44,28 @@ npm test
 npm run build
 ```
 
+The test suite has 90 tests. Rebuilding a region from OpenStreetMap uses `node scripts/osm/build.mjs <region ids>`; the US live data needs an EIA access key set as an environment variable on the host.
+
 ## Stack
 
-TypeScript, React 19, Vite, three.js (instanced city, custom shaders, bloom), GSAP ScrollTrigger for the landing sequence, KaTeX for the lessons, Vitest for the grid engine.
+TypeScript, React 19 and Vite. three.js draws the city, the network maps, the power stations and the control rooms, with custom shaders and procedural textures. GSAP drives the landing sequence, KaTeX the equations and Vitest the tests. Sound is synthesised with the Web Audio API.
 
 ## Structure
 
 ```
-src/grid/      grid engine: network data, load flow, profiles, simulation, scenarios, tests
-src/scene/     three.js city, transmission lines, plants and camera
-src/pages/     landing, shift board, control room, debrief, lessons, about
-src/components frequency dial, timeline, inspector, network map
+src/grid/          Halvern engine, AC power flow, region simulator, blackout events, case files
+src/nuclear/       reactor model and plant scenarios
+src/plants3d/      3D power stations, textures, reactor interiors, grid stress, time-lapse, flood, sound
+src/controlroom/   control-room replays and their time series
+src/fallout/       dispersion and deposition model
+src/ai/            risk predictor features, inference and training
+src/scene/         three.js city and network maps
+src/pages/         every page of the site
+scripts/osm/       region definitions and the OpenStreetMap build
+api/               serverless function for US data
+docs/              technical report
 ```
+
+## Data
+
+Network, settlement and road data © OpenStreetMap contributors (ODbL). World outline from Natural Earth. Live data from Elexon Insights, the NESO Carbon Intensity API and the U.S. Energy Information Administration. Close-up props for the power stations from Poly Haven (CC0).

@@ -11,9 +11,9 @@ Source code: https://github.com/abeeryaseer24/Power-Systems
 
 ## Abstract
 
-This report describes Blackstart, a power system simulator that runs in a web browser. The software contains a fictional test system for operator training, reduced models of 17 transmission networks derived from OpenStreetMap data, reconstructions of 24 historical blackouts, and a point-kinetics reactor model applied to seven nuclear plants. The network models solve an AC power flow with generator reactive limits and switched shunt compensation, and a per-island frequency model with governor droop, secondary control, under-frequency load shedding and line and generator protection. A multilayer perceptron trained on simulated disturbances estimates the probability of collapse within 60 s, and two modules display live data from the British and United States power systems.
+This report describes Blackstart, a power system simulator that runs in a web browser. The software contains a fictional test system for operator training, reduced models of 17 transmission networks derived from OpenStreetMap data, reconstructions of 24 historical blackouts, and a point-kinetics reactor model applied to seven nuclear plants. The network models solve an AC power flow with generator reactive limits and switched shunt compensation, and a per-island frequency model with governor droop, secondary control, under-frequency load shedding and line and generator protection. A multilayer perceptron trained on simulated disturbances estimates the probability of collapse within 60 s, and two modules display live data from the British and United States power systems. Six power stations are modelled in three dimensions, where they can be subjected to disturbances on a representation of their grid, built up from an empty site, flooded, and examined in cutaway; two accidents are replayed from the control room, and the dispersion of the Chernobyl and Fukushima releases is estimated with a puff model.
 
-The models are of reduced order and are intended for teaching. Line parameters are typical values for each voltage class, generator dynamics are aggregated per island, and the blackout reconstructions combine simulated physics with event sequences taken from the investigation reports. No reconstruction has been validated against recorded measurements. Section 13 discusses these limitations.
+The models are of reduced order and are intended for teaching. Line parameters are typical values for each voltage class, generator dynamics are aggregated per island, and the blackout reconstructions combine simulated physics with event sequences taken from the investigation reports. No reconstruction has been validated against recorded measurements. Section 14 discusses these limitations.
 
 ## 1. Introduction
 
@@ -41,9 +41,10 @@ The software consists of the following modules:
 - A reactor model with seven plant configurations and a start-up exercise.
 - Three analytical tools covering distance protection, merit-order pricing and inter-area oscillations.
 - A disturbance risk predictor, and live data from Great Britain and the United States.
+- Three-dimensional models of six power stations, with grid disturbances, construction, flooding and cutaway views, two control-room replays, and dispersion maps for the Chernobyl and Fukushima releases.
 - An introductory course of fifteen chapters.
 
-The software is written in TypeScript using React, with three.js for map rendering and Vitest for testing. All computation runs in the browser, except for one serverless function that holds the access key for United States data.
+The software is written in TypeScript using React, with three.js for rendering and Vitest for testing. All computation runs in the browser, except for one serverless function that holds the access key for United States data.
 
 ## 2. Test System
 
@@ -234,17 +235,64 @@ The Great Britain module retrieves system frequency at 15 s resolution, generati
 
 The United States module retrieves hourly data from the Hourly Electric Grid Monitor of the U.S. Energy Information Administration (form EIA-930) for eight balancing authorities: demand, day-ahead demand forecast, net generation, interchange and generation by fuel type. Because this service requires an access key, requests pass through a serverless function that adds the key from the hosting environment, accepts only a fixed list of balancing authorities, returns only the fields required and caches responses for ten minutes. The key is never sent to the browser.
 
-## 11. Verification
+## 11. Plant Models and Accident Visualisation
 
-The test suite contains 81 automated tests. The AC power flow is checked against a closed-form solution for a two-bus system; it is shown to fail to converge beyond the nose of the PV curve; the decoupled and Newton-Raphson solutions are compared on the Halvern network with losses, line charging and PV buses; and a generator held at its reactive limit is shown to allow its terminal voltage to fall. Further tests cover the DC load flow and island detection, the weather and demand profiles, the Halvern scenarios, black start from a hydro unit, the connection of Rooppur to the Bangladesh network, each contingency modifier, the network simulator, and the reactor model (steady state at rated power, decay heat after shutdown, the reactor period after a reactivity step, and completion of every plant scenario). Each historical reconstruction is required to produce a loss of supply in observation mode. The tests run on every change submitted to the repository.
+### 11.1 Geometry and rendering
+
+Six power stations are modelled in three dimensions: Rooppur, Chernobyl, Fukushima Daiichi, Three Mile Island, Drax and the Three Gorges Dam. Each site is laid out from published dimensions and site plans, with its true orientation. Cooling towers are hyperbolic shells of revolution on a ring of diagonal legs; containments are cylinders with domes and an inner surface, so that a section through them shows a wall of finite thickness; stacks, switchyards, transmission lines, roads, fences and woodland are built from a common set of procedural components. Surface textures (weathered concrete, profiled cladding, window grids, ground cover) are generated in the browser, so the whole module adds about 50 kB of compressed code. Six props used at close range (a covered car, a road barrier, an oil drum, a crate, an electrical cabinet and a shrub) are public-domain models from Poly Haven [30]; their textures were reduced to 512 pixels, and they are loaded only when the viewer approaches the site.
+
+The scene is lit by a physical sky model whose sun position follows the site latitude and the time of day. Shadows are recomputed only when the view moves or the sun changes, the image resolution adapts to the measured frame time, and light bloom is applied only at night, when it represents street lighting, lit windows and aviation lights. At night the larger structures are floodlit from the ground. Steam leaves each operating cooling tower as a particle plume driven by the wind. A cutaway clips the containment or reactor building to show the reactor: the once-through steam generators and pressurizer relief line of the Babcock & Wilcox plant at Three Mile Island, the horizontal steam generators and core catcher of the VVER-1200, the drywell and suppression torus of the Mark I containment, and the upper shield of the RBMK, which in the Chernobyl ruin stands close to vertical. The viewer can orbit the site, follow a guided tour of six or seven stops, or walk the site in the third or first person with collision against buildings.
+
+### 11.2 Plant on its grid
+
+Each plant can be subjected to disturbances on a representation of the grid it served (Table 5). The grid is reduced to one aggregate swing equation of the form of Equation (1), with demand sensitive to frequency (1.5 % of demand per 1 % of frequency), governors on the rest of the system with 5 % droop, a 6 s lag and headroom of 4 % of their output, an integral secondary control, and four stages of under-frequency load shedding of 5 % each, at 48.8, 48.6, 48.4 and 48.2 Hz on a 50 Hz system and the equivalent fractions of 60 Hz. The units of the plant follow their own droop. After a reactor trip, the heat output follows decay heat, approximately 6.6 % of rated power falling with the power &minus;0.2 of time.
+
+Table 5. Grid representations used for the plant disturbances.
+
+| Plant | Grid | Frequency (Hz) | Demand (MW) | H (s) | Units in service |
+|---|---|---|---|---|---|
+| Rooppur | Bangladesh national grid | 50 | 15,500 | 4 | 2 × 1,200 MW |
+| Chernobyl | Soviet unified grid, Kyiv region, 1985 | 50 | 26,000 | 6 | 4 × 1,000 MW |
+| Fukushima Daiichi | TEPCO, 2010 | 50 | 48,000 | 5.5 | 6 × 784 MW |
+| Three Mile Island | PJM, 1979 | 60 | 32,000 | 5 | 1 × 906 MW |
+| Drax | Great Britain | 50 | 29,000 | 3 | 4 × 645 MW |
+| Three Gorges | Central China | 50 | 190,000 | 5 | 26 × 700 MW |
+
+Four disturbances are available: loss of the largest other infeed on the grid, a trip of one unit of the plant, loss of all off-site supplies to the station, and a rise in demand of 4 % over about a minute. The plant responds visibly. The tower plumes fade as heat output falls. On a trip, steam is discharged through relief and dump valves on the turbine hall roof, and without off-site supplies the condenser is lost and decay heat continues to leave through these valves. The switchyard arcs when its breakers open. The station lighting fails for 10 s, until the emergency diesels have started, and then returns at reduced level. For the hydro station a load rejection opens the spillway. With both Rooppur units lost together, the frequency of the Bangladesh grid falls to about 48.6 Hz and two stages of load shedding (about 1.5 GW) operate; the loss of a 660 MW unit elsewhere is held above the first stage and corrected by secondary control.
+
+### 11.3 Construction time-lapse
+
+The construction of each plant can be replayed from an empty site to commissioning, with dates and captions taken from public accounts. A grid of 256 by 256 cells over the site holds the height that each structure may have reached at a given moment, and every surface above that height is discarded when the image is drawn, so that walls rise in courses and tower shells rise in lifts. Each structure is given a construction window according to its type, cranes stand beside the large structures while they rise, and steam and lighting begin at commissioning. Two events are scripted: the New Safe Confinement at Chernobyl, assembled 327 m to the west and moved over unit 4 in 2016, and the filling of the Three Gorges reservoir from 66 m to 135 m in 2003 and to 175 m in 2010.
+
+### 11.4 Control-room replays
+
+Two accidents are replayed from the operator's position: Three Mile Island unit 2 from 04:00 on 28 March 1979 [24, 26], and Chernobyl unit 4 from 00:00 on 26 April 1986 [23]. Seven panel sections surround the viewer, and every instrument is drawn from time series that represent the recorded trends: reactor coolant pressure, pressurizer level, neutron power, injection flow, drain tank pressure and core exit temperature at Three Mile Island; thermal power, operating reactivity margin, coolant flow and drum pressure at Chernobyl. At Three Mile Island the indicator of the pilot-operated relief valve goes out at 04:00:50 while the valve remains open until its block valve is closed at 06:22, the emergency feedwater valve lights are hidden, and about 120 alarm windows light while the alarm printer falls more than an hour behind. At Chernobyl the wall of rod position indicators, the core map, the reactivity margin printout below the permitted 15 rods, and the shutdown button lead into the power excursion. Playback slows to real time for the final minute, and the view turns to the panel concerned unless the user takes control. These replays present the published sequences; they are not driven by the reactor model of Section 7.
+
+### 11.5 Flood scenarios
+
+At Fukushima Daiichi the tsunami of 11 March 2011 is replayed at one minute per second [25, 27]. Off-site power is lost with the earthquake at 14:46, the emergency diesels start a minute later, the first wave of about 4 m at 15:27 is stopped at the intake, and the main wave of 14 to 15 m at 15:35 crosses the 5.7 m design basis and the 10 m site grade. Each item of equipment fails when the water passes its elevation: the seawater pumps at the intake, the diesels and switchgear in the turbine building basements, and the DC batteries of units 1, 2 and 4, while the unit 3 batteries and the air-cooled diesel of unit 6 survive. A station blackout indicator lights when AC power is lost. At Rooppur a manual flood level on the Padma can be set against site grade; these levels are illustrative and are labelled as such.
+
+### 11.6 Atmospheric dispersion and deposition
+
+The spread of the Chernobyl and Fukushima releases is estimated with a Lagrangian puff model on a separate map of each region, 340 km and 240 km across. Two puffs per half hour are released in proportion to a relative release history, which for Chernobyl includes the initial release, the minimum after about five days and the second rise during the graphite fire, and for Fukushima the venting and explosions of units 1 and 3 and the containment failure of unit 2 on 15 March [23, 25]. Each puff is carried by an hour-by-hour wind direction and speed reconstructed from published accounts, with a random deviation per puff, and its width grows with age. Deposition is proportional to the remaining material, with a dry rate everywhere and a wet rate about eight times higher during precipitation, distributed over a Gaussian footprint on a grid of 200 by 200 cells, and only on land. The results are scaled so that the highest Cs-137 category reaches about 30 km along the direction of greatest deposition, and are then shown in the published categories [28, 29]. Evacuation zones appear at the times they were ordered.
+
+The model reproduces the broad pattern of each event, including the north-west band towards Iitate formed by precipitation on the afternoon of 15 March 2011, and the contamination in the Gomel region after rain on 28 and 29 April 1986. It has no terrain effects, no vertical structure, no radioactive decay and one wind for the whole map at any time, and its scaling is a calibration. The maps are therefore indicative and are labelled as modelled.
+
+### 11.7 Sound
+
+A positional soundscape is synthesised in the browser without recorded material: transformer hum at twice the supply frequency with its harmonics near each transformer, the noise of falling water inside each operating tower, turbine hall noise in proportion to output, discharge from the relief valves during a trip, the spillway, wind that increases with height, and footsteps when walking. Breaker operations, load shedding and station blackout have their own sounds, and the control rooms have the hum of their lighting, one tone per new alarm and the explosion at Chernobyl.
+
+## 12. Verification
+
+The test suite contains 90 automated tests. The AC power flow is checked against a closed-form solution for a two-bus system; it is shown to fail to converge beyond the nose of the PV curve; the decoupled and Newton-Raphson solutions are compared on the Halvern network with losses, line charging and PV buses; and a generator held at its reactive limit is shown to allow its terminal voltage to fall. Further tests cover the DC load flow and island detection, the weather and demand profiles, the Halvern scenarios, black start from a hydro unit, the connection of Rooppur to the Bangladesh network, each contingency modifier, the network simulator, and the reactor model (steady state at rated power, decay heat after shutdown, the reactor period after a reactivity step, and completion of every plant scenario). Each historical reconstruction is required to produce a loss of supply in observation mode. For the plant models, tests confirm that the grid representation holds frequency without disturbance, rides through the loss of a 660 MW unit on the Bangladesh grid without load shedding and returns to nominal frequency, sheds load when both Rooppur units are lost, and scales the shedding thresholds for a 60 Hz grid; that the dispersion model keeps its highest category near the source and its Fukushima deposition on land; and that the control-room sequences place the relief valve indication, the shutdown signal and the excursion in the reported order. The tests run on every change submitted to the repository.
 
 These are consistency and regression tests. They confirm that the software implements the models described; they do not show that the models represent the real systems.
 
-## 12. Results Summary
+## 13. Results Summary
 
-The network models solve for all 17 regions after the corrections in Table 2, and all 24 reconstructions produce a loss of supply when run in observation mode (Table 4). Grid-forming batteries rated at 8 % of demand raised the frequency nadir and reduced load shedding in each of the three regions tested (Table 3). The risk predictor achieved an area under the ROC curve of 0.80 on held-out simulated runs, with low precision. The live data modules operate against the public services described in Section 10.
+The network models solve for all 17 regions after the corrections in Table 2, and all 24 reconstructions produce a loss of supply when run in observation mode (Table 4). Grid-forming batteries rated at 8 % of demand raised the frequency nadir and reduced load shedding in each of the three regions tested (Table 3). The risk predictor achieved an area under the ROC curve of 0.80 on held-out simulated runs, with low precision. The live data modules operate against the public services described in Section 10. The plant models respond to disturbances on their grids in the manner described in Section 11.2, and the dispersion model reproduces the principal deposition patterns of both releases (Section 11.6).
 
-## 13. Limitations
+## 14. Limitations
 
 1. Line impedances and ratings are typical values for each voltage class. Conductor types, bundling, transformer impedances and protection settings for the real networks are not known, and generator capacities are taken from mapped data or defaults.
 
@@ -260,19 +308,25 @@ The network models solve for all 17 regions after the corrections in Table 2, an
 
 7. The analytical tools are simplified as stated in Section 8: single-phase analysis, no remote infeed, no bidding behaviour, and damping terms in place of control loops.
 
-## 14. Conclusions
+8. The plant models are architectural representations from published dimensions; equipment layout inside buildings is schematic. The grid representations in Table 5 use one swing equation per grid with assumed inertia and reserves, and the control-room replays follow time series that represent the published trends, not plant data.
+
+9. The dispersion maps rest on reconstructed winds, a relative release history and a calibration to the published maps (Section 11.6). They show where deposition occurred, approximately; they do not give doses.
+
+## 15. Conclusions
 
 The project shows that a large part of an undergraduate power system syllabus can be implemented as interacting models on real network topology, in software that runs in a browser. The combination of AC power flow, frequency response and protection on these networks reproduces the general course of the 24 blackouts studied. The corrections in Table 2 each followed from diagnosing a specific failure: excessive charging on 765 kV lines, a missing double circuit, half of a plant counted on the wrong system, and a merit order that overloaded a corridor.
 
-The models are of teaching grade. They are reduced-order reconstructions of each network and are not suitable for planning or operational studies. The blackout replays are best described as reconstructions that combine event sequences from the investigation reports with simulated physics.
+The models are of teaching grade. They are reduced-order reconstructions of each network and are not suitable for planning or operational studies. The blackout replays are best described as reconstructions that combine event sequences from the investigation reports with simulated physics. The plant models connect the same ideas to the buildings in which they occur: the effect of a trip on frequency, the dependence of a station on off-site and emergency supplies, and the elevation of safety equipment relative to a flood.
 
-## 15. Recommendations for Further Work
+## 16. Recommendations for Further Work
 
 1. Validate one event quantitatively by comparing the Great Britain 9 August 2019 reconstruction with the frequency record in the official report [12], which shows a nadir of 48.8 Hz, and adjusting inertia and response until the profiles agree.
 2. Indicate in the interface whether each consequence in a replay is simulated or scripted.
 3. Replace typical line parameters with published network data where system operators release it.
 4. Add individual machine angles to the network models, so that transient stability and inter-area modes arise in the networks themselves.
 5. Retrain the predictor on all 17 regions with more runs, report precision-recall curves, and compare it with simple threshold rules on frequency and its rate of change.
+6. Drive the control-room replays from the reactor model of Section 7, so that an intervention by the user changes the outcome.
+7. Replace the puff model with a published dispersion code and meteorological reanalysis data for the two releases.
 
 ## References
 
@@ -326,6 +380,16 @@ The models are of teaching grade. They are reduced-order reconstructions of each
 
 [25] International Atomic Energy Agency, *The Fukushima Daiichi Accident*, Report by the Director General, 2015; TEPCO, *Fukushima Nuclear Accidents Investigation Report*, 2012.
 
+[26] M. Rogovin and G. T. Frampton, *Three Mile Island: A Report to the Commissioners and to the Public*, U.S. Nuclear Regulatory Commission Special Inquiry Group, 1980.
+
+[27] The National Diet of Japan, *The Official Report of the Fukushima Nuclear Accident Independent Investigation Commission*, 2012.
+
+[28] Ministry of Education, Culture, Sports, Science and Technology (Japan), results of airborne monitoring of Cs-134 and Cs-137 deposition, 2011.
+
+[29] UNSCEAR, *Sources and Effects of Ionizing Radiation*, Annex J (Chernobyl), 2000; International Atomic Energy Agency, *Environmental Consequences of the Chernobyl Accident and their Remediation*, 2006.
+
+[30] Poly Haven, public-domain (CC0) 3D models, https://polyhaven.com.
+
 Network, settlement and map data © OpenStreetMap contributors, available under the Open Database Licence. World outline from Natural Earth. Live data from Elexon, the National Energy System Operator and the U.S. Energy Information Administration.
 
 ## Appendix A. Software Structure
@@ -340,10 +404,14 @@ Table A1. Organisation of the source code.
 | src/nuclear | Reactor model and plant scenarios |
 | src/ai | Feature extraction, inference and explanation for the risk predictor; training script |
 | src/scene | Three-dimensional rendering of the test system and of the network maps |
+| src/plants3d | Plant models, procedural textures, reactor interiors, grid disturbances, construction, flooding, sound |
+| src/controlroom | Control-room replays and their time series |
+| src/fallout | Dispersion and deposition model |
 | src/pages, src/components | User interface |
 | scripts/osm | Region definitions and the OpenStreetMap build procedure |
 | api | Serverless function for United States data |
 | public/data | Built network models, trained predictor and world outline |
+| public/props | Six public-domain props for the plant models |
 
 The network simulator runs in the browser's main thread within the rendering loop, and is limited to about 8 ms of computation per frame so that the display remains responsive. When the requested simulation speed cannot be reached within this limit, the achieved speed is displayed. The largest model (Moscow, 476 buses) completes its three-minute reconstruction in about 4.5 s of computation. The decoupled load flow refactorises its matrices only when the set of PV and PQ buses changes.
 
@@ -378,7 +446,7 @@ Bus counts include junctions where lines meet away from a substation. Mapped gen
 ```
 npm install
 npm run dev                                    local server at http://localhost:5173
-npm test                                       run the 81 tests
+npm test                                       run the 90 tests
 node scripts/osm/build.mjs <region ids>        rebuild regions (downloads cached in scripts/osm/.cache)
 LAYERS=cached node scripts/osm/build.mjs <id>  rebuild using cached map layers only
 TRAIN=1 RUNS=400 npx vitest run src/ai/train.test.ts    retrain the risk predictor
