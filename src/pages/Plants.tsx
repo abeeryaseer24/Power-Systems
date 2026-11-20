@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ELEVATIONS, SITES, siteById, type El } from '../plants3d/sites';
-import type { FloodDef, Mode, PlantScene, SiteDef } from '../plants3d/PlantScene';
+import type { FloodDef, Mode, PlantScene, SiteDef, Stop } from '../plants3d/PlantScene';
+import { TOURS, type Tour } from '../plants3d/tours';
+import { sfx } from '../lib/sfx';
 import { at } from '../controlroom/timelines';
 import { SCENARIOS, StressSim, type GridDef } from '../plants3d/stress';
 import type { Lapse } from '../plants3d/build';
@@ -112,6 +114,11 @@ function Viewer({ site }: { site: SiteDef }) {
   const [lapse, setLapse] = useState(false);
   const [flood, setFlood] = useState(false);
   const [fp, setFp] = useState(false);
+  const [film, setFilm] = useState<{ i: number; p: number } | null>(null);
+  const [filmPaused, setFilmPaused] = useState(false);
+  const [card, setCard] = useState(true);
+  const [seen, setSeen] = useState<Set<number>>(new Set());
+  const tour = TOURS[site.id];
   const touch = typeof window !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   useEffect(() => {
@@ -125,6 +132,8 @@ function Viewer({ site }: { site: SiteDef }) {
       e.onStop = setStop;
       e.onMode = setMode;
       e.onFp = setFp;
+      e.onFilm = (i, p) => setFilm({ i, p });
+      e.onPin = () => setCard(true);
       eng.current = e;
       if (import.meta.env.DEV) (window as unknown as { __pv: PlantScene }).__pv = e;
       setReady(true);
@@ -140,6 +149,25 @@ function Viewer({ site }: { site: SiteDef }) {
     return () => ro.disconnect();
   }, []);
   useEffect(() => { eng.current?.setHour(hour); }, [hour, ready]);
+  const filmI = film?.i ?? null;
+  useEffect(() => {
+    if (mode !== 'film' || filmI === null || !tour) return;
+    const act = tour.stops[filmI]?.act;
+    if (filmI === -1) { setHour(tour.stops[0]?.act?.hour ?? 10); setCut(false); }
+    if (!act) return;
+    if (act.hour !== undefined) setHour(act.hour);
+    setCut(!!act.cut);
+    if (act.era) setEra(act.era);
+    if (!act.build) eng.current?.setBuild(null);
+    if (!act.flood) eng.current?.setFlood(null);
+  }, [filmI, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (mode !== 'film' || !film || !tour) return;
+    const act = tour.stops[film.i]?.act;
+    if (act?.build && film.p > 0) eng.current?.setBuild(act.build[0] + (act.build[1] - act.build[0]) * film.p);
+    if (act?.flood && s.flood && film.p > 0) eng.current?.setFlood(act.flood[0] + (act.flood[1] - act.flood[0]) * Math.min(1, film.p * 1.4), s.flood.start + (s.flood.finish - s.flood.start) * Math.min(1, film.p * 1.2));
+  }, [film, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (mode === 'tour') setSeen((x) => new Set(x).add(stop)); }, [stop, mode]);
   useEffect(() => { eng.current?.setEra(era); }, [era, ready]);
   useEffect(() => { eng.current?.setCutaway(cut); }, [cut, ready]);
   useEffect(() => {
@@ -151,10 +179,12 @@ function Viewer({ site }: { site: SiteDef }) {
     const k = (ev: KeyboardEvent) => {
       if (ev.key === 'Escape' && eng.current?.mode === 'walk') eng.current.setMode('orbit');
       if (mode === 'tour' && (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft')) eng.current?.tourGo(stop + (ev.key === 'ArrowRight' ? 1 : -1));
+      if (mode === 'film' && ev.key === ' ') { ev.preventDefault(); const v = !filmPaused; setFilmPaused(v); if (eng.current) eng.current.filmPaused = v; }
+      if (mode === 'film' && ev.key === 'Escape') go('orbit');
     };
     addEventListener('keydown', k);
     return () => removeEventListener('keydown', k);
-  }, [mode, stop]);
+  }, [mode, stop, filmPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openFlood = () => {
     if (!flood) { setStress(false); setLapse(false); eng.current?.setStress(null); if (s.eras) setEra(s.eras[0].id); }
@@ -172,9 +202,30 @@ function Viewer({ site }: { site: SiteDef }) {
     setStress(!stress);
     setFacts(false);
   };
-  const go = (m: Mode) => { eng.current?.setMode(m); setMode(m); };
+  const endFilm = () => {
+    eng.current?.setBuild(null);
+    eng.current?.setFlood(null);
+    setCut(false);
+    if (s.eras) setEra(s.eras[0].id);
+    setFilm(null);
+    sfx.setDrone(0);
+  };
+  const go = (m: Mode) => {
+    if (mode === 'film' && m !== 'film') endFilm();
+    if (m === 'film') {
+      setLapse(false); setFlood(false); setStress(false); eng.current?.setStress(null);
+      sfx.unlock();
+      sfx.setDrone(0.22);
+      eng.current?.startFilm((tour?.stops ?? []).map((t) => ({ shot: t.shot ?? 'orbit', dur: t.dur ?? 12 })));
+      setFilmPaused(false);
+      setMode('film');
+      return;
+    }
+    if (m === 'tour') { setCard(true); setFacts(false); }
+    eng.current?.setMode(m);
+    setMode(m);
+  };
   const s = site;
-  const st = eng.current?.stops[stop];
   const night = hour < 5.5 || hour > 19;
 
   return (
@@ -205,16 +256,17 @@ function Viewer({ site }: { site: SiteDef }) {
       {lapse && s.lapse && <LapsePanel lapse={s.lapse} eng={eng} onClose={openLapse} />}
       {stress && s.grid && <StressPanel grid={s.grid} eng={eng} onClose={openStress} />}
 
-      {mode === 'tour' && st && (
-        <section className="pv-caption" aria-live="polite">
-          <span className="pv-step">{String(stop + 1).padStart(2, '0')} / {String(eng.current!.stops.length).padStart(2, '0')}</span>
-          <h2>{st.title}</h2>
-          <p>{st.body}</p>
-          <div className="pv-capnav">
-            <button onClick={() => eng.current?.tourGo(stop - 1)} aria-label="Previous stop">‹</button>
-            <button onClick={() => eng.current?.tourGo(stop + 1)} className="pv-next">Next stop ›</button>
-          </div>
-        </section>
+      {mode === 'tour' && card && eng.current && (
+        <TourCard site={s} tour={tour} stops={eng.current.stops} i={stop} seen={seen.size} eng={eng} cut={cut} setCut={setCut} era={era} setEra={setEra} setHour={setHour} onGo={(k) => eng.current?.tourGo(k)} onClose={() => setCard(false)} />
+      )}
+      {mode === 'tour' && !card && <button className="tc-reopen" onClick={() => setCard(true)}>Show card</button>}
+      {mode === 'tour' && <p className="pv-hint">Click a numbered pin to go there</p>}
+
+      {mode === 'film' && film && tour && eng.current && (
+        <FilmOverlay site={s} tour={tour} stops={eng.current.stops} i={film.i} p={film.p} paused={filmPaused}
+          onPause={() => { const v = !filmPaused; setFilmPaused(v); if (eng.current) eng.current.filmPaused = v; }}
+          onJump={(k) => { if (k === -1) { eng.current?.startFilm((tour.stops).map((t) => ({ shot: t.shot ?? 'orbit', dur: t.dur ?? 12 }))); } else eng.current?.filmJump(k); }}
+          onExit={() => go('orbit')} onExplore={() => go('tour')} />
       )}
 
       {mode === 'walk' && (
@@ -225,9 +277,9 @@ function Viewer({ site }: { site: SiteDef }) {
 
       <nav className="pv-bar" ref={bar} aria-label="Viewer controls">
         <div className="pv-seg" role="group" aria-label="Mode">
-          {(['orbit', 'tour', 'walk', 'axo'] as Mode[]).map((m) => (
+          {(['orbit', 'film', 'tour', 'walk', 'axo'] as Mode[]).map((m) => (
             <button key={m} className={mode === m ? 'on' : ''} onClick={() => go(m)} aria-pressed={mode === m}>
-              {m === 'orbit' ? 'Orbit' : m === 'tour' ? 'Tour the plant' : m === 'walk' ? 'Walk' : 'Axonometric'}
+              {m === 'orbit' ? 'Orbit' : m === 'film' ? 'Film tour' : m === 'tour' ? 'Interactive tour' : m === 'walk' ? 'Walk' : 'Axonometric'}
             </button>
           ))}
         </div>
@@ -446,6 +498,132 @@ function FloodPanel({ flood, eng, onClose }: { flood: FloodDef; eng: React.RefOb
       {flood.from === 'east' && <div className={`pv-sbo ${sbo ? 'on' : ''}`}>{sbo ? 'STATION BLACKOUT' : 'AC power available'}</div>}
       <p className="pv-hint2">{flood.note}</p>
     </aside>
+  );
+}
+
+const sentences = (t: string) => t.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter(Boolean);
+
+/** Documentary-style overlay for the film tour. */
+function FilmOverlay({ site, tour, stops, i, p, paused, onPause, onJump, onExit, onExplore }: {
+  site: SiteDef; tour: Tour; stops: Stop[]; i: number; p: number; paused: boolean;
+  onPause: () => void; onJump: (i: number) => void; onExit: () => void; onExplore: () => void;
+}) {
+  const n = stops.length;
+  if (i < 0) {
+    return (
+      <div className="fm-wrap">
+        <div className="fm-bars" aria-hidden="true"><i /><i /></div>
+        <section className="fm-title" aria-live="polite">
+          <span>A film tour · {tour.year}</span>
+          <h2>{site.name}</h2>
+          <p>{tour.logline}</p>
+        </section>
+        <FilmControls n={n} i={i} paused={paused} onPause={onPause} onJump={onJump} onExit={onExit} />
+      </div>
+    );
+  }
+  if (i >= n) {
+    return (
+      <div className="fm-wrap">
+        <div className="fm-bars" aria-hidden="true"><i /><i /></div>
+        <section className="fm-end" aria-live="polite">
+          <span>End of the film</span>
+          <h2>{site.name}</h2>
+          <div>
+            <button onClick={() => onJump(-1)}>Watch again</button>
+            <button onClick={onExplore} className="fm-primary">Explore it yourself</button>
+            <button onClick={onExit}>Close</button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+  const st = stops[i], ts = tour.stops[i];
+  const lines = sentences(`${st.body} ${ts?.deep ?? ''}`);
+  const flying = p === 0;
+  const k = Math.min(lines.length - 1, Math.floor(p * lines.length * 1.02));
+  return (
+    <div className="fm-wrap">
+      <div className="fm-bars" aria-hidden="true"><i /><i /></div>
+      <header className={`fm-chapter ${flying ? 'in' : ''}`} key={'c' + i}>
+        <span>Chapter {String(i + 1).padStart(2, '0')}</span>
+        <h2>{st.title}</h2>
+      </header>
+      {!flying && <p className="fm-sub" key={'s' + i + '-' + k} aria-live="polite">{lines[k]}</p>}
+      {ts && !flying && (
+        <dl className="fm-stats">
+          {ts.stats.map(([a, b], j) => (
+            <div key={a} className={p > 0.06 + j * 0.12 ? 'on' : ''}><dt>{a}</dt><dd>{b}</dd></div>
+          ))}
+        </dl>
+      )}
+      <FilmControls n={n} i={i} p={p} paused={paused} onPause={onPause} onJump={onJump} onExit={onExit} />
+    </div>
+  );
+}
+
+function FilmControls({ n, i, p = 0, paused, onPause, onJump, onExit }: { n: number; i: number; p?: number; paused: boolean; onPause: () => void; onJump: (i: number) => void; onExit: () => void }) {
+  return (
+    <nav className="fm-ctl" aria-label="Film controls">
+      <button onClick={() => onJump(Math.max(-1, i - 1))} aria-label="Previous chapter">‹</button>
+      <button onClick={onPause} aria-label={paused ? 'Play' : 'Pause'}>{paused ? '▶' : '❚❚'}</button>
+      <button onClick={() => onJump(i + 1)} aria-label="Next chapter">›</button>
+      <ol>
+        {Array.from({ length: n }, (_, k) => (
+          <li key={k} onClick={() => onJump(k)}><i style={{ width: `${k < i ? 100 : k === i ? p * 100 : 0}%` }} /></li>
+        ))}
+      </ol>
+      <button onClick={onExit} className="fm-exit">Exit film</button>
+    </nav>
+  );
+}
+
+/** Card for the interactive tour: insight, statistics, things to do. */
+function TourCard({ site, tour, stops, i, seen, eng, cut, setCut, era, setEra, setHour, onGo, onClose }: {
+  site: SiteDef; tour?: Tour; stops: Stop[]; i: number; seen: number; eng: React.RefObject<PlantScene | null>;
+  cut: boolean; setCut: (v: boolean) => void; era: string; setEra: (v: string) => void; setHour: (v: number) => void; onGo: (i: number) => void; onClose: () => void;
+}) {
+  const st = stops[i], ts = tour?.stops[i], act = ts?.act;
+  const [busy, setBusy] = useState<string | null>(null);
+  const animate = (label: string, f: (p: number) => void, dur: number, end: () => void) => {
+    setBusy(label);
+    const t0 = performance.now();
+    const loop = (now: number) => {
+      const p = Math.min(1, (now - t0) / (dur * 1000));
+      f(p);
+      if (p < 1) requestAnimationFrame(loop); else setTimeout(() => { end(); setBusy(null); }, 2500);
+    };
+    requestAnimationFrame(loop);
+  };
+  if (!st) return null;
+  const eraLabel = act?.era ? site.eras?.find((e) => e.id === act.era)?.label : undefined;
+  return (
+    <section className="tc-card" aria-live="polite" key={i}>
+      <header>
+        <span>{String(i + 1).padStart(2, '0')} / {String(stops.length).padStart(2, '0')} · {seen} visited</span>
+        <button onClick={onClose} aria-label="Close card">×</button>
+      </header>
+      <h2>{st.title}</h2>
+      <p>{st.body}</p>
+      {ts && (
+        <>
+          <dl className="tc-stats">{ts.stats.map(([a, b]) => <div key={a}><dt>{a}</dt><dd>{b}</dd></div>)}</dl>
+          <h3>Why it matters</h3>
+          <p className="tc-deep">{ts.deep}</p>
+        </>
+      )}
+      <div className="tc-acts">
+        {site.cutaway && <button className={cut ? 'on' : ''} onClick={() => setCut(!cut)}>{cut ? 'Close the cutaway' : 'Look inside'}</button>}
+        {eraLabel && era !== act!.era && <button onClick={() => setEra(act!.era!)}>Show {eraLabel}</button>}
+        <button onClick={() => setHour(20.8)}>See it at night</button>
+        {act?.build && <button disabled={!!busy} onClick={() => animate('build', (p) => eng.current?.setBuild(act.build![0] + (act.build![1] - act.build![0]) * p), 12, () => eng.current?.setBuild(null))}>{busy === 'build' ? 'Building…' : 'Watch it being built'}</button>}
+        {act?.flood && site.flood && <button disabled={!!busy} onClick={() => animate('flood', (p) => eng.current?.setFlood(act.flood![0] + (act.flood![1] - act.flood![0]) * Math.min(1, p * 1.4), site.flood!.start + (site.flood!.finish - site.flood!.start) * Math.min(1, p * 1.2)), 12, () => eng.current?.setFlood(null))}>{busy === 'flood' ? 'The wave…' : 'Replay the wave'}</button>}
+      </div>
+      <nav className="tc-nav">
+        <button onClick={() => onGo(i - 1)} aria-label="Previous stop">‹</button>
+        <button onClick={() => onGo(i + 1)} className="pv-next">Next stop ›</button>
+      </nav>
+    </section>
   );
 }
 

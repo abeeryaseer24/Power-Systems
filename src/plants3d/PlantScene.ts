@@ -16,7 +16,8 @@ import { Soundscape } from './soundscape';
 import { sfx } from '../lib/sfx';
 
 export type Stop = { title: string; body: string; cam: [number, number, number]; look: [number, number, number] };
-export type Mode = 'orbit' | 'tour' | 'walk' | 'axo';
+export type Mode = 'orbit' | 'film' | 'tour' | 'walk' | 'axo';
+export type FilmShot = { shot: 'orbit' | 'dolly' | 'crane' | 'track'; dur: number };
 
 /** Flood scenario: water rises from `normal` and arrives from one side as a front. */
 export type FloodDef = {
@@ -82,6 +83,13 @@ export class PlantScene {
   onStop?: (i: number) => void;
   onMode?: (m: Mode) => void;
   onFp?: (fp: boolean) => void;
+  /** Film tour progress: stop index (-1 title, stops.length end) and progress 0..1 within it. */
+  onFilm?: (i: number, p: number) => void;
+  onPin?: (i: number) => void;
+  filmPaused = false;
+  private film: { shots: FilmShot[]; i: number; t: number; from: THREE.Vector3; fromLook: THREE.Vector3; look: THREE.Vector3; lastP: number } | null = null;
+  private pins: HTMLButtonElement[] = [];
+  private visited = new Set<number>();
   private steamRule?: (tag: string | undefined, era: string) => boolean;
   private plumes: Plumes;
   private lampPts!: THREE.Points;
@@ -198,6 +206,7 @@ export class PlantScene {
     for (let i = 0; i < 110; i++) this.plumes.update(0.2, this.camera);
     this.scene.add(this.plumes.points);
     this.buildLabels();
+    this.buildPins();
     for (const y of this.kit.yards) {
       const a = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: new THREE.Color(2.2, 2.6, 4), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
       a.position.copy(y);
@@ -397,7 +406,9 @@ export class PlantScene {
     this.controls.autoRotate = false;
     this.walker.figure.visible = m === 'walk';
     this.walker.active = m === 'walk';
-    this.controls.enabled = m !== 'walk';
+    this.controls.enabled = m !== 'walk' && m !== 'film';
+    if (prev === 'film') { this.controls.target.copy(this.film?.look ?? this.controls.target); this.film = null; }
+    this.pins.forEach((p) => { p.style.display = m === 'tour' ? '' : 'none'; });
     if (prev === 'axo' || m === 'axo') {
       this.active = m === 'axo' ? this.ortho : this.camera;
       this.controls.object = this.active;
@@ -417,6 +428,7 @@ export class PlantScene {
       this.controls.target.set(...this.site.focus);
     }
     if (m === 'tour') this.tourGo(0);
+    if (m === 'film') this.film = null;
     this.onMode?.(m);
   }
 
@@ -431,6 +443,115 @@ export class PlantScene {
       onComplete: () => { if (this.mode === 'tour') { this.controls.autoRotate = true; this.controls.autoRotateSpeed = 0.35; } },
     });
     this.onStop?.(this.tourIdx);
+    this.visited.add(this.tourIdx);
+    this.pins.forEach((p, k) => { p.classList.toggle('seen', this.visited.has(k)); p.classList.toggle('on', k === this.tourIdx); });
+  }
+
+  // ------------------------------------------------------------------ film tour
+
+  /** Start the film: an establishing shot, then each stop as a flight and a shot. */
+  startFilm(shots: FilmShot[]) {
+    if (this.mode !== 'film') this.setMode('film');
+    this.controls.autoRotate = false;
+    gsap.killTweensOf(this.camera.position);
+    gsap.killTweensOf(this.controls.target);
+    const c = new THREE.Vector3(...this.site.cam), f = new THREE.Vector3(...this.site.focus);
+    // title: start high and wide, behind the usual view
+    this.camera.position.copy(c.clone().sub(f).multiplyScalar(1.9).add(f).add(new THREE.Vector3(0, this.site.extent * 0.25, 0)));
+    this.film = { shots, i: -1, t: 0, from: this.camera.position.clone(), fromLook: f.clone(), look: f.clone(), lastP: -1 };
+    this.filmPaused = false;
+    this.onFilm?.(-1, 0);
+  }
+
+  filmJump(i: number) {
+    if (!this.film) return;
+    const n = this.film.shots.length;
+    this.film.i = Math.max(-1, Math.min(n, i));
+    this.film.t = 0;
+    this.film.from = this.camera.position.clone();
+    this.film.fromLook = this.film.look.clone();
+    this.onFilm?.(this.film.i, 0);
+  }
+
+  private stepFilm(dt: number) {
+    const F = this.film!;
+    if (this.filmPaused) { this.camera.lookAt(F.look); return; }
+    F.t += dt;
+    const n = F.shots.length;
+    const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+    let p = 0;
+    if (F.i === -1) {
+      // establishing shot: a slow descent onto the usual view
+      const D = 7;
+      p = Math.min(1, F.t / D);
+      const to = new THREE.Vector3(...this.site.cam);
+      this.camera.position.lerpVectors(F.from, to, ease(p));
+      F.look.copy(F.fromLook);
+      if (p >= 1) this.filmJump(0);
+    } else if (F.i < n) {
+      const st = this.stops[F.i], sh = F.shots[F.i];
+      const fly = F.i === 0 ? 4 : 4.5;
+      const cam = new THREE.Vector3(...st.cam), look = new THREE.Vector3(...st.look);
+      if (F.t < fly) {
+        // flight: along a curve lifted above both ends, look target eased across
+        const q = ease(F.t / fly);
+        const mid = F.from.clone().lerp(cam, 0.5);
+        mid.y += Math.max(40, F.from.distanceTo(cam) * 0.18);
+        const a = F.from.clone().lerp(mid, q), b = mid.clone().lerp(cam, q);
+        this.camera.position.copy(a.lerp(b, q));
+        F.look.lerpVectors(F.fromLook, look, q);
+        p = 0;
+      } else {
+        // the shot itself
+        p = Math.min(1, (F.t - fly) / sh.dur);
+        const e = ease(p) * 0.6 + p * 0.4;
+        const off = cam.clone().sub(look);
+        if (sh.shot === 'orbit') off.applyAxisAngle(new THREE.Vector3(0, 1, 0), e * 0.5);
+        else if (sh.shot === 'dolly') off.multiplyScalar(1 - 0.32 * e);
+        else if (sh.shot === 'crane') { off.multiplyScalar(1 + 0.1 * e); off.y += off.length() * 0.3 * e; }
+        else { const side = new THREE.Vector3(-off.z, 0, off.x).normalize(); off.addScaledVector(side, off.length() * 0.28 * e); }
+        this.camera.position.copy(look).add(off);
+        F.look.copy(look);
+        if (p >= 1) this.filmJump(F.i + 1);
+      }
+    } else {
+      // end: drift up and away from the last stop
+      this.camera.position.y += dt * 6;
+      p = 1;
+    }
+    this.camera.lookAt(F.look);
+    if (Math.abs(p - F.lastP) > 0.01 || p === 0) { F.lastP = p; this.onFilm?.(F.i, p); }
+  }
+
+  // ------------------------------------------------------------------ interactive pins
+
+  private buildPins() {
+    this.stops.forEach((s, k) => {
+      const b = document.createElement('button');
+      b.className = 'pv-pin';
+      b.innerHTML = `<span>${String(k + 1).padStart(2, '0')}</span><em>${s.title}</em>`;
+      b.style.display = 'none';
+      b.addEventListener('click', (e) => { e.stopPropagation(); this.tourGo(k); this.onPin?.(k); });
+      this.overlay.appendChild(b);
+      this.pins.push(b);
+    });
+  }
+
+  private placePins() {
+    const w = this.host.clientWidth, h = this.host.clientHeight;
+    const placed: [number, number][] = [];
+    this.stops.forEach((s, k) => {
+      tmp.set(...s.look).project(this.active);
+      const vis = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
+      const el = this.pins[k];
+      const x = (tmp.x * 0.5 + 0.5) * w;
+      let y = (-tmp.y * 0.5 + 0.5) * h;
+      // pins on the same building fan out upwards instead of stacking
+      while (placed.some(([px, py]) => Math.abs(px - x) < 30 && Math.abs(py - y) < 30)) y -= 38;
+      placed.push([x, y]);
+      el.style.visibility = vis ? 'visible' : 'hidden';
+      el.style.transform = `translate(${x}px, ${y}px)`;
+    });
   }
 
   setCutaway(on: boolean) {
@@ -559,9 +680,11 @@ export class PlantScene {
     const t = this.clock.elapsedTime;
     this.adapt(raw);
     if (this.mode === 'walk') this.walker.update(dt, this.camera);
+    else if (this.mode === 'film' && this.film) this.stepFilm(dt);
     else this.controls.update();
+    if (this.mode === 'tour') this.placePins();
     // keep the shadow frustum centred on what we look at
-    const focus = this.mode === 'walk' ? this.walker.figure.position : this.controls.target;
+    const focus = this.mode === 'walk' ? this.walker.figure.position : this.mode === 'film' && this.film ? this.film.look : this.controls.target;
     this.sun.target.position.copy(focus);
     this.sun.position.copy(focus).addScaledVector(this.sunDir.y > 0 ? this.sunDir : tmp.set(0, 1, 0), 2500);
     this.moon.target.position.copy(focus);
@@ -667,6 +790,7 @@ export class PlantScene {
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.labelEls.forEach((e) => e.remove());
+    this.pins.forEach((e) => e.remove());
   }
 }
 
