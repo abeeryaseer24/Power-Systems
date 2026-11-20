@@ -178,3 +178,6 @@
   .pv-lapse-head strong { font-size: 38px; }
   .pv-lapse-head p { font-size: 15px; }
 }
+
+.pv-room-btn { text-decoration: none; border-color: var(--porcelain); }
+.pv-room-btn:hover { background: var(--porcelain); color: var(--night); }

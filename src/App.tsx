@@ -29,13 +29,14 @@ const LiveUS = lazy(() => import('./pages/LiveUS'));
 const Career = lazy(() => import('./pages/Career'));
 const Trailer = lazy(() => import('./pages/Trailer'));
 const Plants = lazy(() => import('./pages/Plants'));
+const ControlRoomPage = lazy(() => import('./pages/ControlRoomPage'));
 
 export default function App() {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
-  const chrome = !pathname.startsWith('/control') && !/^\/(atlas|blackouts|documentary|plants)\/./.test(pathname) && !pathname.startsWith('/what-if') && !pathname.startsWith('/black-start') && !pathname.startsWith('/dhaka-tonight');
+  const chrome = (!pathname.startsWith('/control') || pathname === '/control-room') && !/^\/control-room\/./.test(pathname) && !/^\/(atlas|blackouts|documentary|plants)\/./.test(pathname) && !pathname.startsWith('/what-if') && !pathname.startsWith('/black-start') && !pathname.startsWith('/dhaka-tonight');
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
@@ -75,6 +76,8 @@ export default function App() {
           <Route path="/trailer" element={<Trailer />} />
           <Route path="/plants" element={<Plants />} />
           <Route path="/plants/:id" element={<Plants />} />
+          <Route path="/control-room" element={<ControlRoomPage />} />
+          <Route path="/control-room/:id" element={<ControlRoomPage />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />

@@ -226,6 +226,7 @@ function Viewer({ site }: { site: SiteDef }) {
             {s.eras.map((e) => <button key={e.id} className={era === e.id ? 'on' : ''} onClick={() => setEra(e.id)}>{e.label}</button>)}
           </div>
         )}
+        {(s.id === 'tmi' || s.id === 'chernobyl') && <Link className="pv-cut pv-room-btn" to={`/control-room/${s.id}`}>Control room</Link>}
         {s.lapse && <button className={`pv-cut pv-lapse-btn ${lapse ? 'on' : ''}`} onClick={openLapse} aria-pressed={lapse}>Time-lapse</button>}
         {s.grid && <button className={`pv-cut pv-stress-btn ${stress ? 'on' : ''}`} onClick={openStress} aria-pressed={stress}>Stress test</button>}
         {s.cutaway && (
