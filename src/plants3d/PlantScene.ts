@@ -207,6 +207,7 @@ export class PlantScene {
     this.scene.add(this.plumes.points);
     this.buildLabels();
     this.buildPins();
+    this.kit.cutaways.forEach((c) => { c.plane = c.plane.clone(); });
     for (const y of this.kit.yards) {
       const a = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: new THREE.Color(2.2, 2.6, 4), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
       a.position.copy(y);
@@ -720,7 +721,7 @@ export class PlantScene {
     const bm = this.beaconPts.material as THREE.PointsMaterial;
     bm.opacity = (0.25 + 0.75 * this.night) * (Math.sin(t * 3.2) > 0.2 ? 1 : 0.05);
     this.grade.uniforms.uTime.value = t % 10;
-    if (this.cut) this.placeLabels();
+    if (this.cut) { this.aimCuts(); this.placeLabels(); }
     else for (const el of this.labelEls) el.style.opacity = '0';
     this.composer.render();
   };
@@ -757,14 +758,41 @@ export class PlantScene {
 
   private placeLabels() {
     const w = this.host.clientWidth, h = this.host.clientHeight;
+    const shown = (o: THREE.Object3D | null): boolean => !o || (o.visible && shown(o.parent));
+    const items: { el: HTMLDivElement; x: number; y: number }[] = [];
     this.labels.forEach((l, i) => {
       const el = this.labelEls[i];
       l.obj.updateWorldMatrix(true, false);
-      tmp.copy(l.at).applyMatrix4(l.obj.matrixWorld).project(this.active);
-      const vis = tmp.z < 1 && Math.abs(tmp.x) < 1 && Math.abs(tmp.y) < 1 && l.obj.parent?.visible !== false;
+      const world = l.at.clone().applyMatrix4(l.obj.matrixWorld);
+      // only the reactor in front of you: labels further than 450 m stay hidden
+      const near = this.active === this.camera ? world.distanceTo(this.camera.position) < 450 : true;
+      tmp.copy(world).project(this.active);
+      const vis = near && tmp.z < 1 && Math.abs(tmp.x) < 0.95 && Math.abs(tmp.y) < 0.95 && shown(l.obj);
       el.style.opacity = vis ? '1' : '0';
-      el.style.transform = `translate(${(tmp.x * 0.5 + 0.5) * w}px, ${(-tmp.y * 0.5 + 0.5) * h}px)`;
+      if (vis) items.push({ el, x: (tmp.x * 0.5 + 0.5) * w, y: (-tmp.y * 0.5 + 0.5) * h });
     });
+    // push labels apart top to bottom so none overlap; a leader keeps each tied to its part
+    items.sort((a, b) => a.y - b.y);
+    const placed: { x0: number; x1: number; y: number }[] = [];
+    for (const it of items) {
+      const wd = it.el.offsetWidth || 160;
+      let y = it.y;
+      while (placed.some((p) => Math.abs(p.y - y) < 27 && it.x < p.x1 + 6 && it.x + wd > p.x0 - 6)) y += 28;
+      placed.push({ x0: it.x, x1: it.x + wd, y });
+      it.el.style.transform = `translate(${it.x}px, ${y}px)`;
+      it.el.style.setProperty('--lead', `${Math.max(0, y - it.y)}px`);
+    }
+  }
+
+  /** Keep each cutaway's section facing the camera, so you always see in. */
+  private aimCuts() {
+    for (const c of this.kit.cutaways) {
+      c.inside.getWorldPosition(tmp);
+      const n = new THREE.Vector3(tmp.x - this.active.position.x, 0, tmp.z - this.active.position.z);
+      if (n.lengthSq() < 1) continue;
+      n.normalize();
+      c.plane.set(n, -n.dot(tmp) + 2);
+    }
   }
 
   dispose() {

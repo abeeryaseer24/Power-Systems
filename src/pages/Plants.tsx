@@ -501,7 +501,8 @@ function FloodPanel({ flood, eng, onClose }: { flood: FloodDef; eng: React.RefOb
   );
 }
 
-const sentences = (t: string) => t.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter(Boolean);
+// instructions written for the buttons ("Open the cutaway.") are not narration
+const sentences = (t: string) => t.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter((x) => x && !/^(Open the cutaway|Switch to )/.test(x));
 
 /** Documentary-style overlay for the film tour. */
 function FilmOverlay({ site, tour, stops, i, p, paused, onPause, onJump, onExit, onExplore }: {
@@ -604,7 +605,7 @@ function TourCard({ site, tour, stops, i, seen, eng, cut, setCut, era, setEra, s
         <button onClick={onClose} aria-label="Close card">×</button>
       </header>
       <h2>{st.title}</h2>
-      <p>{st.body}</p>
+      <p>{sentences(st.body).join(' ')}</p>
       {ts && (
         <>
           <dl className="tc-stats">{ts.stats.map(([a, b]) => <div key={a}><dt>{a}</dt><dd>{b}</dd></div>)}</dl>

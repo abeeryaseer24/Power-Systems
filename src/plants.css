@@ -291,3 +291,5 @@
   .fm-stats dd { font-size: 18px; }
   .fm-chapter h2 { max-width: 90vw; }
 }
+
+.pv-label::before { content: ''; position: absolute; left: 0; bottom: 50%; width: 1px; height: var(--lead, 0px); background: var(--porcelain); opacity: 0.8; transform: translateY(100%); }
