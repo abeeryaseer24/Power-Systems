@@ -38,6 +38,7 @@ export class Kit {
   uplights: { pos: THREE.Vector3; at: THREE.Vector3 }[] = [];
   props: PropSpot[] = [];
   yards: THREE.Vector3[] = [];
+  hums: THREE.Vector3[] = [];
 
   /** Place a downloaded prop (loaded later, when the viewer is close). */
   prop(id: PropId, x: number, z: number, rot = this.R() * Math.PI * 2, s?: number) {
@@ -422,6 +423,7 @@ export class Kit {
     }
     this.colliders.push({ x, z, hw: 7 * s, hd: 4 * s, rot });
     this.jobs.push({ x, z, hw: 8 * s, hd: 8 * s, rot, kind: 'yard' });
+    this.hums.push(V(x, y0 + 4, z));
     const off = V(0, 0, 6.5 * s).applyAxisAngle(V(0, 1, 0), rot);
     this.prop('utility_box_02', x + off.x, z + off.z, rot);
     this.prop('utility_box_02', x + off.x + 1.2 * Math.cos(rot), z + off.z - 1.2 * Math.sin(rot), rot);

@@ -204,3 +204,15 @@
 .pv-sbo.on { background: var(--trip); color: var(--night); border-color: var(--trip); animation: pv-pulse 1s steps(2) infinite; }
 .pv-flood-btn { border-color: var(--glaze); color: var(--glaze); }
 .pv-flood-btn.on { background: var(--glaze); color: var(--night); }
+
+.pv-sound { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 28px; height: 28px; margin-left: 10px; vertical-align: middle; color: var(--porcelain); }
+.pv-sound svg { width: 20px; height: 20px; }
+.pv-sound:focus-visible { outline: 2px solid var(--sodium); }
+.pv-fp { all: unset; cursor: pointer; position: absolute; right: 22px; bottom: calc(var(--bar-h, 60px) + 28px); font-family: var(--display); font-weight: 700; font-size: 15px; padding: 7px 12px; background: rgba(8, 16, 28, 0.7); border: 1px solid var(--rule-strong); }
+.pv-fp.on { background: var(--porcelain); color: var(--night); }
+.pv-fp kbd { font-family: var(--ui); font-size: 11px; padding: 1px 5px; border: 1px solid currentColor; margin-left: 6px; opacity: 0.7; }
+
+.pv-more { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 0; margin-top: 28px; border-top: 1px solid var(--rule-strong); border-left: 1px solid var(--rule-strong); }
+.pv-more a { display: grid; gap: 2px; padding: 16px 18px; text-decoration: none; color: var(--porcelain); font-family: var(--display); font-weight: 700; font-size: 20px; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); }
+.pv-more a span { font-weight: 500; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sodium); }
+.pv-more a:hover, .pv-more a:focus-visible { background: rgba(134, 197, 218, 0.06); }

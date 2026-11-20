@@ -12,6 +12,8 @@ import { glow, puff, rng } from './textures';
 import type { Label } from './interiors';
 import type { GridDef, StressState } from './stress';
 import { BuildLapse, type Lapse } from './build';
+import { Soundscape } from './soundscape';
+import { sfx } from '../lib/sfx';
 
 export type Stop = { title: string; body: string; cam: [number, number, number]; look: [number, number, number] };
 export type Mode = 'orbit' | 'tour' | 'walk' | 'axo';
@@ -79,6 +81,7 @@ export class PlantScene {
   night = 0;
   onStop?: (i: number) => void;
   onMode?: (m: Mode) => void;
+  onFp?: (fp: boolean) => void;
   private steamRule?: (tag: string | undefined, era: string) => boolean;
   private plumes: Plumes;
   private lampPts!: THREE.Points;
@@ -111,6 +114,10 @@ export class PlantScene {
   private floodPlane = new THREE.Plane();
   private foam: THREE.Mesh | null = null;
   private waveEm: Emitter[] = [];
+  sound: Soundscape;
+  private soundAcc = 0;
+  private lastShed = 0;
+  private lastArc = 0;
 
   constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef) {
     const mobile = matchMedia('(max-width: 760px)').matches;
@@ -199,7 +206,17 @@ export class PlantScene {
     this.controls.screenSpacePanning = false;
     this.controls.update();
 
+    const k = this.kit;
+    this.sound = new Soundscape({
+      hum: [...k.hums, ...k.yards],
+      towers: k.emitters.filter((e) => e.kind === 'steam' && e.radius > 10).map((e) => new THREE.Vector3(e.pos.x, site.groundY(e.pos.x, e.pos.z), e.pos.z)),
+      halls: k.jobs.filter((j) => j.kind === 'hall').map((j) => new THREE.Vector3(j.x, site.groundY(j.x, j.z) + 15, j.z)),
+      spill: k.emitters.filter((e) => e.kind === 'spray').map((e) => e.pos.clone()),
+    });
+    this.renderer.domElement.addEventListener('pointerdown', this.wake);
     this.walker = new Walker(this.kit.colliders, site.groundY, this.renderer.domElement);
+    this.walker.onStep = () => this.sound.step();
+    this.walker.onFp = (v) => this.onFp?.(v);
     this.walker.figure.visible = false;
     this.scene.add(this.walker.figure);
 
@@ -506,6 +523,22 @@ export class PlantScene {
     this.moon.target.position.copy(focus);
     this.moon.position.copy(focus).add(tmp.set(-800, 1600, 600));
     this.plumes.update(dt, this.active);
+    this.soundAcc += dt;
+    if (this.soundAcc > 0.1) {
+      this.soundAcc = 0;
+      const lp = this.mode === 'walk' ? this.walker.figure.position : this.camera.position;
+      const st = this.stress;
+      const steamOn = this.kit.emitters.some((e) => e.kind === 'steam' && e.radius > 10 && e.rate > 0);
+      const spill = this.kit.emitters.filter((e) => e.kind === 'spray' && e.tag === 'flood').reduce((m, e) => Math.max(m, e.rate), 0);
+      this.sound.update(lp, { steam: steamOn ? (st ? st.steam : 1) : 0, output: st ? Math.min(1, st.heat) : this.buildP !== null && this.buildP < 0.97 ? 0 : 1, dump: st?.dump ?? 0, spill, night: this.night, height: Math.max(0, lp.y - this.site.groundY(lp.x, lp.z)) });
+      // breaker clunks and the klaxon when the stress test bites
+      if (st) {
+        if (st.arc > 0.5 && this.lastArc <= 0.5) { sfx.clunk(1.2); if (!st.diesel && st.lights < 0.2) sfx.klaxon(3); }
+        if (st.shed > this.lastShed) sfx.clunk(0.6);
+        this.lastArc = st.arc;
+        this.lastShed = st.shed;
+      }
+    }
     if (this.propsState === 'idle' && (this.mode === 'walk' || this.camera.position.distanceTo(this.controls.target) < 500)) this.loadProps();
     if (this.floodMesh?.visible) { const nm = (this.floodMesh.material as THREE.MeshStandardMaterial).normalMap; if (nm) nm.offset.set(t * 0.02, t * 0.01); }
     for (const m of this.water) if (m.normalMap) { m.normalMap.offset.x = t * 0.004; m.normalMap.offset.y = t * 0.006; }
@@ -516,6 +549,13 @@ export class PlantScene {
     else for (const el of this.labelEls) el.style.opacity = '0';
     this.composer.render();
   };
+
+  private wake = () => { this.sound.start(); };
+
+  /** Third-person or first-person walking. */
+  setFirstPerson(on: boolean) {
+    this.walker.fp = on;
+  }
 
   private loadProps() {
     this.propsState = 'loading';
@@ -541,6 +581,8 @@ export class PlantScene {
     cancelAnimationFrame(this.raf);
     removeEventListener('resize', this.resize);
     this.walker.dispose();
+    this.sound.stop();
+    this.renderer.domElement.removeEventListener('pointerdown', this.wake);
     this.controls.dispose();
     gsap.killTweensOf(this.camera.position);
     gsap.killTweensOf(this.controls.target);
@@ -707,6 +749,9 @@ class Walker {
   private parts: Record<string, THREE.Object3D> = {};
   private drag: { x: number; y: number } | null = null;
   private dist = 7;
+  fp = false;
+  onStep?: () => void;
+  private lastFoot = 0;
 
   constructor(private col: Collider[], private gy: (x: number, z: number) => number, private el: HTMLElement) {
     const skin = new THREE.MeshStandardMaterial({ color: '#b98a6a', roughness: 0.7 });
@@ -745,7 +790,12 @@ class Walker {
     el.addEventListener('wheel', this.wh, { passive: true });
   }
 
-  private kd = (e: KeyboardEvent) => { if (this.active) this.keys.add(e.key.toLowerCase()); };
+  private kd = (e: KeyboardEvent) => {
+    if (!this.active) return;
+    if (e.key.toLowerCase() === 'v') { this.fp = !this.fp; this.onFp?.(this.fp); return; }
+    this.keys.add(e.key.toLowerCase());
+  };
+  onFp?: (fp: boolean) => void;
   private ku = (e: KeyboardEvent) => this.keys.delete(e.key.toLowerCase());
   private pd = (e: PointerEvent) => { if (this.active) this.drag = { x: e.clientX, y: e.clientY }; };
   private pm = (e: PointerEvent) => {
@@ -802,6 +852,18 @@ class Walker {
     this.parts['sh-1'].rotation.x = -sw * 0.8;
     this.parts['sh1'].rotation.x = sw * 0.8;
     this.figure.position.y += Math.abs(Math.cos(this.phase)) * 0.04 * Math.min(1, speed / 4);
+    const foot = Math.floor(this.phase / Math.PI);
+    if (foot !== this.lastFoot && len > 0.05) { this.lastFoot = foot; this.onStep?.(); }
+    if (this.fp) {
+      // eyes at 1.65 m, the body hidden, looking where the mouse points
+      this.figure.visible = false;
+      const eye = p.clone().add(new THREE.Vector3(0, 1.65 + Math.sin(this.phase * 2) * 0.03, 0));
+      cam.position.copy(eye);
+      const look = eye.clone().add(new THREE.Vector3(-Math.sin(this.yaw) * Math.cos(this.pitch - 0.2), -Math.sin(this.pitch - 0.2), -Math.cos(this.yaw) * Math.cos(this.pitch - 0.2)));
+      cam.lookAt(look);
+      return;
+    }
+    this.figure.visible = this.active;
     const back = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch)).multiplyScalar(this.dist);
     const want = p.clone().add(new THREE.Vector3(0, 1.7, 0)).add(back);
     want.y = Math.max(want.y, this.gy(want.x, want.z) + 0.8);

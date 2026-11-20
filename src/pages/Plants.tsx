@@ -5,6 +5,7 @@ import type { FloodDef, Mode, PlantScene, SiteDef } from '../plants3d/PlantScene
 import { at } from '../controlroom/timelines';
 import { SCENARIOS, StressSim, type GridDef } from '../plants3d/stress';
 import type { Lapse } from '../plants3d/build';
+import SoundToggle from '../components/SoundToggle';
 import '../plants.css';
 
 export default function Plants() {
@@ -33,6 +34,12 @@ export default function Plants() {
           </li>
         ))}
       </ol>
+      <nav className="pv-more" aria-label="More">
+        <Link to="/control-room/tmi"><span>Control room</span>TMI-2, 28 March 1979</Link>
+        <Link to="/control-room/chernobyl"><span>Control room</span>Chernobyl-4, 26 April 1986</Link>
+        <Link to="/fallout/chernobyl"><span>Fallout map</span>Chernobyl, April–May 1986</Link>
+        <Link to="/fallout/fukushima"><span>Fallout map</span>Fukushima, March 2011</Link>
+      </nav>
       <p className="pv-note">Every building, tower and reactor is made in code, from published dimensions and site layouts. Plans are true to scale and orientation. Small details are simplified. Close-up props (covered cars, barriers, drums, crates, cabinets, shrubs) are CC0 models from <a href="https://polyhaven.com">Poly Haven</a>.</p>
     </main>
   );
@@ -104,6 +111,7 @@ function Viewer({ site }: { site: SiteDef }) {
   const [stress, setStress] = useState(false);
   const [lapse, setLapse] = useState(false);
   const [flood, setFlood] = useState(false);
+  const [fp, setFp] = useState(false);
   const touch = typeof window !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   useEffect(() => {
@@ -116,6 +124,7 @@ function Viewer({ site }: { site: SiteDef }) {
       e = new PlantScene(host.current, overlay.current, site);
       e.onStop = setStop;
       e.onMode = setMode;
+      e.onFp = setFp;
       eng.current = e;
       if (import.meta.env.DEV) (window as unknown as { __pv: PlantScene }).__pv = e;
       setReady(true);
@@ -176,6 +185,7 @@ function Viewer({ site }: { site: SiteDef }) {
 
       <header className="pv-title">
         <Link to="/plants" className="pv-back">All plants</Link>
+        <SoundToggle className="pv-sound" />
         <h1>{s.name}</h1>
         <p>{s.kind} · {s.place}</p>
       </header>
@@ -207,8 +217,9 @@ function Viewer({ site }: { site: SiteDef }) {
       )}
 
       {mode === 'walk' && (
-        <p className="pv-hint">{touch ? 'Drag the pad to walk, drag the view to look' : 'WASD to walk · Shift to run · drag to look · scroll to zoom · Esc to leave'}</p>
+        <p className="pv-hint">{touch ? 'Drag the pad to walk, drag the view to look' : 'WASD to walk · Shift to run · drag to look · V for first person · Esc to leave'}</p>
       )}
+      {mode === 'walk' && <button className={`pv-fp ${fp ? 'on' : ''}`} onClick={() => { const n = !fp; setFp(n); eng.current?.setFirstPerson(n); }} aria-pressed={fp}>{fp ? 'Third person' : 'First person'} <kbd>V</kbd></button>}
       {mode === 'walk' && touch && <Joystick onMove={(x, y) => eng.current?.setMove(x, y)} />}
 
       <nav className="pv-bar" ref={bar} aria-label="Viewer controls">

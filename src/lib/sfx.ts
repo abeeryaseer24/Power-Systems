@@ -54,6 +54,11 @@ class Sfx {
     return () => this.listeners.delete(l);
   }
 
+  /** The shared context, master bus and noise buffer, once unlocked. */
+  audio() {
+    return this.ready();
+  }
+
   private ready() {
     return this.ctx && this.master && this.noiseBuf ? { ctx: this.ctx, out: this.master, noise: this.noiseBuf } : null;
   }

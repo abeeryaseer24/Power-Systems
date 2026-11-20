@@ -4,6 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { at, type Replay } from './timelines';
+import { sfx } from '../lib/sfx';
 
 // A horseshoe of seven board sections around the operator's seat. Every
 // instrument is drawn on canvas from the replay's curves, so the board is the
@@ -49,6 +50,8 @@ export class ControlRoom {
   private acc = 0;
   private dead = false;
   private trace: number[] = [];
+  private litCount = 0;
+  private boomed = false;
 
   constructor(private host: HTMLElement, public rp: Replay) {
     this.pal = PAL[rp.style];
@@ -511,7 +514,11 @@ export class ControlRoom {
     }
   }
 
-  private pd = (e: PointerEvent) => { this.drag = { x: e.clientX, y: e.clientY }; };
+  private pd = (e: PointerEvent) => {
+    sfx.unlock();
+    sfx.setHum(50, 0.15);
+    this.drag = { x: e.clientX, y: e.clientY };
+  };
   private pm = (e: PointerEvent) => {
     if (!this.drag) return;
     this.yaw += (e.clientX - this.drag.x) * 0.004;
@@ -554,6 +561,12 @@ export class ControlRoom {
       if (this.playing) { this.trace.push(at(this.rp.gauges.find((q) => q.id === 'rcs')?.curve ?? g.curve, this.t)); if (this.trace.length > 200) this.trace.shift(); }
       this.draw();
       this.onTick?.(this.t);
+      const lit = this.alarmLitAt.filter((x) => x <= this.t).length;
+      if (lit > this.litCount && this.playing) sfx.tick();
+      if (lit > this.litCount + 3 && this.playing) sfx.klaxon(1);
+      this.litCount = lit;
+      if (at(this.rp.extra.blast ?? [[0, 0]], this.t) > 0 && !this.boomed) { this.boomed = true; sfx.boom(); sfx.powerDown(); }
+      if (this.t < 5027) this.boomed = false;
     }
     this.composer.render();
   };
@@ -561,6 +574,7 @@ export class ControlRoom {
   dispose() {
     this.dead = true;
     cancelAnimationFrame(this.raf);
+    sfx.quiet();
     removeEventListener('pointermove', this.pm);
     removeEventListener('pointerup', this.pu);
     removeEventListener('resize', this.resize);
