@@ -9,6 +9,8 @@ import { bands, cladding, concrete, glow, ground, rng, roadLines, waterNormal, w
 export type Emitter = { pos: THREE.Vector3; radius: number; rate: number; base?: number; kind: 'steam' | 'smoke' | 'spray' | 'jet'; tag?: string; dir?: THREE.Vector3 };
 export type Collider = { x: number; z: number; hw: number; hd: number; rot: number } | { x: number; z: number; r: number };
 export type Job = Collider & { kind: string };
+/** Things that travel along a path: trucks, trains, ships. */
+export type Mover = { path: THREE.Vector3[]; cum: number[]; len: number; closed: boolean; speed: number; spacing: number; n: number; y?: number; meshes: { im: THREE.InstancedMesh; off: THREE.Matrix4 }[] };
 export type Cutaway = { plane: THREE.Plane; mats: THREE.Material[]; inside: THREE.Object3D };
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -39,6 +41,45 @@ export class Kit {
   props: PropSpot[] = [];
   yards: THREE.Vector3[] = [];
   hums: THREE.Vector3[] = [];
+  movers: Mover[] = [];
+  mini = false;
+
+  /** Register a mover: n units spaced along the path, each made of the given parts. */
+  mover(pts: THREE.Vector3[], opts: { closed?: boolean; speed: number; n: number; spacing: number; y?: number; parts: { geo: THREE.BufferGeometry; mat: THREE.Material; off?: THREE.Matrix4; colors?: string[]; shadow?: boolean }[] }) {
+    const path = opts.closed ? [...pts, pts[0]] : pts;
+    const cum = [0];
+    for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + path[i].distanceTo(path[i - 1]));
+    const meshes = opts.parts.map((p) => {
+      const im = new THREE.InstancedMesh(p.geo, p.mat, opts.n);
+      im.castShadow = p.shadow ?? false;
+      im.receiveShadow = true;
+      im.frustumCulled = false;
+      if (p.colors) for (let i = 0; i < opts.n; i++) im.setColorAt(i, new THREE.Color(p.colors[Math.floor(this.R() * p.colors.length)]));
+      this.root.add(im);
+      return { im, off: p.off ?? new THREE.Matrix4() };
+    });
+    this.movers.push({ path, cum, len: cum[cum.length - 1], closed: !!opts.closed, speed: opts.speed, spacing: opts.spacing, n: opts.n, y: opts.y, meshes });
+  }
+
+  private truckGeo?: THREE.BufferGeometry;
+  private lightGeo?: THREE.BufferGeometry;
+  /** Lorries driving a road both ways, headlights on at night. */
+  traffic(pts: [number, number][], n: number) {
+    if (this.mini || n <= 0) return;
+    if (!this.truckGeo) {
+      const cab = new THREE.BoxGeometry(2.5, 3, 2.5); cab.translate(4.6, 1.9, 0);
+      const box = new THREE.BoxGeometry(8, 3.4, 2.5); box.translate(-0.8, 2.1, 0);
+      const chassis = new THREE.BoxGeometry(11, 0.6, 2.2); chassis.translate(0.6, 0.55, 0);
+      this.truckGeo = mergeSimple([cab, box, chassis]);
+      const l = new THREE.BoxGeometry(0.15, 0.25, 2.1); l.translate(5.9, 1.0, 0);
+      this.lightGeo = l;
+    }
+    const pts3 = pts.map(([x, z]) => V(x, 0, z));
+    this.mover(pts3, { speed: 9 + this.R() * 4, n, spacing: 0, parts: [
+      { geo: this.truckGeo, mat: this.memo('truck', () => new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.2 })), colors: ['#e6e3da', '#c73b2c', '#2d4f7c', '#d9a21d', '#5b6b55', '#efefef'] },
+      { geo: this.lightGeo!, mat: this.emissive('#ffe3b0', 6) },
+    ] });
+  }
 
   /** Place a downloaded prop (loaded later, when the viewer is close). */
   prop(id: PropId, x: number, z: number, rot = this.R() * Math.PI * 2, s?: number) {
@@ -592,6 +633,7 @@ export class Kit {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
     g.computeVertexNormals();
+    if (lit) this.traffic(pts, Math.min(6, Math.max(1, Math.round(len / 700))));
     const m = this.memo('road', () => new THREE.MeshStandardMaterial({ map: roadLines(), roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 }));
     const mesh = new THREE.Mesh(g, m);
     mesh.receiveShadow = true;
@@ -637,6 +679,69 @@ export class Kit {
     this.floods.push({ pos: V(gx, this.groundY(gx, gz), gz), r: 22 });
   }
 
+  /** A gate sign on two posts; lines are drawn on a canvas (any script the system fonts cover). */
+  sign(x: number, z: number, rot: number, lines: { text: string; size: number; color?: string }[], bg = '#1f3b63', w = 7, h = 2.4) {
+    const c = document.createElement('canvas');
+    c.width = 1024; c.height = Math.round((1024 * h) / w);
+    const g = c.getContext('2d')!;
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 8; g.strokeRect(14, 14, c.width - 28, c.height - 28);
+    let y = 40;
+    const total = lines.reduce((s, l) => s + l.size * 1.25, 0);
+    y = (c.height - total) / 2;
+    for (const l of lines) {
+      g.font = `700 ${l.size}px "Atkinson Hyperlegible Next", "Yu Gothic", "Meiryo", "Segoe UI", sans-serif`;
+      g.fillStyle = l.color ?? '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'top';
+      g.fillText(l.text, c.width / 2, y);
+      y += l.size * 1.25;
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    const grp = new THREE.Group();
+    grp.position.set(x, this.groundY(x, z), z);
+    grp.rotation.y = rot;
+    const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0 });
+    this.nightMats.push({ m, k: 0.35 });
+    this.mesh(new THREE.BoxGeometry(w, h, 0.15), [this.plain('#333'), this.plain('#333'), this.plain('#333'), this.plain('#333'), m, this.plain('#555')], 0, 1.6 + h / 2, 0, grp);
+    for (const s of [-1, 1]) this.mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.6 + h, 8), this.steel('#777'), s * (w / 2 - 0.4), (1.6 + h) / 2, -0.1, grp);
+    return grp;
+  }
+
+  /** A flag on a pole; draw() paints the flag on a 3:5 canvas. Returns the cloth for the wind. */
+  flag(x: number, z: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void, height = 12) {
+    const c = document.createElement('canvas');
+    c.width = 500; c.height = 300;
+    draw(c.getContext('2d')!, 500, 300);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    const y0 = this.groundY(x, z);
+    this.mesh(new THREE.CylinderGeometry(0.06, 0.09, height, 10), this.steel('#d8d8d8'), x, y0 + height / 2, z);
+    const geo = new THREE.PlaneGeometry(3, 1.8, 20, 6);
+    geo.translate(1.5, 0, 0);
+    const cloth = this.mesh(geo, new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.8 }), x + 0.08, y0 + height - 1, z);
+    cloth.name = 'flag';
+    return cloth;
+  }
+
+  /** A man fishing from a small boat, rod and line. */
+  fisherman(x: number, z: number, y: number, rot = 0) {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    g.rotation.y = rot;
+    this.add(g);
+    const hull = this.mesh(new THREE.BoxGeometry(4, 0.6, 1.4), this.plain('#5d6b4f', 0.8), 0, 0.15, 0, g);
+    hull.name = 'boat';
+    this.mesh(new THREE.CapsuleGeometry(0.22, 0.45, 4, 8), this.plain('#3b4a5c', 0.9), 0.6, 0.95, 0, g);
+    this.mesh(new THREE.SphereGeometry(0.13, 12, 8), this.plain('#b98a6a', 0.7), 0.6, 1.5, 0, g);
+    this.mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.12, 12), this.plain('#6a5a3a', 0.9), 0.6, 1.62, 0, g);
+    const rod = this.mesh(new THREE.CylinderGeometry(0.015, 0.03, 3.4, 6), this.plain('#2a2a2a', 0.5), 1.6, 2.0, 0, g, false);
+    rod.rotation.z = -1.0;
+    const line = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(3.05, 2.95, 0), new THREE.Vector3(3.4, -0.2, 0)]);
+    g.add(new THREE.Line(line, new THREE.LineBasicMaterial({ color: '#dddddd' })));
+    return g;
+  }
+
   /** A paved apron under a group of buildings. */
   apron(x: number, z: number, w: number, d: number, rot = 0) {
     const m = this.memo('apron', () => {
@@ -672,6 +777,7 @@ export class Kit {
 
   /** Scattered trees, instanced, with colour variation. */
   trees(n: number, box: [number, number, number, number], avoid: (x: number, z: number) => boolean, kind: 'pine' | 'broad' | 'palm' | 'mixed' = 'mixed', seed = 3) {
+    if (this.mini) n = Math.floor(n * 0.15);
     const R = rng(seed);
     const pineG = this.memo2('pineG', () => {
       const g = new THREE.ConeGeometry(2.6, 9, 7, 3);

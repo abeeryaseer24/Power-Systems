@@ -94,6 +94,15 @@ function Elevation({ els }: { els: El[] }) {
   );
 }
 
+function localHour(tz: string) {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date());
+  const g = (t: string) => Number(p.find((x) => x.type === t)?.value ?? 0);
+  return g('hour') + g('minute') / 60;
+}
+function localClock(tz: string) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
+}
+
 const HOURS = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 
 function Viewer({ site }: { site: SiteDef }) {
@@ -114,6 +123,7 @@ function Viewer({ site }: { site: SiteDef }) {
   const [lapse, setLapse] = useState(false);
   const [flood, setFlood] = useState(false);
   const [fp, setFp] = useState(false);
+  const [live, setLive] = useState(false);
   const [film, setFilm] = useState<{ i: number; p: number } | null>(null);
   const [filmPaused, setFilmPaused] = useState(false);
   const [card, setCard] = useState(true);
@@ -149,6 +159,14 @@ function Viewer({ site }: { site: SiteDef }) {
     return () => ro.disconnect();
   }, []);
   useEffect(() => { eng.current?.setHour(hour); }, [hour, ready]);
+  // live mode: the sky follows the real local time at the plant, updated every 30 s
+  useEffect(() => {
+    if (!live || !site.tz) return;
+    const tick = () => setHour(localHour(site.tz!));
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [live, site.tz]);
   const filmI = film?.i ?? null;
   useEffect(() => {
     if (mode !== 'film' || filmI === null || !tour) return;
@@ -285,13 +303,13 @@ function Viewer({ site }: { site: SiteDef }) {
         </div>
         <label className="pv-time">
           <span className="pv-clock">{HOURS(hour)}</span>
-          <input type="range" min={0} max={23.99} step={0.05} value={hour} onChange={(e) => setHour(Number(e.target.value))} aria-label="Time of day" />
+          <input type="range" min={0} max={23.99} step={0.05} value={hour} onChange={(e) => { setLive(false); setHour(Number(e.target.value)); }} aria-label="Time of day" />
           <button className={`pv-play ${play ? 'on' : ''}`} onClick={(e) => { e.preventDefault(); setPlay(!play); }} aria-label={play ? 'Stop the clock' : 'Run the clock'}>{play ? '❚❚' : '▶'}</button>
         </label>
-        <div className="pv-seg pv-quick" role="group" aria-label="Day or night">
-          <button onClick={() => setHour(10.5)} className={!night ? 'on' : ''}>Day</button>
-          <button onClick={() => setHour(19.6)}>Dusk</button>
-          <button onClick={() => setHour(23)} className={night ? 'on' : ''}>Night</button>
+        <div className="pv-seg pv-quick" role="group" aria-label="Time of day">
+          <button onClick={() => { setLive(false); setHour(10.5); }} className={!night && !live ? 'on' : ''}>Day</button>
+          <button onClick={() => { setLive(false); setHour(23); }} className={night && !live ? 'on' : ''}>Night</button>
+          {s.tz && <button onClick={() => setLive(!live)} className={live ? 'on' : ''} title={`Local time at ${s.name} right now`}>Live {live ? localClock(s.tz) : ''}</button>}
         </div>
         {s.eras && (
           <div className="pv-seg" role="group" aria-label="Period">

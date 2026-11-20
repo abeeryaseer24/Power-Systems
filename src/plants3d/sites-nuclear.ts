@@ -20,6 +20,7 @@ export const TMI: SiteDef = {
   name: 'Three Mile Island',
   place: 'Susquehanna River, Pennsylvania',
   lat: 40.15,
+  tz: 'America/New_York',
   kind: 'Two Babcock & Wilcox PWRs',
   blurb: 'Four 113 m towers on a river island. Unit 2 partly melted down on 28 March 1979 after a relief valve stuck open and nobody could see it.',
   facts: [['Units', '2 × B&W PWR'], ['Unit 2', '906 MWe, 1978–79'], ['Unit 1', '819 MWe, 1974–2019'], ['Towers', '4 × 113 m'], ['Containment', '58 m, 1.2 m wall']],
@@ -55,6 +56,7 @@ export const TMI: SiteDef = {
     k.line(new THREE.Vector2(-360, 80), new THREE.Vector2(-2600, 1100), 380, 52);
     k.apron(-30, 0, 330, 700);
     k.perimeter(-50, 0, 350, 760, 'w');
+    k.sign(-245, -30, Math.PI / 2, [{ text: 'THREE MILE ISLAND', size: 64 }, { text: 'Nuclear Generating Station', size: 40, color: '#cfe0ff' }]);
     k.road([[-250, -1500], [-250, -500], [-230, 0], [-250, 600], [-250, 1700]], 8);
     k.road([[-250, -560], [700, -620], [1300, -640]], 9);
     k.mesh(new THREE.BoxGeometry(1000, 2, 12), k.concrete('#9a958b', 20, 4), 430, 6, -600);
@@ -93,6 +95,7 @@ export const ROOPPUR: SiteDef = {
   name: 'Rooppur',
   place: 'Ishwardi, Pabna, on the Padma',
   lat: 24.07,
+  tz: 'Asia/Dhaka',
   kind: 'Two VVER-1200 (AES-2006)',
   blurb: 'Bangladesh’s first nuclear plant: two Generation III+ Russian PWRs with double containments, core catchers and four 170 m cooling towers.',
   facts: [['Units', '2 × VVER-1200'], ['Output', '2 × 1,200 MWe'], ['Containment', 'Double wall, ~70 m'], ['Towers', '4 × ~170 m'], ['Grid', '400 kV and 230 kV']],
@@ -141,6 +144,8 @@ export const ROOPPUR: SiteDef = {
     k.towerCrane(-40, 60, 95, 60, 0.4);
     k.apron(80, 0, 520, 760);
     k.perimeter(110, 0, 560, 900, 'w');
+    k.sign(-196, -24, Math.PI / 2, [{ text: 'রূপপুর পারমাণবিক বিদ্যুৎকেন্দ্র', size: 54 }, { text: 'ROOPPUR NUCLEAR POWER PLANT', size: 40, color: '#ffe9a8' }], '#0d5a3e');
+    k.flag(-196, 30, (g, w, h) => { g.fillStyle = '#006a4e'; g.fillRect(0, 0, w, h); g.fillStyle = '#f42a41'; g.beginPath(); g.arc(w * 0.45, h / 2, h * 0.33, 0, Math.PI * 2); g.fill(); });
     k.road([[-500, -700], [-300, -380], [-200, 0], [-300, 420], [-500, 900]], 9);
     k.road([[-200, 0], [700, 0], [1400, 260]], 9);
     k.parking(-280, -200, 26, 5, Math.PI / 2);
@@ -185,6 +190,7 @@ export const FUKUSHIMA: SiteDef = {
   name: 'Fukushima Daiichi',
   place: 'Ōkuma and Futaba, Fukushima Prefecture',
   lat: 37.42,
+  tz: 'Asia/Tokyo',
   kind: 'Six GE boiling-water reactors',
   blurb: 'Six BWRs on a terrace cut 10 m above the Pacific. On 11 March 2011 a 14 m tsunami flooded the diesels and switchgear, and units 1 to 3 melted down.',
   facts: [['Units', '6 × BWR (Mark I / II)'], ['Total', '4,696 MWe'], ['Site grade', '10 m (units 1–4)'], ['Tsunami', '~14–15 m'], ['Stacks', '3 × 120 m']],
@@ -284,6 +290,7 @@ export const FUKUSHIMA: SiteDef = {
     k.line(new THREE.Vector2(-560, -220), new THREE.Vector2(-3200, 400), 400, 55);
     k.apron(80, -100, 250, 380);
     k.perimeter(40, -100, 300, 420, 'w');
+    k.sign(-122, -126, Math.PI / 2, [{ text: '東京電力 福島第一原子力発電所', size: 56 }, { text: 'TEPCO FUKUSHIMA DAIICHI NPS', size: 38, color: '#d8e6ff' }], '#20364f');
     k.apron(80, -600, 250, 210);
     k.road([[-1200, -260], [-560, -180], [-110, -150], [-110, 120], [-60, 300]], 9);
     k.road([[-110, -150], [-110, -700]], 8);
@@ -324,6 +331,7 @@ export const CHERNOBYL: SiteDef = {
   name: 'Chernobyl',
   place: 'Pripyat, Ukraine',
   lat: 51.39,
+  tz: 'Europe/Kyiv',
   kind: 'Four RBMK-1000 reactors',
   blurb: 'Four graphite-moderated channel reactors in one 800 m building. Unit 4 exploded on 26 April 1986. Today a 108 m steel arch, the largest movable land structure ever built, covers it.',
   facts: [['Units', '4 × RBMK-1000'], ['Each', '1,000 MWe, 3,200 MWt'], ['Turbine hall', '~800 m long'], ['New Safe Confinement', '257 m span, 108 m high'], ['Cooling', '22 km² pond']],
@@ -444,6 +452,9 @@ export const CHERNOBYL: SiteDef = {
     k.line(new THREE.Vector2(-150, -510), new THREE.Vector2(800, -3600), 420, 60);
     k.apron(-200, 0, 820, 280);
     k.perimeter(-160, -60, 900, 420, 'n');
+    k.sign(-200, -300, 0, [{ text: 'ЧОРНОБИЛЬСЬКА АЕС', size: 64 }, { text: 'Chornobyl NPP', size: 40, color: '#ffe08a' }], '#2c3e57');
+    // a man fishing on the cooling pond: its catfish grew famously large
+    k.fisherman(420, 820, -2.6, 0.6);
     k.road([[-3000, -260], [-700, -200], [400, -200], [1500, -60], [1700, 400]], 9);
     k.road([[-700, -200], [-1400, -1200], [-2400, -2200]], 9);
     k.parking(-600, 80, 20, 3, 0, 0.3);

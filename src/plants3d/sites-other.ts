@@ -25,6 +25,7 @@ export const DRAX: SiteDef = {
   name: 'Drax',
   place: 'Selby, North Yorkshire',
   lat: 53.74,
+  tz: 'Europe/London',
   kind: 'Biomass, formerly coal',
   blurb: 'Once the largest coal plant in western Europe. Twelve cooling towers, a 259 m chimney and four white domes that hold wood pellets shipped across the Atlantic.',
   facts: [['Capacity', '~2,600 MW (biomass)'], ['Peak', '3,960 MW, 6 units'], ['Towers', '12 × 114 m'], ['Chimney', '259 m'], ['Domes', '4 × 50 m, 75,000 t each']],
@@ -72,20 +73,22 @@ export const DRAX: SiteDef = {
     const loop: [number, number][] = [];
     for (let i = 0; i <= 64; i++) { const a = (i / 64) * Math.PI * 2; loop.push([Math.cos(a) * 420, 560 + Math.sin(a) * 150]); }
     k.road(loop, 6, false);
+    // the biomass train runs round the loop at walking pace
     const wagon = new THREE.BoxGeometry(16, 4.2, 3.2);
     wagon.translate(0, 2.6, 0);
-    for (let i = 0; i < 30; i++) {
-      const a = 0.4 + i * 0.045;
-      const x = Math.cos(a) * 420, z = 560 + Math.sin(a) * 150;
-      const q = new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), -Math.atan2(150 * Math.cos(a), -420 * Math.sin(a)));
-      k.instance('wagon', wagon, k.plain(i === 0 ? '#2e4a3a' : '#5d7a4a', 0.6, 0.3), new THREE.Matrix4().compose(V(x, dxY(x, z), z), q, V(1, 1, 1)));
-    }
+    const roof = new THREE.BoxGeometry(15.4, 0.5, 3.4);
+    roof.translate(0, 4.9, 0);
+    k.mover(loop.slice(0, -1).map(([x, z]) => V(x, 0, z)), { closed: true, speed: 3.2, n: 30, spacing: 17, parts: [
+      { geo: wagon, mat: k.plain('#5d7a4a', 0.6, 0.3) },
+      { geo: roof, mat: k.plain('#d7d4cc', 0.5, 0.3) },
+    ] });
     k.switchyard(0, -380, 420, 150, { kv: 400 });
     k.line(new THREE.Vector2(-180, -460), new THREE.Vector2(-2200, -3800), 380, 52);
     k.line(new THREE.Vector2(180, -460), new THREE.Vector2(2600, -3800), 380, 52);
     for (let i = 0; i < 6; i++) for (const tx of [-1, 1]) k.transformer(tx * (60 + i * 30), -110, 0, 1.2);
     k.apron(0, 60, 1260, 620);
     k.perimeter(0, 210, 1360, 1060, 's');
+    k.sign(-40, 760, Math.PI, [{ text: 'DRAX', size: 120 }, { text: 'Power Station', size: 44, color: '#cdeccf' }], '#0f4d3a');
     k.road([[-3000, 760], [-500, 760], [600, 760], [3000, 700]], 9);
     k.road([[-500, 760], [-500, 300]], 8);
     k.parking(-560, 380, 30, 5, Math.PI / 2);
@@ -138,6 +141,7 @@ export const THREE_GORGES: SiteDef = {
   name: 'Three Gorges Dam',
   place: 'Sandouping, Yichang, Hubei',
   lat: 30.82,
+  tz: 'Asia/Shanghai',
   kind: 'Hydroelectric gravity dam',
   blurb: 'The largest power station on Earth: 22.5 GW from 32 Francis turbines, behind a concrete wall 2.3 km long and 181 m high on the Yangtze.',
   facts: [['Capacity', '22,500 MW'], ['Units', '32 × 700 MW + 2 × 50 MW'], ['Dam', '2,335 m long, 181 m high'], ['Reservoir', '175 m normal pool'], ['Ship lock', '5 steps, 113 m lift']],
@@ -234,11 +238,16 @@ export const THREE_GORGES: SiteDef = {
     // ship lift: a 3,000 t tank of water carried between four towers
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(sx * 70, -1290 + sz * 30, 30, 22, 160, k.concrete('#cbc6bb', 30, 67), { y: 50 });
     k.box(0, -1290, 120, 26, 10, k.steel('#7c8487'), { y: 120, collide: false, parapet: false });
-    for (let i = 0; i < 8; i++) {
-      const x = 600 + i * 340, z = -300 + ((i * 197) % 600);
-      const hull = new THREE.BoxGeometry(70, 5, 13);
-      hull.translate(0, 2.5, 0);
-      k.instance('ship', hull, k.plain('#e7e4dc', 0.6, 0.2), new THREE.Matrix4().compose(V(x, 64.5, z), new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), 0.1), V(1, 1, 1)));
+    // river traffic below the dam, coming and going
+    const hullG = new THREE.BoxGeometry(70, 5, 13);
+    hullG.translate(0, 2.5, 0);
+    const cabinG = new THREE.BoxGeometry(12, 7, 11);
+    cabinG.translate(-24, 8, 0);
+    for (const [zz, sp, n] of [[-120, 4.5, 4], [180, 3.8, 3]] as const) {
+      k.mover([V(4200, 0, zz), V(2400, 0, zz + 60), V(900, 0, zz - 30), V(420, 0, zz)], { speed: sp, n, spacing: 0, y: 64.3, parts: [
+        { geo: hullG, mat: k.plain('#e7e4dc', 0.6, 0.2) },
+        { geo: cabinG, mat: k.plain('#2d5a7a', 0.5, 0.3) },
+      ] });
     }
     townBlocks(k, 2600, 2000, 36, 900, [6, 22]);
     const avoid = (x: number, z: number) => tgTerrain(x, z) < 190 && x < 0 || tgTerrain(x, z) < 72 || (z < -1350 && z > -1750 && x > -950 && x < 1250);

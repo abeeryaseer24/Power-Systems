@@ -37,6 +37,8 @@ export type SiteDef = {
   name: string;
   place: string;
   lat: number;
+  /** IANA time zone, for the live clock */
+  tz?: string;
   kind: string;
   blurb: string;
   facts: [string, string][];
@@ -103,6 +105,8 @@ export class PlantScene {
   private envRT: THREE.WebGLRenderTarget | null = null;
   private lastEnvHour = -99;
   private water: THREE.MeshStandardMaterial[] = [];
+  private cloths: THREE.Mesh[] = [];
+  private boats: THREE.Object3D[] = [];
   private clock = new THREE.Clock();
   private raf = 0;
   private grade: ShaderPass;
@@ -198,6 +202,8 @@ export class PlantScene {
     this.kit.root.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial;
       if (o.name === 'water' && m && !this.water.includes(m)) this.water.push(m);
+      if (o.name === 'flag') this.cloths.push(o as THREE.Mesh);
+      if (o.name === 'boat' && o.parent) this.boats.push(o.parent);
     });
     this.era = site.eras?.[0]?.id ?? '';
     this.applyEra();
@@ -717,6 +723,13 @@ export class PlantScene {
     }
     if (this.propsState === 'idle' && (this.mode === 'walk' || this.camera.position.distanceTo(this.controls.target) < 500)) this.loadProps();
     if (this.floodMesh?.visible) { const nm = (this.floodMesh.material as THREE.MeshStandardMaterial).normalMap; if (nm) nm.offset.set(t * 0.02, t * 0.01); }
+    for (const c of this.cloths) {
+      const pa = c.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < pa.count; i++) { const x = pa.getX(i); pa.setZ(i, Math.sin(x * 2.2 - t * 5) * 0.12 * x / 3); }
+      pa.needsUpdate = true;
+    }
+    this.moveAll(t);
+    for (const b of this.boats) { b.rotation.z = Math.sin(t * 0.9) * 0.03; b.rotation.x = Math.sin(t * 0.7 + 1) * 0.02; }
     for (const m of this.water) if (m.normalMap) { m.normalMap.offset.x = t * 0.004; m.normalMap.offset.y = t * 0.006; }
     const bm = this.beaconPts.material as THREE.PointsMaterial;
     bm.opacity = (0.25 + 0.75 * this.night) * (Math.sin(t * 3.2) > 0.2 ? 1 : 0.05);
@@ -727,6 +740,37 @@ export class PlantScene {
   };
 
   private wake = () => { this.sound.start(); };
+
+  private mvM = new THREE.Matrix4();
+  private mvQ = new THREE.Quaternion();
+  private mvP = new THREE.Vector3();
+  /** Advance every mover along its path; open paths are driven there and back. */
+  private moveAll(t: number) {
+    for (const mv of this.kit.movers) {
+      for (let k = 0; k < mv.n; k++) {
+        let s: number, dir = 1;
+        if (mv.closed) s = (((t * mv.speed - k * mv.spacing) % mv.len) + mv.len) % mv.len;
+        else {
+          const u = (t * mv.speed + (k / mv.n) * 2 * mv.len) % (2 * mv.len);
+          s = u < mv.len ? u : 2 * mv.len - u;
+          dir = u < mv.len ? 1 : -1;
+        }
+        let i = 1;
+        while (i < mv.cum.length - 1 && mv.cum[i] < s) i++;
+        const a = mv.path[i - 1], b = mv.path[i];
+        const f = (s - mv.cum[i - 1]) / (mv.cum[i] - mv.cum[i - 1] || 1);
+        this.mvP.lerpVectors(a, b, f);
+        // drive on the right: offset 2 m from the centreline
+        const dx = (b.x - a.x) * dir, dz = (b.z - a.z) * dir, L = Math.hypot(dx, dz) || 1;
+        if (!mv.closed && mv.y === undefined) { this.mvP.x += (dz / L) * 2; this.mvP.z -= (dx / L) * 2; }
+        this.mvP.y = mv.y ?? this.site.groundY(this.mvP.x, this.mvP.z);
+        this.mvQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-dz, dx));
+        this.mvM.compose(this.mvP, this.mvQ, new THREE.Vector3(1, 1, 1));
+        for (const m of mv.meshes) m.im.setMatrixAt(k, this.mvM);
+      }
+      for (const m of mv.meshes) m.im.instanceMatrix.needsUpdate = true;
+    }
+  }
 
   /** Adaptive resolution: drop the pixel ratio when frames run long, recover when there is headroom. */
   private adapt(raw: number) {
