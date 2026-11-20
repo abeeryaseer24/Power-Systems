@@ -153,7 +153,7 @@ export class PlantScene {
   private lastShed = 0;
   private lastArc = 0;
 
-  constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef) {
+  constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef, opts: { mini?: boolean } = {}) {
     const mobile = matchMedia('(max-width: 760px)').matches;
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.dprMax = Math.min(devicePixelRatio, mobile ? 1.25 : 1.5);
@@ -202,13 +202,14 @@ export class PlantScene {
 
     // world
     this.kit = new Kit(site.groundY);
+    this.kit.mini = !!opts.mini;
     const built = site.build(this.kit, this.labels);
     this.stops = built.stops;
     this.steamRule = built.steam;
     this.onBuild = built.onBuild;
     this.kit.finish();
     // compile the time-lapse height test into the shaders up front, so opening it never stalls
-    if (site.lapse) {
+    if (site.lapse && !opts.mini) {
       this.lapseObj = new BuildLapse(this.kit, this.kit.root, new THREE.Vector2(site.focus[0], site.focus[2]), site.extent * 1.15, site.lapse);
       this.lapseObj.prepare();
     }
@@ -247,6 +248,15 @@ export class PlantScene {
     this.controls.minDistance = 20;
     this.controls.maxDistance = site.extent * 1.4;
     this.controls.screenSpacePanning = false;
+    if (opts.mini) {
+      // index preview: no shadows, low resolution, a slow turntable
+      this.renderer.shadowMap.enabled = false;
+      this.dprMax = this.dpr = 1;
+      this.controls.enabled = false;
+      this.controls.autoRotate = true;
+      this.controls.autoRotateSpeed = 1.6;
+      this.propsState = 'done';
+    }
     this.controls.update();
 
     const k = this.kit;

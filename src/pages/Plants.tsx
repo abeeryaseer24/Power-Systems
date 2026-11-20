@@ -28,7 +28,10 @@ export default function Plants() {
           <li key={s.id}>
             <Link to={`/plants/${s.id}`} className="pv-sheet">
               <span className="pv-no">{String(i + 1).padStart(2, '0')}</span>
-              <Elevation els={ELEVATIONS[s.id]} />
+              <span className="pv-elevwrap">
+                <Elevation els={ELEVATIONS[s.id]} />
+                <MiniPreview site={s} />
+              </span>
               <span className="pv-name">{s.name}</span>
               <span className="pv-kind">{s.kind} · {s.place}</span>
               <span className="pv-blurb">{s.blurb}</span>
@@ -45,6 +48,44 @@ export default function Plants() {
       <p className="pv-note">Every building, tower and reactor is made in code, from published dimensions and site layouts. Plans are true to scale and orientation. Small details are simplified. Close-up props (covered cars, barriers, drums, crates, cabinets, shrubs) are CC0 models from <a href="https://polyhaven.com">Poly Haven</a>.</p>
     </main>
   );
+}
+
+/**
+ * Hover preview: after a short pause the card builds a lightweight version
+ * of the plant over its drawing and turns it slowly. One at a time; never on touch.
+ */
+let miniBusy = false;
+function MiniPreview({ site }: { site: SiteDef }) {
+  const host = useRef<HTMLSpanElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const card = host.current?.closest('.pv-sheet');
+    if (!card || matchMedia('(pointer: coarse)').matches) return;
+    let timer = 0, eng: PlantScene | null = null, alive = false;
+    const enter = () => {
+      alive = true;
+      timer = window.setTimeout(async () => {
+        if (!alive || miniBusy || !host.current) return;
+        miniBusy = true;
+        const { PlantScene } = await import('../plants3d/PlantScene');
+        if (!alive || !host.current) { miniBusy = false; return; }
+        const ov = document.createElement('div');
+        eng = new PlantScene(host.current, ov, site, { mini: true });
+        eng.setHour(site.id === 'chernobyl' ? 17.8 : 9.5);
+        setShown(true);
+      }, 350);
+    };
+    const leave = () => {
+      alive = false;
+      clearTimeout(timer);
+      setShown(false);
+      if (eng) { eng.dispose(); eng = null; miniBusy = false; }
+    };
+    card.addEventListener('mouseenter', enter);
+    card.addEventListener('mouseleave', leave);
+    return () => { card.removeEventListener('mouseenter', enter); card.removeEventListener('mouseleave', leave); leave(); };
+  }, [site]);
+  return <span className={`pv-mini ${shown ? 'on' : ''}`} ref={host} aria-hidden="true" />;
 }
 
 /** A line elevation at 1 px = 2 m with a ground line and a 100 m scale bar. */

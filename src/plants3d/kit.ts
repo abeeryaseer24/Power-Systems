@@ -887,6 +887,7 @@ export class Kit {
 
   /** Terrain mesh following groundY, textured with a blended ground palette. */
   terrain(size: number, palette: { grass: string; dry: string; earth: string }, seg = 256, cx = 0, cz = 0, fn = this.groundY) {
+    if (this.mini) seg = Math.min(seg, 90);
     const g = new THREE.PlaneGeometry(size, size, seg, seg);
     g.rotateX(-Math.PI / 2);
     const p = g.attributes.position as THREE.BufferAttribute;
