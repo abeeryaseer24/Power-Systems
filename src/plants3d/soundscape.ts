@@ -13,6 +13,7 @@ export class Soundscape {
   private layers: Record<string, Layer> = {};
   private ok = false;
   private nextChirp = 0;
+  private raining = false;
   private ctx?: AudioContext;
   private out?: AudioNode;
 
@@ -76,6 +77,10 @@ export class Soundscape {
     layer('dump', [{ node: roar.fl, src: roar.s }]);
     const water = noiseSrc('lowpass', 700, 0.5);
     layer('spill', [{ node: water.fl, src: water.s }]);
+    const shower = noiseSrc('highpass', 1800, 0.4);
+    const patter = noiseSrc('bandpass', 4200, 0.8);
+    layer('weather', [{ node: shower.fl, src: shower.s }, { node: patter.fl, src: patter.s }]);
+    if (this.raining) this.set('weather', 0.28);
   }
 
   private near(list: THREE.Vector3[], p: THREE.Vector3, ref: number) {
@@ -102,7 +107,7 @@ export class Soundscape {
     this.set('spill', 0.8 * s.spill * this.near(this.sources.spill, p, 600));
     // crickets on a warm night
     const now = this.ctx.currentTime;
-    if (s.night > 0.6 && s.height < 120 && now > this.nextChirp) {
+    if (!this.raining && s.night > 0.6 && s.height < 120 && now > this.nextChirp) {
       this.nextChirp = now + 0.6 + Math.random() * 1.8;
       this.chirp();
     }
@@ -121,6 +126,11 @@ export class Soundscape {
     o.connect(g).connect(this.out!);
     o.start(t);
     o.stop(t + 0.25);
+  }
+
+  setRain(on: boolean) {
+    this.raining = on;
+    this.set('weather', on ? 0.28 : 0);
   }
 
   step() {

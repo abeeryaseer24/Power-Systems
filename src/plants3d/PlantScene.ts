@@ -17,6 +17,7 @@ import { sfx } from '../lib/sfx';
 
 export type Stop = { title: string; body: string; cam: [number, number, number]; look: [number, number, number] };
 export type Mode = 'orbit' | 'film' | 'tour' | 'walk' | 'axo';
+export type Weather = 'clear' | 'rain' | 'mist';
 export type FilmShot = { shot: 'orbit' | 'dolly' | 'crane' | 'track'; dur: number };
 
 /** Flood scenario: water rises from `normal` and arrives from one side as a front. */
@@ -94,6 +95,12 @@ export class PlantScene {
   private visited = new Set<number>();
   private steamRule?: (tag: string | undefined, era: string) => boolean;
   private plumes: Plumes;
+  weather: Weather = 'clear';
+  private fogBase = 0.0001;
+  private cloud!: THREE.Mesh;
+  private rain: THREE.LineSegments | null = null;
+  private rainPos: Float32Array | null = null;
+  private terrainMats: THREE.MeshStandardMaterial[] = [];
   private lampPts!: THREE.Points;
   private beaconPts!: THREE.Points;
   private floods!: THREE.InstancedMesh;
@@ -184,7 +191,8 @@ export class PlantScene {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.6;
     this.scene.add(this.sun, this.sun.target, this.moon, this.moon.target, this.hemi);
-    this.scene.fog = new THREE.FogExp2('#9fb1c4', (site.fog ?? 0.00011) * 0.72);
+    this.fogBase = (site.fog ?? 0.00011) * 0.72;
+    this.scene.fog = new THREE.FogExp2('#9fb1c4', this.fogBase);
 
     // world
     this.kit = new Kit(site.groundY);
@@ -314,6 +322,19 @@ export class PlantScene {
     }));
     this.nightSky.renderOrder = -1;
     this.scene.add(this.nightSky);
+    this.cloud = new THREE.Mesh(new THREE.SphereGeometry(14000, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, transparent: true, depthWrite: false, fog: false,
+      uniforms: { uCloud: { value: 0 }, uNight: { value: 0 }, uMist: { value: 0 } },
+      vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: `uniform float uCloud; uniform float uNight; uniform float uMist; varying vec3 vD;
+        void main(){ float y = max(vD.y, 0.0);
+          vec3 day = mix(vec3(0.62,0.66,0.7), vec3(0.42,0.46,0.5), pow(y, 0.6));
+          day = mix(day, vec3(0.78,0.8,0.82), uMist);
+          vec3 c = mix(day, vec3(0.025,0.03,0.04) + vec3(0.06,0.035,0.015) * exp(-y * 8.0), uNight);
+          gl_FragColor = vec4(c, uCloud); }`,
+    }));
+    this.cloud.renderOrder = -1;
+    this.scene.add(this.cloud);
   }
 
   private buildLights() {
@@ -376,12 +397,26 @@ export class PlantScene {
     const dayFog = new THREE.Color('#9db0c4').lerp(new THREE.Color('#d6a77e'), low * 0.8);
     fog.color.copy(dayFog).lerp(new THREE.Color('#0d1828'), this.night);
     this.renderer.toneMappingExposure = 0.46 + 0.5 * this.night;
+    // weather: overcast rain or ground mist on top of the clear-sky lighting
+    const wet = this.weather === 'rain', mist = this.weather === 'mist';
+    if (wet || mist) {
+      this.sun.intensity *= wet ? 0.18 : 0.45;
+      this.hemi.intensity = this.hemi.intensity * 1.2 + (wet ? 0.35 : 0.3) * day;
+      this.renderer.toneMappingExposure *= wet ? 1.12 : 1.05;
+      const wf = wet ? new THREE.Color('#7f8a94') : new THREE.Color('#c3cad0');
+      fog.color.copy(wf.lerp(new THREE.Color('#0b1119'), this.night));
+    }
+    fog.density = this.fogBase * (wet ? 3.2 : mist ? 9 : 1);
+    const cu = this.cloud.material as THREE.ShaderMaterial;
+    cu.uniforms.uCloud.value = wet ? 0.94 : mist ? 0.7 : 0;
+    cu.uniforms.uNight.value = this.night;
+    cu.uniforms.uMist.value = mist ? 1 : 0;
     // bloom is for lamps and windows at night; by day it smears the bright sky over the whole frame
     this.bloom.enabled = this.night > 0.05;
     this.bloom.strength = 0.85 * this.night;
     this.bloom.threshold = 0.7 + 0.6 * (1 - this.night);
     this.applyNight();
-    (this.stars.material as THREE.PointsMaterial).opacity = this.night;
+    (this.stars.material as THREE.PointsMaterial).opacity = this.night * (this.weather === 'clear' ? 1 : 0.1);
     (this.nightSky.material as THREE.ShaderMaterial).uniforms.uNight.value = this.night;
     this.grade.uniforms.uNight.value = this.night;
     this.plumes.setLight(this.sun.color.clone().multiplyScalar(this.sun.intensity / 5.2), this.night, this.sunDir);
@@ -402,6 +437,47 @@ export class PlantScene {
     this.envRT = this.pmrem.fromScene(this.envScene, 0, 0.1, 200);
     this.scene.environment = this.envRT.texture;
     this.scene.environmentIntensity = 0.08 + 0.1 * (1 - this.night) + 0.06 * this.night;
+  }
+
+  /** Clear, rain or mist. Rain wets the ground, roughens the water and leans the plumes. */
+  setWeather(w: Weather) {
+    this.weather = w;
+    if (!this.terrainMats.length) this.kit.root.traverse((o) => { if (o.name === 'terrain') this.terrainMats.push((o as THREE.Mesh).material as THREE.MeshStandardMaterial); });
+    const wet = w === 'rain';
+    for (const m of this.terrainMats) { m.color.setScalar(wet ? 0.62 : 1); m.roughness = wet ? 0.55 : 1; }
+    for (const m of this.water) if (m.normalScale) m.normalScale.setScalar(wet ? 0.6 : 0.25);
+    this.plumes.windScale = wet ? 2.2 : w === 'mist' ? 0.5 : 1;
+    if (wet && !this.rain) {
+      const n = 6000;
+      this.rainPos = new Float32Array(n * 6);
+      for (let i = 0; i < n; i++) {
+        const x = (Math.random() - 0.5) * 360, y = Math.random() * 200, z = (Math.random() - 0.5) * 360;
+        this.rainPos.set([x, y, z, x, y - 1.8, z], i * 6);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(this.rainPos, 3));
+      this.rain = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#b9c3cc', transparent: true, opacity: 0.32, depthWrite: false }));
+      this.rain.frustumCulled = false;
+      this.scene.add(this.rain);
+    }
+    if (this.rain) this.rain.visible = wet;
+    this.sound.setRain(wet);
+    this.setHour(this.hour);
+  }
+
+  private stepRain(dt: number) {
+    if (!this.rain?.visible || !this.rainPos) return;
+    const p = this.rainPos, c = this.active.position;
+    const wx = (this.site.wind?.[0] ?? 3) * 0.25, wz = (this.site.wind?.[1] ?? 1) * 0.25;
+    this.rain.position.set(Math.round(c.x / 20) * 20, c.y - 90, Math.round(c.z / 20) * 20);
+    for (let i = 0; i < p.length; i += 6) {
+      let y = p[i + 1] - 32 * dt;
+      let x = p[i] + wx * 32 * dt * 0.1, z = p[i + 2] + wz * 32 * dt * 0.1;
+      if (y < 0) { y += 200; x = (Math.random() - 0.5) * 360; z = (Math.random() - 0.5) * 360; }
+      p[i] = x; p[i + 1] = y; p[i + 2] = z;
+      p[i + 3] = x - wx * 0.15; p[i + 4] = y - 1.8; p[i + 5] = z - wz * 0.15;
+    }
+    (this.rain.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
   }
 
   setMode(m: Mode) {
@@ -729,6 +805,7 @@ export class PlantScene {
       pa.needsUpdate = true;
     }
     this.moveAll(t);
+    this.stepRain(dt);
     for (const b of this.boats) { b.rotation.z = Math.sin(t * 0.9) * 0.03; b.rotation.x = Math.sin(t * 0.7 + 1) * 0.02; }
     for (const m of this.water) if (m.normalMap) { m.normalMap.offset.x = t * 0.004; m.normalMap.offset.y = t * 0.006; }
     const bm = this.beaconPts.material as THREE.PointsMaterial;
@@ -882,6 +959,7 @@ class Plumes {
   private R = rng(4);
   private mat: THREE.ShaderMaterial;
 
+  windScale = 1;
   constructor(private em: Emitter[], private wind: THREE.Vector3) {
     const n = em.reduce((s, e) => s + MAXP[e.kind], 0) || 1;
     this.pos = new Float32Array(n * 3);
@@ -987,9 +1065,9 @@ class Plumes {
       else this.vel[i3 + 1] *= 1 - (k === 'jet' ? 0.5 : 0.08) * dt;
       const h = Math.max(0, this.pos[i3 + 1] - e.pos.y);
       const drift = k === 'spray' ? 0.3 : Math.min(1, 0.25 + h / 120);
-      this.pos[i3] += (this.vel[i3] + this.wind.x * drift) * dt;
+      this.pos[i3] += (this.vel[i3] + this.wind.x * drift * this.windScale) * dt;
       this.pos[i3 + 1] += this.vel[i3 + 1] * dt;
-      this.pos[i3 + 2] += (this.vel[i3 + 2] + this.wind.z * drift) * dt;
+      this.pos[i3 + 2] += (this.vel[i3 + 2] + this.wind.z * drift * this.windScale) * dt;
       const base = k === 'spray' ? e.radius * 0.6 : e.radius;
       this.size[i] = k === 'jet' ? 2 + t * 26 : base * (k === 'spray' ? 0.8 + t * 2 : 0.85 + t * 1.5);
       const fadeIn = Math.min(1, t * 8);

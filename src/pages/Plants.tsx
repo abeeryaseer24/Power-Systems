@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ELEVATIONS, SITES, siteById, type El } from '../plants3d/sites';
-import type { FloodDef, Mode, PlantScene, SiteDef, Stop } from '../plants3d/PlantScene';
+import type { FloodDef, Mode, PlantScene, SiteDef, Stop, Weather } from '../plants3d/PlantScene';
 import { TOURS, type Tour } from '../plants3d/tours';
 import { sfx } from '../lib/sfx';
 import { at } from '../controlroom/timelines';
@@ -124,6 +124,7 @@ function Viewer({ site }: { site: SiteDef }) {
   const [flood, setFlood] = useState(false);
   const [fp, setFp] = useState(false);
   const [live, setLive] = useState(false);
+  const [weather, setWeather] = useState<Weather>('clear');
   const [film, setFilm] = useState<{ i: number; p: number } | null>(null);
   const [filmPaused, setFilmPaused] = useState(false);
   const [card, setCard] = useState(true);
@@ -187,6 +188,7 @@ function Viewer({ site }: { site: SiteDef }) {
   }, [film, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (mode === 'tour') setSeen((x) => new Set(x).add(stop)); }, [stop, mode]);
   useEffect(() => { eng.current?.setEra(era); }, [era, ready]);
+  useEffect(() => { if (ready) eng.current?.setWeather(weather); }, [weather, ready]);
   useEffect(() => { eng.current?.setCutaway(cut); }, [cut, ready]);
   useEffect(() => {
     if (!play) return;
@@ -310,6 +312,9 @@ function Viewer({ site }: { site: SiteDef }) {
           <button onClick={() => { setLive(false); setHour(10.5); }} className={!night && !live ? 'on' : ''}>Day</button>
           <button onClick={() => { setLive(false); setHour(23); }} className={night && !live ? 'on' : ''}>Night</button>
           {s.tz && <button onClick={() => setLive(!live)} className={live ? 'on' : ''} title={`Local time at ${s.name} right now`}>Live {live ? localClock(s.tz) : ''}</button>}
+        </div>
+        <div className="pv-seg" role="group" aria-label="Weather">
+          {(['clear', 'rain', 'mist'] as Weather[]).map((w) => <button key={w} className={weather === w ? 'on' : ''} onClick={() => setWeather(w)}>{w === 'clear' ? 'Clear' : w === 'rain' ? 'Rain' : 'Mist'}</button>)}
         </div>
         {s.eras && (
           <div className="pv-seg" role="group" aria-label="Period">
