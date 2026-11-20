@@ -355,6 +355,47 @@ export class RegionScene {
     this.shake = Math.min(1.5, this.shake + a);
   }
 
+  /** Documentary camera: slow push-in and drift, a target bloom, eased every frame. */
+  private cine = { on: false, push: 0, drift: 0, bloom: 1.05, exposure: 1, minDist: 0 };
+
+  /**
+   * Frame a cinematic shot around the region centre. `dist` is a fraction of the region extent,
+   * `push` the fraction of distance closed per second, `drift` the orbit rate in rad/s.
+   */
+  shot(opts: { dist: number; push?: number; drift?: number; bloom?: number; exposure?: number; tilt?: number; cut?: boolean }) {
+    const c = this.controls;
+    const first = !this.cine.on;
+    this.cine.on = true;
+    this.cine.push = opts.push ?? 0.012;
+    this.cine.drift = opts.drift ?? 0.02;
+    this.cine.bloom = opts.bloom ?? 1.05;
+    this.cine.exposure = opts.exposure ?? 1;
+    if (first || opts.cut) {
+      // a cut changes exposure at once, as a film edit would
+      this.bloom.strength = this.cine.bloom;
+      this.renderer.toneMappingExposure = this.cine.exposure;
+    }
+    this.cine.minDist = this.extent * 0.08;
+    const dist = this.extent * opts.dist;
+    const tilt = opts.tilt ?? 0.95; // ratio of height to ground distance
+    const ang = Math.atan2(this.camera.position.x - c.target.x, this.camera.position.z - c.target.z) + (opts.cut ? 0.6 : 0);
+    const ground = dist / Math.sqrt(1 + tilt * tilt);
+    const to = new THREE.Vector3(Math.sin(ang) * ground, ground * tilt, Math.cos(ang) * ground);
+    const from = this.camera.position.clone().sub(c.target);
+    if (opts.cut) {
+      this.camera.position.copy(c.target).add(to);
+      return;
+    }
+    const t0 = performance.now();
+    const step = () => {
+      const t = Math.min(1, (performance.now() - t0) / 2600);
+      const e = 1 - Math.pow(1 - t, 3);
+      this.camera.position.copy(c.target).add(from.clone().lerp(to, e));
+      if (t < 1 && !this.disposed) requestAnimationFrame(step);
+    };
+    step();
+  }
+
   /** Fly to a point at a given viewing distance. */
   focus(x: number, z: number, dist: number) {
     const c = this.controls;
@@ -499,6 +540,15 @@ export class RegionScene {
       const off = this.camera.position.clone().sub(c.target);
       off.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * 0.03);
       this.camera.position.copy(c.target).add(off);
+    }
+    if (this.cine.on) {
+      const c = this.controls;
+      const off = this.camera.position.clone().sub(c.target);
+      off.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * this.cine.drift);
+      if (off.length() > this.cine.minDist) off.multiplyScalar(1 - dt * this.cine.push);
+      this.camera.position.copy(c.target).add(off);
+      this.bloom.strength += (this.cine.bloom - this.bloom.strength) * Math.min(1, dt * 1.5);
+      this.renderer.toneMappingExposure += (this.cine.exposure - this.renderer.toneMappingExposure) * Math.min(1, dt * 1.5);
     }
     this.controls.update();
     if (this.shake > 0.001) {

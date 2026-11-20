@@ -201,7 +201,7 @@ function Shell({ ep, started, onStart, ready, readyLabel, player, more, children
   }, [started, paused, i]);
   const order: Beat[] = ['cut', 'clock', 'title', 'body', 'diagram', 'hold', 'out'];
   const at = (b: Beat) => order.indexOf(beat) >= order.indexOf(b);
-  const showDiagram = phase === 'scenes' && beat !== 'out' && (diagramOpen || (!!scene.fx?.length && at('diagram')));
+  const showDiagram = phase === 'scenes' && beat !== 'out' && (diagramOpen || (!!scene.fx?.length && beat === 'diagram'));
   const next = EPISODES[EPISODES.findIndex((e) => e.id === ep.id) + 1];
   const black = started && (phase !== 'scenes' || beat === 'cut' || beat === 'out');
   return (
@@ -209,6 +209,7 @@ function Shell({ ep, started, onStart, ready, readyLabel, player, more, children
       onPointerMove={started ? wake : undefined} onPointerDown={started ? wake : undefined}>
       {children}
       <div className="doc-grade" aria-hidden="true" />
+      <div className={`doc-scrim ${!started ? 'title' : ''}`} aria-hidden="true" />
       {started && phase === 'scenes' && scene.mood === 'impact' && beat !== 'cut' && <div className="doc-hit" key={`hit-${i}`} aria-hidden="true" />}
       <div className={`doc-black ${black ? 'on' : ''}`} aria-hidden="true" />
       <div className="doc-grain" aria-hidden="true" />
@@ -232,7 +233,7 @@ function Shell({ ep, started, onStart, ready, readyLabel, player, more, children
       {started && phase === 'scenes' && (
         <>
           {showDiagram && <Anatomy ep={ep} upto={i} />}
-          <section className={`doc-scene ${beat === 'out' ? 'leaving' : ''}`} key={i} aria-live="polite">
+          <section className={`doc-scene ${beat === 'out' ? 'leaving' : ''} ${showDiagram && !diagramOpen ? 'behind' : ''}`} key={i} aria-live="polite">
             {at('clock') && <span className="doc-clock">{typed}<b className="caret" aria-hidden="true" /></span>}
             {at('title') && <h2>{scene.title}</h2>}
             {at('body') && parts.length > 0 && (
@@ -295,10 +296,29 @@ function GridEpisode({ ep }: { ep: Ep }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i, started, r.sim]);
 
+  // the camera: a new shot for every scene, cut during the black beat, framed by mood
   useEffect(() => {
-    if (started && (scene.mood === 'impact' || scene.mood === 'dark')) r.scene?.kick(scene.mood === 'dark' ? 1 : 0.6);
+    const sc = r.scene;
+    if (!sc) return;
+    if (!started || player.phase === 'intro') {
+      sc.shot({ dist: 0.95, push: 0.003, drift: 0.012, bloom: 0.55, exposure: 0.8 });
+      return;
+    }
+    if (player.phase !== 'scenes') return;
+    const plan = {
+      calm: { dist: 0.85, push: 0.007, drift: 0.014, bloom: 0.55, exposure: 0.85, tilt: 1.0 },
+      tension: { dist: 0.6, push: 0.016, drift: 0.024, bloom: 0.65, exposure: 0.8, tilt: 0.8 },
+      impact: { dist: 0.42, push: 0.026, drift: 0.035, bloom: 1.05, exposure: 1.0, tilt: 0.65 },
+      dark: { dist: 0.95, push: 0.003, drift: 0.008, bloom: 1.1, exposure: 1.15, tilt: 1.15 },
+      after: { dist: 0.75, push: 0.005, drift: 0.006, bloom: 0.55, exposure: 0.85, tilt: 1.05 },
+    }[scene.mood ?? 'calm'];
+    sc.shot({ ...plan, cut: true });
+    if (scene.mood === 'impact') {
+      const t = window.setTimeout(() => sc.kick(0.9), 1250);
+      return () => window.clearTimeout(t);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i, started]);
+  }, [i, started, player.phase, r.scene]);
 
   return (
     <Shell ep={ep} started={started} onStart={() => setStarted(true)} ready={!!r.sim} readyLabel={r.loading} player={player}
