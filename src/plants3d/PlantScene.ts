@@ -10,6 +10,7 @@ import { gsap } from 'gsap';
 import { Kit, type Collider, type Emitter } from './kit';
 import { glow, puff, rng } from './textures';
 import type { Label } from './interiors';
+import type { GridDef, StressState } from './stress';
 
 export type Stop = { title: string; body: string; cam: [number, number, number]; look: [number, number, number] };
 export type Mode = 'orbit' | 'tour' | 'walk' | 'axo';
@@ -24,6 +25,7 @@ export type SiteDef = {
   facts: [string, string][];
   eras?: { id: string; label: string }[];
   cutaway?: string;
+  grid?: GridDef;
   focus: [number, number, number];
   cam: [number, number, number];
   spawn: [number, number];
@@ -82,6 +84,10 @@ export class PlantScene {
   private disposed = false;
   private sunDir = new THREE.Vector3();
   private propsState: 'idle' | 'loading' | 'done' = 'idle';
+  private stress: StressState | null = null;
+  private arcs: THREE.Sprite[] = [];
+  private arcLight = new THREE.PointLight('#bfd8ff', 0, 900, 1.6);
+  private lights = 1;
 
   constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef) {
     const mobile = matchMedia('(max-width: 760px)').matches;
@@ -143,6 +149,15 @@ export class PlantScene {
     for (let i = 0; i < 110; i++) this.plumes.update(0.2, this.camera);
     this.scene.add(this.plumes.points);
     this.buildLabels();
+    for (const y of this.kit.yards) {
+      const a = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: new THREE.Color(2.2, 2.6, 4), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      a.position.copy(y);
+      a.scale.setScalar(55);
+      this.scene.add(a);
+      this.arcs.push(a);
+    }
+    if (this.kit.yards[0]) this.arcLight.position.copy(this.kit.yards[0]);
+    this.scene.add(this.arcLight);
 
     // controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -259,7 +274,6 @@ export class PlantScene {
     this.sun.intensity = 4.2 * THREE.MathUtils.smoothstep(elD, -1, 8);
     this.sun.color.setRGB(1, 0.93 - low * 0.32, 0.84 - low * 0.55);
     this.moon.intensity = 1.1 * this.night;
-    for (const s of this.spots) s.intensity = 160000 * this.night;
     this.hemi.intensity = 0.06 + 0.12 * day + 0.1 * this.night;
     this.hemi.color.setRGB(0.55 + 0.2 * day, 0.62 + 0.2 * day, 0.8 + 0.1 * day);
     const fog = this.scene.fog as THREE.FogExp2;
@@ -268,13 +282,19 @@ export class PlantScene {
     this.renderer.toneMappingExposure = 0.4 + 0.5 * this.night;
     this.bloom.strength = 0.12 + 0.8 * this.night;
     this.bloom.threshold = 2.6 - 1.9 * this.night;
-    for (const { m, k } of this.kit.nightMats) m.emissiveIntensity = k * this.night;
-    (this.lampPts.material as THREE.PointsMaterial).opacity = this.night;
-    (this.floods.material as THREE.MeshBasicMaterial).opacity = this.night * 0.32;
+    this.applyNight();
     (this.stars.material as THREE.PointsMaterial).opacity = this.night * 0.9;
     this.grade.uniforms.uNight.value = this.night;
     this.plumes.setLight(this.sun.color.clone().multiplyScalar(this.sun.intensity / 4.2), this.night, this.sunDir);
     if (Math.abs(h - this.lastEnvHour) > 0.25) this.updateEnv();
+  }
+
+  private applyNight() {
+    const n = this.night * this.lights;
+    for (const { m, k } of this.kit.nightMats) m.emissiveIntensity = k * n;
+    (this.lampPts.material as THREE.PointsMaterial).opacity = n;
+    (this.floods.material as THREE.MeshBasicMaterial).opacity = n * 0.32;
+    for (const s of this.spots) s.intensity = 160000 * n;
   }
 
   private updateEnv() {
@@ -345,7 +365,30 @@ export class PlantScene {
 
   private applyEra() {
     for (const [name, g] of this.kit.eras) g.visible = name === this.era;
-    this.kit.emitters.forEach((e) => { e.rate = this.steamRule ? (this.steamRule(e.tag, this.era) ? 1 : 0) : 1; });
+    this.kit.emitters.forEach((e) => { e.base = e.tag === 'dump' ? 0 : this.steamRule ? (this.steamRule(e.tag, this.era) ? 1 : 0) : 1; });
+    this.applyRates();
+  }
+
+  /** Drive the plant from the stress simulator (null returns it to normal). */
+  setStress(s: StressState | null) {
+    this.stress = s;
+    this.applyRates();
+    const L = s ? s.lights : 1;
+    if (Math.abs(L - this.lights) > 0.01) { this.lights = L; this.applyNight(); }
+    // an arc flickers rather than glowing steadily
+    const arc = (s?.arc ?? 0) * (0.35 + 0.65 * Math.random());
+    for (const a of this.arcs) (a.material as THREE.SpriteMaterial).opacity = arc;
+    this.arcLight.intensity = arc * 3e5;
+  }
+
+  private applyRates() {
+    const s = this.stress, hydro = this.site.grid?.kind === 'hydro';
+    for (const e of this.kit.emitters) {
+      const base = e.base ?? 1;
+      if (e.tag === 'dump') e.rate = s ? s.dump : 0;
+      else if (hydro && e.tag === 'flood') e.rate = Math.max(base, s ? s.dump : 0);
+      else e.rate = s ? base * s.steam : base;
+    }
   }
 
   setMove(x: number, y: number) {
@@ -434,7 +477,7 @@ export class PlantScene {
 
 // ------------------------------------------------------------------ steam
 
-const MAXP: Record<Emitter['kind'], number> = { steam: 170, smoke: 90, spray: 260 };
+const MAXP: Record<Emitter['kind'], number> = { steam: 170, smoke: 90, spray: 260, jet: 70 };
 
 class Plumes {
   points: THREE.Points;
@@ -504,31 +547,32 @@ class Plumes {
       if (this.age[i] < 0) { this.alpha[i] = 0; continue; }
       if (this.age[i] > this.life[i]) {
         if (e.rate <= 0) { this.alpha[i] = 0; continue; }
+        if (this.R() > e.rate) { this.alpha[i] = 0; this.age[i] = this.life[i] - this.R() * 0.6; continue; }
         const a = this.R() * Math.PI * 2, r = Math.sqrt(this.R()) * e.radius;
         this.pos[i3] = e.pos.x + Math.cos(a) * r;
         this.pos[i3 + 1] = e.pos.y;
         this.pos[i3 + 2] = e.pos.z + Math.sin(a) * r;
-        const up = e.kind === 'spray' ? 0 : e.kind === 'smoke' ? 7 : 5 + this.R() * 3;
+        const up = e.kind === 'spray' ? 0 : e.kind === 'jet' ? 30 + this.R() * 10 : e.kind === 'smoke' ? 7 : 5 + this.R() * 3;
         const d = e.dir ?? new THREE.Vector3();
         this.vel[i3] = d.x * (0.7 + this.R() * 0.6) + (this.R() - 0.5) * 1.5;
         this.vel[i3 + 1] = up + d.y * (0.7 + this.R() * 0.6);
         this.vel[i3 + 2] = d.z * (0.7 + this.R() * 0.6) + (this.R() - 0.5) * 1.5;
         this.age[i] = 0;
-        this.life[i] = e.kind === 'spray' ? 4 + this.R() * 3 : 13 + this.R() * 8;
+        this.life[i] = e.kind === 'spray' ? 4 + this.R() * 3 : e.kind === 'jet' ? 3 + this.R() * 2.5 : 13 + this.R() * 8;
       }
       const t = this.age[i] / this.life[i];
       const k = e.kind;
       if (k === 'spray') this.vel[i3 + 1] -= 6 * dt;
-      else this.vel[i3 + 1] *= 1 - 0.08 * dt;
+      else this.vel[i3 + 1] *= 1 - (k === 'jet' ? 0.5 : 0.08) * dt;
       const h = Math.max(0, this.pos[i3 + 1] - e.pos.y);
       const drift = k === 'spray' ? 0.3 : Math.min(1, 0.25 + h / 120);
       this.pos[i3] += (this.vel[i3] + this.wind.x * drift) * dt;
       this.pos[i3 + 1] += this.vel[i3 + 1] * dt;
       this.pos[i3 + 2] += (this.vel[i3 + 2] + this.wind.z * drift) * dt;
       const base = k === 'spray' ? e.radius * 0.6 : e.radius;
-      this.size[i] = base * (k === 'spray' ? 0.8 + t * 2 : 0.9 + t * 2.4);
+      this.size[i] = k === 'jet' ? 2 + t * 26 : base * (k === 'spray' ? 0.8 + t * 2 : 0.9 + t * 2.4);
       const fadeIn = Math.min(1, t * 8);
-      this.alpha[i] = fadeIn * Math.pow(1 - t, 1.6) * (k === 'smoke' ? 0.35 : k === 'spray' ? 0.5 : 0.8);
+      this.alpha[i] = fadeIn * Math.pow(1 - t, 1.6) * (k === 'smoke' ? 0.35 : k === 'spray' ? 0.5 : k === 'jet' ? 0.9 : 0.8);
     }
     const g = this.points.geometry;
     (g.attributes.position as THREE.BufferAttribute).needsUpdate = true;

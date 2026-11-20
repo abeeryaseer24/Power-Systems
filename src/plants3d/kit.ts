@@ -6,7 +6,7 @@ import { bands, cladding, concrete, glow, ground, rng, roadLines, waterNormal, w
 // Sites call these builders; the Kit collects instances, colliders, light points
 // and steam emitters, and the scene engine brings them to life.
 
-export type Emitter = { pos: THREE.Vector3; radius: number; rate: number; kind: 'steam' | 'smoke' | 'spray'; tag?: string; dir?: THREE.Vector3 };
+export type Emitter = { pos: THREE.Vector3; radius: number; rate: number; base?: number; kind: 'steam' | 'smoke' | 'spray' | 'jet'; tag?: string; dir?: THREE.Vector3 };
 export type Collider = { x: number; z: number; hw: number; hd: number; rot: number } | { x: number; z: number; r: number };
 export type Cutaway = { plane: THREE.Plane; mats: THREE.Material[]; inside: THREE.Object3D };
 
@@ -34,6 +34,7 @@ export class Kit {
   beacons: THREE.Vector3[] = [];
   uplights: { pos: THREE.Vector3; at: THREE.Vector3 }[] = [];
   props: PropSpot[] = [];
+  yards: THREE.Vector3[] = [];
 
   /** Place a downloaded prop (loaded later, when the viewer is close). */
   prop(id: PropId, x: number, z: number, rot = this.R() * Math.PI * 2, s?: number) {
@@ -196,6 +197,13 @@ export class Kit {
       r.rotation.y = Math.PI / 2;
     }
     this.colliders.push({ x, z, hw: w / 2, hd: d / 2, rot: opts.rot ?? 0 });
+    // atmospheric dump / relief valve stacks on the roof: silent until a trip
+    for (const s of [-0.3, 0.3]) {
+      const p = V(s * w, 0, 0).applyAxisAngle(V(0, 1, 0), opts.rot ?? 0);
+      const top = grp.position.y + h + d * 0.06 + 6;
+      this.mesh(new THREE.CylinderGeometry(0.8, 0.8, 7, 12), this.steel('#7b8285'), x + p.x, top - 3.5, z + p.z);
+      this.emitters.push({ pos: V(x + p.x, top, z + p.z), radius: 1.2, rate: 0, kind: 'jet', tag: 'dump' });
+    }
     for (const s of [-1, 1]) {
       const p = V(s * (w / 2 + 6), 0, d * 0.3).applyAxisAngle(V(0, 1, 0), opts.rot ?? 0);
       this.clutter(x + p.x, z + p.z, 5);
@@ -446,6 +454,7 @@ export class Kit {
       }
     }
     this.colliders.push({ x, z, hw: w / 2, hd: d / 2, rot: o.rot ?? 0 });
+    this.yards.push(V(x, y0 + H * 0.6, z));
     for (let k = 0; k < 6; k++) this.lamps.push(P(-w / 2 + (w * k) / 5, 12, -d / 2));
   }
 

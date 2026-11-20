@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ELEVATIONS, SITES, siteById, type El } from '../plants3d/sites';
 import type { Mode, PlantScene, SiteDef } from '../plants3d/PlantScene';
+import { SCENARIOS, StressSim, type GridDef } from '../plants3d/stress';
 import '../plants.css';
 
 export default function Plants() {
@@ -96,6 +97,7 @@ function Viewer({ site }: { site: SiteDef }) {
   const [stop, setStop] = useState(0);
   const [facts, setFacts] = useState(!matchMedia('(max-width: 760px)').matches);
   const [play, setPlay] = useState(false);
+  const [stress, setStress] = useState(false);
   const touch = typeof window !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   useEffect(() => {
@@ -132,6 +134,12 @@ function Viewer({ site }: { site: SiteDef }) {
     return () => removeEventListener('keydown', k);
   }, [mode, stop]);
 
+  const openStress = () => {
+    if (!stress && s.grid?.era) setEra(s.grid.era);
+    if (stress) eng.current?.setStress(null);
+    setStress(!stress);
+    setFacts(false);
+  };
   const go = (m: Mode) => { eng.current?.setMode(m); setMode(m); };
   const s = site;
   const st = eng.current?.stops[stop];
@@ -158,6 +166,8 @@ function Viewer({ site }: { site: SiteDef }) {
           </dl>
         )}
       </aside>
+
+      {stress && s.grid && <StressPanel grid={s.grid} eng={eng} onClose={openStress} />}
 
       {mode === 'tour' && st && (
         <section className="pv-caption" aria-live="polite">
@@ -199,11 +209,76 @@ function Viewer({ site }: { site: SiteDef }) {
             {s.eras.map((e) => <button key={e.id} className={era === e.id ? 'on' : ''} onClick={() => setEra(e.id)}>{e.label}</button>)}
           </div>
         )}
+        {s.grid && <button className={`pv-cut pv-stress-btn ${stress ? 'on' : ''}`} onClick={openStress} aria-pressed={stress}>Stress test</button>}
         {s.cutaway && (
           <button className={`pv-cut ${cut ? 'on' : ''}`} onClick={() => setCut(!cut)} aria-pressed={cut}>{cut ? 'Close cutaway' : s.cutaway}</button>
         )}
       </nav>
     </main>
+  );
+}
+
+function StressPanel({ grid, eng, onClose }: { grid: GridDef; eng: React.RefObject<PlantScene | null>; onClose: () => void }) {
+  const sim = useRef(new StressSim(grid));
+  const [, tick] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  useEffect(() => {
+    let last = performance.now(), n = 0, raf = 0;
+    const loop = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000) * speed;
+      last = now;
+      for (let i = 0; i < 4; i++) sim.current.step(dt / 4);
+      eng.current?.setStress(sim.current.s);
+      if (++n % 4 === 0) tick((x) => x + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [speed, eng]);
+  useEffect(() => () => eng.current?.setStress(null), [eng]);
+  const st = sim.current.s;
+  const f0 = grid.f0, dev = st.f - f0;
+  const W = 300, H = 90, span = 1.6;
+  const y = (f: number) => H / 2 - ((f - f0) / span) * (H / 2);
+  const pts = st.trace.map((f, i) => `${(i / 359) * W},${Math.max(0, Math.min(H, y(f)))}`).join(' ');
+  const band = Math.abs(dev) > 0.8 ? 'bad' : Math.abs(dev) > 0.2 ? 'warn' : 'ok';
+  return (
+    <aside className="pv-stress" aria-label="Stress test">
+      <header>
+        <span>Stress test · {grid.name}</span>
+        <button onClick={onClose} aria-label="Close stress test">×</button>
+      </header>
+      <div className={`pv-freq ${band}`}>
+        <strong>{st.f.toFixed(3)}</strong><span>Hz</span>
+        <em>{dev >= 0 ? '+' : ''}{(dev * 1000).toFixed(0)} mHz</em>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="pv-trace" aria-hidden="true">
+        <line x1="0" x2={W} y1={y(f0)} y2={y(f0)} className="t-nom" />
+        <line x1="0" x2={W} y1={y(f0 * 0.976)} y2={y(f0 * 0.976)} className="t-ufls" />
+        <text x="4" y={y(f0 * 0.976) - 3}>UFLS {(f0 * 0.976).toFixed(1)} Hz</text>
+        <polyline points={pts} />
+      </svg>
+      <dl>
+        <div><dt>This plant</dt><dd>{Math.round(st.plantMW).toLocaleString()} MW</dd></div>
+        <div><dt>{grid.kind === 'hydro' ? 'Turbine flow' : grid.kind === 'thermal' ? 'Boiler firing' : 'Reactor heat'}</dt><dd>{(st.heat * 100).toFixed(1)} %</dd></div>
+        <div><dt>{grid.kind === 'hydro' ? 'Spillway' : 'Dump valves'}</dt><dd>{st.dump > 0.05 ? 'Open' : 'Shut'}</dd></div>
+        <div><dt>Station supply</dt><dd className={st.lights < 0.5 ? 'bad' : ''}>{st.lights < 0.1 ? 'Dark' : st.diesel ? 'Diesels' : 'Grid'}</dd></div>
+        <div><dt>Load shed</dt><dd className={st.shed > 0 ? 'bad' : ''}>{Math.round(st.shed).toLocaleString()} MW</dd></div>
+      </dl>
+      <div className="pv-sc">
+        {SCENARIOS.map((sc) => <button key={sc.id} onClick={() => sim.current.fire(sc.id)} title={sc.note}>{sc.label}</button>)}
+      </div>
+      <div className="pv-sc-foot">
+        <div className="pv-seg" role="group" aria-label="Speed">
+          {[1, 4, 16].map((v) => <button key={v} className={speed === v ? 'on' : ''} onClick={() => setSpeed(v)}>×{v}</button>)}
+        </div>
+        <button className="pv-reset" onClick={() => { sim.current = new StressSim(grid); tick((x) => x + 1); }}>Reset</button>
+      </div>
+      <ol className="pv-log">
+        {st.log.map((l) => <li key={l.t + l.text} className={l.bad ? 'bad' : ''}><time>{l.t.toFixed(1)} s</time>{l.text}</li>)}
+      </ol>
+      <p className="pv-hint2">Try it at night: the station goes dark on loss of offsite power.</p>
+    </aside>
   );
 }
 
