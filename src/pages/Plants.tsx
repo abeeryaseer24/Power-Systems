@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ELEVATIONS, SITES, siteById, type El } from '../plants3d/sites';
 import type { Mode, PlantScene, SiteDef } from '../plants3d/PlantScene';
 import { SCENARIOS, StressSim, type GridDef } from '../plants3d/stress';
+import type { Lapse } from '../plants3d/build';
 import '../plants.css';
 
 export default function Plants() {
@@ -88,6 +89,8 @@ const HOURS = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String
 function Viewer({ site }: { site: SiteDef }) {
   const host = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLElement>(null);
+  const main = useRef<HTMLElement>(null);
   const eng = useRef<PlantScene | null>(null);
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<Mode>('orbit');
@@ -98,6 +101,7 @@ function Viewer({ site }: { site: SiteDef }) {
   const [facts, setFacts] = useState(!matchMedia('(max-width: 760px)').matches);
   const [play, setPlay] = useState(false);
   const [stress, setStress] = useState(false);
+  const [lapse, setLapse] = useState(false);
   const touch = typeof window !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   useEffect(() => {
@@ -117,6 +121,13 @@ function Viewer({ site }: { site: SiteDef }) {
     return () => { alive = false; clearTimeout(t); e?.dispose(); eng.current = null; };
   }, [site]);
 
+  // panels stack above the control bar, whatever height it wraps to
+  useEffect(() => {
+    if (!bar.current || !main.current) return;
+    const ro = new ResizeObserver(() => main.current?.style.setProperty('--bar-h', `${bar.current!.offsetHeight}px`));
+    ro.observe(bar.current);
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => { eng.current?.setHour(hour); }, [hour, ready]);
   useEffect(() => { eng.current?.setEra(era); }, [era, ready]);
   useEffect(() => { eng.current?.setCutaway(cut); }, [cut, ready]);
@@ -134,7 +145,12 @@ function Viewer({ site }: { site: SiteDef }) {
     return () => removeEventListener('keydown', k);
   }, [mode, stop]);
 
+  const openLapse = () => {
+    if (!lapse) { setStress(false); eng.current?.setStress(null); if (s.eras) setEra(s.eras[0].id); }
+    setLapse(!lapse);
+  };
   const openStress = () => {
+    if (!stress && lapse) setLapse(false);
     if (!stress && s.grid?.era) setEra(s.grid.era);
     if (stress) eng.current?.setStress(null);
     setStress(!stress);
@@ -146,7 +162,7 @@ function Viewer({ site }: { site: SiteDef }) {
   const night = hour < 5.5 || hour > 19;
 
   return (
-    <main id="main" className={`pv-viewer ${night ? 'is-night' : ''}`}>
+    <main id="main" ref={main} className={`pv-viewer ${night ? 'is-night' : ''}`}>
       <div className="pv-canvas" ref={host} />
       <div className="pv-overlay" ref={overlay} aria-hidden="true" />
       {!ready && <div className="pv-loading" role="status"><span>Pouring concrete</span><small>{s.name}</small></div>}
@@ -167,6 +183,7 @@ function Viewer({ site }: { site: SiteDef }) {
         )}
       </aside>
 
+      {lapse && s.lapse && <LapsePanel lapse={s.lapse} eng={eng} onClose={openLapse} />}
       {stress && s.grid && <StressPanel grid={s.grid} eng={eng} onClose={openStress} />}
 
       {mode === 'tour' && st && (
@@ -186,7 +203,7 @@ function Viewer({ site }: { site: SiteDef }) {
       )}
       {mode === 'walk' && touch && <Joystick onMove={(x, y) => eng.current?.setMove(x, y)} />}
 
-      <nav className="pv-bar" aria-label="Viewer controls">
+      <nav className="pv-bar" ref={bar} aria-label="Viewer controls">
         <div className="pv-seg" role="group" aria-label="Mode">
           {(['orbit', 'tour', 'walk', 'axo'] as Mode[]).map((m) => (
             <button key={m} className={mode === m ? 'on' : ''} onClick={() => go(m)} aria-pressed={mode === m}>
@@ -209,6 +226,7 @@ function Viewer({ site }: { site: SiteDef }) {
             {s.eras.map((e) => <button key={e.id} className={era === e.id ? 'on' : ''} onClick={() => setEra(e.id)}>{e.label}</button>)}
           </div>
         )}
+        {s.lapse && <button className={`pv-cut pv-lapse-btn ${lapse ? 'on' : ''}`} onClick={openLapse} aria-pressed={lapse}>Time-lapse</button>}
         {s.grid && <button className={`pv-cut pv-stress-btn ${stress ? 'on' : ''}`} onClick={openStress} aria-pressed={stress}>Stress test</button>}
         {s.cutaway && (
           <button className={`pv-cut ${cut ? 'on' : ''}`} onClick={() => setCut(!cut)} aria-pressed={cut}>{cut ? 'Close cutaway' : s.cutaway}</button>
@@ -279,6 +297,50 @@ function StressPanel({ grid, eng, onClose }: { grid: GridDef; eng: React.RefObje
       </ol>
       <p className="pv-hint2">Try it at night: the station goes dark on loss of offsite power.</p>
     </aside>
+  );
+}
+
+function LapsePanel({ lapse, eng, onClose }: { lapse: Lapse; eng: React.RefObject<PlantScene | null>; onClose: () => void }) {
+  const [p, setP] = useState(0);
+  const [run, setRun] = useState(true);
+  useEffect(() => { eng.current?.setBuild(p); }, [p, eng]);
+  useEffect(() => () => eng.current?.setBuild(null), [eng]);
+  useEffect(() => {
+    if (!run) return;
+    let last = performance.now(), raf = 0;
+    const loop = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setP((x) => {
+        const n = Math.min(1, x + dt / 45);
+        if (n >= 1) setRun(false);
+        return n;
+      });
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [run]);
+  const year = lapse.from + p * (lapse.to - lapse.from);
+  const mark = [...lapse.marks].reverse().find(([at]) => p >= at);
+  return (
+    <section className="pv-lapse" aria-label="Construction time-lapse">
+      <div className="pv-lapse-head">
+        <strong>{Math.floor(year)}</strong>
+        <p key={mark?.[1]}>{mark?.[1]}</p>
+        <button onClick={onClose} aria-label="Close time-lapse">×</button>
+      </div>
+      <div className="pv-lapse-row">
+        <button className="pv-play" onClick={() => { if (p >= 1) setP(0); setRun(!run); }} aria-label={run ? 'Pause' : 'Play'}>{run ? '❚❚' : '▶'}</button>
+        <div className="pv-lapse-track">
+          <input type="range" min={0} max={1} step={0.001} value={p} onChange={(e) => { setRun(false); setP(Number(e.target.value)); }} aria-label="Construction progress" />
+          <div className="pv-ticks" aria-hidden="true">
+            {lapse.marks.map(([at, t]) => <span key={t} style={{ left: `${at * 100}%` }} />)}
+          </div>
+        </div>
+        <span className="pv-lapse-end">{Math.floor(lapse.to)}</span>
+      </div>
+    </section>
   );
 }
 

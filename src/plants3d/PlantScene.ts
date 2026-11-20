@@ -11,6 +11,7 @@ import { Kit, type Collider, type Emitter } from './kit';
 import { glow, puff, rng } from './textures';
 import type { Label } from './interiors';
 import type { GridDef, StressState } from './stress';
+import { BuildLapse, type Lapse } from './build';
 
 export type Stop = { title: string; body: string; cam: [number, number, number]; look: [number, number, number] };
 export type Mode = 'orbit' | 'tour' | 'walk' | 'axo';
@@ -26,6 +27,7 @@ export type SiteDef = {
   eras?: { id: string; label: string }[];
   cutaway?: string;
   grid?: GridDef;
+  lapse?: Lapse;
   focus: [number, number, number];
   cam: [number, number, number];
   spawn: [number, number];
@@ -34,7 +36,7 @@ export type SiteDef = {
   fog?: number;
   wind?: [number, number];
   groundY: (x: number, z: number) => number;
-  build: (k: Kit, labels: Label[]) => { stops: Stop[]; steam?: (tag: string | undefined, era: string) => boolean };
+  build: (k: Kit, labels: Label[]) => { stops: Stop[]; steam?: (tag: string | undefined, era: string) => boolean; onBuild?: (p: number | null) => void };
 };
 
 const tmp = new THREE.Vector3();
@@ -88,6 +90,9 @@ export class PlantScene {
   private arcs: THREE.Sprite[] = [];
   private arcLight = new THREE.PointLight('#bfd8ff', 0, 900, 1.6);
   private lights = 1;
+  private lapseObj: BuildLapse | null = null;
+  private buildP: number | null = null;
+  private onBuild?: (p: number | null) => void;
 
   constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef) {
     const mobile = matchMedia('(max-width: 760px)').matches;
@@ -136,7 +141,13 @@ export class PlantScene {
     const built = site.build(this.kit, this.labels);
     this.stops = built.stops;
     this.steamRule = built.steam;
+    this.onBuild = built.onBuild;
     this.kit.finish();
+    // compile the time-lapse height test into the shaders up front, so opening it never stalls
+    if (site.lapse) {
+      this.lapseObj = new BuildLapse(this.kit, this.kit.root, new THREE.Vector2(site.focus[0], site.focus[2]), site.extent * 1.15, site.lapse);
+      this.lapseObj.prepare();
+    }
     this.scene.add(this.kit.root);
     this.kit.root.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial;
@@ -290,7 +301,7 @@ export class PlantScene {
   }
 
   private applyNight() {
-    const n = this.night * this.lights;
+    const n = this.night * this.lights * (this.buildP === null ? 1 : THREE.MathUtils.smoothstep(this.buildP, 0.9, 0.97));
     for (const { m, k } of this.kit.nightMats) m.emissiveIntensity = k * n;
     (this.lampPts.material as THREE.PointsMaterial).opacity = n;
     (this.floods.material as THREE.MeshBasicMaterial).opacity = n * 0.32;
@@ -381,6 +392,20 @@ export class PlantScene {
     this.arcLight.intensity = arc * 3e5;
   }
 
+  /** Construction time-lapse: p in 0..1 from empty site to commissioning, null to leave. */
+  setBuild(p: number | null) {
+    if (p !== null && !this.lapseObj) {
+      this.lapseObj = new BuildLapse(this.kit, this.kit.root, new THREE.Vector2(this.site.focus[0], this.site.focus[2]), this.site.extent * 1.15, this.site.lapse ?? { from: 0, to: 1, marks: [] });
+    }
+    if (p !== null && this.buildP === null) this.plumes.clear();
+    this.buildP = p;
+    this.lapseObj?.set(p);
+    this.sun.castShadow = p === null;
+    this.onBuild?.(p);
+    this.applyRates();
+    this.applyNight();
+  }
+
   private applyRates() {
     const s = this.stress, hydro = this.site.grid?.kind === 'hydro';
     for (const e of this.kit.emitters) {
@@ -388,6 +413,7 @@ export class PlantScene {
       if (e.tag === 'dump') e.rate = s ? s.dump : 0;
       else if (hydro && e.tag === 'flood') e.rate = Math.max(base, s ? s.dump : 0);
       else e.rate = s ? base * s.steam : base;
+      if (this.buildP !== null && this.buildP < 0.97) e.rate = 0;
     }
   }
 
@@ -528,6 +554,11 @@ class Plumes {
     });
     this.points = new THREE.Points(g, this.mat);
     this.points.frustumCulled = false;
+  }
+
+  clear() {
+    this.alpha.fill(0);
+    for (let i = 0; i < this.age.length; i++) this.age[i] = this.life[i] + 1;
   }
 
   setLight(sun: THREE.Color, night: number, _dir: THREE.Vector3) {

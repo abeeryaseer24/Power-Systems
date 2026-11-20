@@ -25,6 +25,7 @@ export const TMI: SiteDef = {
   facts: [['Units', '2 × B&W PWR'], ['Unit 2', '906 MWe, 1978–79'], ['Unit 1', '819 MWe, 1974–2019'], ['Towers', '4 × 113 m'], ['Containment', '58 m, 1.2 m wall']],
   eras: [{ id: 'today', label: 'Today' }, { id: '1979', label: '28 Mar 1979' }, { id: 'u1', label: '1985–2019' }],
   cutaway: 'Open Unit 2',
+  lapse: { from: 1968, to: 1978.3, marks: [[0, '1968: ground broken on the island'], [0.15, 'Containment base mats poured'], [0.4, 'Tower shells climb, one lift a day'], [0.75, 'Unit 1 commercial operation, 1974'], [0.97, 'Unit 2 online, December 1978']] },
   grid: { name: 'PJM, 1979', f0: 60, loadMW: 32000, H: 5, unitMW: 906, units: 1, kind: 'pwr', era: '1979', largestOther: 1150 },
   focus: [0, 30, 0],
   cam: [620, 260, 700],
@@ -96,6 +97,7 @@ export const ROOPPUR: SiteDef = {
   facts: [['Units', '2 × VVER-1200'], ['Output', '2 × 1,200 MWe'], ['Containment', 'Double wall, ~70 m'], ['Towers', '4 × ~170 m'], ['Grid', '400 kV and 230 kV']],
   eras: [{ id: 'now', label: 'Unit 1 online' }, { id: 'full', label: 'Both units' }],
   cutaway: 'Open Unit 1',
+  lapse: { from: 2017, to: 2026, marks: [[0, 'November 2017: first concrete for Unit 1'], [0.15, 'Containment walls rise in jump-formed lifts'], [0.4, 'Dome lifted on by the 3,200 t crawler crane'], [0.65, 'Cooling tower shells topped out'], [0.8, 'October 2023: fuel delivered'], [0.97, 'Unit 1 at power']] },
   grid: { name: 'Bangladesh national grid', f0: 50, loadMW: 15500, H: 4, unitMW: 1200, units: 2, kind: 'pwr', era: 'full', largestOther: 660 },
   focus: [140, 40, 0],
   cam: [-760, 260, 260],
@@ -175,6 +177,7 @@ export const FUKUSHIMA: SiteDef = {
   facts: [['Units', '6 × BWR (Mark I / II)'], ['Total', '4,696 MWe'], ['Site grade', '10 m (units 1–4)'], ['Tsunami', '~14–15 m'], ['Stacks', '3 × 120 m']],
   eras: [{ id: 'built', label: 'Before 2011' }, { id: 'today', label: 'Today' }],
   cutaway: 'Open Unit 2',
+  lapse: { from: 1966, to: 1979.5, marks: [[0, '1966: the 35 m bluff is cut down to 10 m'], [0.12, 'Unit 1 reactor building rises'], [0.35, 'Unit 1 online, March 1971'], [0.7, 'Units 2 to 5 follow, 1974–78'], [0.97, 'Unit 6 online, October 1979']] },
   grid: { name: 'TEPCO (50 Hz east Japan)', f0: 50, loadMW: 48000, H: 5.5, unitMW: 784, units: 6, kind: 'bwr', era: 'built', largestOther: 1356 },
   focus: [20, 30, -100],
   cam: [900, 300, 380],
@@ -284,6 +287,7 @@ export const CHERNOBYL: SiteDef = {
   facts: [['Units', '4 × RBMK-1000'], ['Each', '1,000 MWe, 3,200 MWt'], ['Turbine hall', '~800 m long'], ['New Safe Confinement', '257 m span, 108 m high'], ['Cooling', '22 km² pond']],
   eras: [{ id: 'today', label: 'Today' }, { id: '1985', label: '1985' }],
   cutaway: 'Open units 3 and 4',
+  lapse: { from: 1970, to: 2016.9, end: 0.3, marks: [[0, '1970: construction begins beside the Pripyat'], [0.08, 'Unit 1 online, 1977'], [0.29, 'Unit 4 online, December 1983'], [0.33, '26 April 1986: unit 4 explodes'], [0.86, '2010–16: the arch is assembled to the west'], [0.94, 'November 2016: 36,000 t slid 327 m into place']] },
   grid: { name: 'Soviet unified grid, Kyiv region', f0: 50, loadMW: 26000, H: 6, unitMW: 1000, units: 4, kind: 'rbmk', era: '1985', largestOther: 1000 },
   focus: [-100, 30, 0],
   cam: [700, 320, 900],
@@ -342,7 +346,9 @@ export const CHERNOBYL: SiteDef = {
     nsc.position.set(90, chY(90, 0), 0);
     nsc.castShadow = true;
     nsc.receiveShadow = true;
-    today.add(nsc);
+    const nscG = new THREE.Group();
+    today.add(nscG);
+    nscG.add(nsc);
     const endShape = new THREE.Shape(curve(half - depth / 2, H - depth / 2));
     const endMat = k.clad('#b3b8b9', 15).clone();
     for (const s of [-1, 1]) {
@@ -350,7 +356,7 @@ export const CHERNOBYL: SiteDef = {
       e.rotation.y = Math.PI / 2;
       e.position.set(90 + (s * L) / 2, chY(90, 0), 0);
       e.castShadow = true;
-      today.add(e);
+      nscG.add(e);
     }
     // the Shelter (1986 sarcophagus) inside: stepped cascade wall, buttresses, the ruin
     const shelter = new THREE.Group();
@@ -380,7 +386,7 @@ export const CHERNOBYL: SiteDef = {
     nscIn.add(shelter);
     nscIn.position.set(90, chY(90, 0), 0);
     nscIn.visible = false;
-    today.add(nscIn);
+    nscG.add(nscIn);
     k.cutaways.push({ plane: cut, mats: [steelPanel, endMat], inside: nscIn });
     labels.push({ text: 'The Shelter, 1986: cascade wall', obj: shelter, at: V(0, 60, -36) });
     labels.push({ text: 'New Safe Confinement, 2016', obj: nscIn, at: V(0, 112, -20) });
@@ -408,6 +414,12 @@ export const CHERNOBYL: SiteDef = {
     k.trees(22000, [-3200, -3200, 3200, 2400], avoid, 'pine', 41);
     return {
       steam: () => false,
+      onBuild: (p) => {
+        // before 2010 there is no arch; it is built 327 m west, then slid east
+        nscG.visible = p === null || p > 0.86;
+        nscG.position.x = p === null ? 0 : -327 * (1 - THREE.MathUtils.smoothstep(p, 0.92, 0.99));
+        stack34.visible = p !== null && p < 0.9;
+      },
       stops: [
         { title: 'Chernobyl Nuclear Power Plant', body: 'Four RBMK-1000 reactors in a single building nearly a kilometre long, cooled by a 22 km² artificial pond. Units 5 and 6 were half-built when unit 4 exploded.', cam: [900, 380, 1100], look: [-150, 30, 0] },
         { title: 'The New Safe Confinement', body: 'Assembled away from the reactor and slid 327 m into place on rails in November 2016. It is 257 m across, 108 m high and weighs 36,000 tonnes, designed to last a century and to let the ruin beneath be taken apart.', cam: [360, 70, 260], look: [90, 50, 0] },

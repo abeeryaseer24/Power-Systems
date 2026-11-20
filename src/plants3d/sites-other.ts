@@ -29,6 +29,7 @@ export const DRAX: SiteDef = {
   blurb: 'Once the largest coal plant in western Europe. Twelve cooling towers, a 259 m chimney and four white domes that hold wood pellets shipped across the Atlantic.',
   facts: [['Capacity', '~2,600 MW (biomass)'], ['Peak', '3,960 MW, 6 units'], ['Towers', '12 × 114 m'], ['Chimney', '259 m'], ['Domes', '4 × 50 m, 75,000 t each']],
   eras: [{ id: 'today', label: 'Biomass, today' }, { id: 'coal', label: 'Coal, 2010' }],
+  lapse: { from: 1967, to: 2014, end: 0.42, marks: [[0, '1967: work starts on the Yorkshire coalfield'], [0.16, 'The 259 m chimney slipformed in one pour'], [0.42, 'Phase two complete: six units, 3,960 MW, 1986'], [0.5, '1988–95: flue-gas desulphurisation added'], [0.9, '2012–14: biomass domes and rail unloading built']] },
   grid: { name: 'GB transmission system', f0: 50, loadMW: 29000, H: 3, unitMW: 645, units: 4, kind: 'thermal', era: 'today', largestOther: 1320 },
   focus: [0, 40, -40],
   cam: [900, 360, 900],
@@ -61,6 +62,7 @@ export const DRAX: SiteDef = {
       d.castShadow = d.receiveShadow = true;
       k.root.add(d);
       k.colliders.push({ x, z: 520, r: 32 });
+      k.jobs.push({ x, z: 520, r: 34, kind: 'late' });
       k.strut(V(x, 48, 500), V(x * 0.4, 60, 300), 4, k.clad('#c7cbcc', 3), 'conv');
       k.strut(V(x, 52, 520), V(x, 52, 560), 3, k.clad('#c7cbcc', 3), 'conv');
     }
@@ -139,6 +141,7 @@ export const THREE_GORGES: SiteDef = {
   blurb: 'The largest power station on Earth: 22.5 GW from 32 Francis turbines, behind a concrete wall 2.3 km long and 181 m high on the Yangtze.',
   facts: [['Capacity', '22,500 MW'], ['Units', '32 × 700 MW + 2 × 50 MW'], ['Dam', '2,335 m long, 181 m high'], ['Reservoir', '175 m normal pool'], ['Ship lock', '5 steps, 113 m lift']],
   eras: [{ id: 'normal', label: 'Normal flow' }, { id: 'flood', label: 'Flood release' }],
+  lapse: { from: 1994, to: 2012, marks: [[0, 'December 1994: construction formally begins'], [0.2, '1997: the Yangtze is diverted'], [0.45, '2003: first impoundment to 135 m, first units online'], [0.7, '2006: dam body topped out at 185 m'], [0.88, '2010: reservoir reaches 175 m'], [0.97, '2012: the last of 32 main units online']] },
   grid: { name: 'Central China grid', f0: 50, loadMW: 190000, H: 5, unitMW: 700, units: 26, kind: 'hydro', era: 'normal', largestOther: 6400 },
   focus: [60, 120, 0],
   cam: [2600, 700, 1500],
@@ -150,7 +153,7 @@ export const THREE_GORGES: SiteDef = {
   groundY: tgY,
   build(k) {
     k.terrain(14000, { grass: '#56693a', dry: '#7d7a4f', earth: '#7b6650' }, 300, 0, 0, tgTerrain);
-    k.water(-4000, 0, 8000, 14000, 175, '#3b5552');
+    const reservoir = k.water(-4000, 0, 8000, 14000, 175, '#3b5552');
     k.water(4000, 0, 8000, 14000, 66, '#56624f');
     // the gravity section: near-vertical upstream face, 0.7 slope downstream
     const prof = new THREE.Shape([
@@ -164,6 +167,7 @@ export const THREE_GORGES: SiteDef = {
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 40, uv.getY(i) / 40);
     k.mesh(dg, k.concrete('#c3beb2', 1, 61, 20));
     k.colliders.push({ x: -11, z: (DAM_Z0 + DAM_Z1) / 2, hw: 1, hd: L / 2, rot: 0 });
+    k.jobs.push({ x: 52, z: (DAM_Z0 + DAM_Z1) / 2, hw: 66, hd: L / 2 + 2, rot: 0, kind: 'dam' });
     // crest parapets and lamps
     const para = k.concrete('#d2cdc2', 10, 62);
     for (const s of [-1, 1]) k.mesh(new THREE.BoxGeometry(0.6, 1.2, L), para, s * 9.7, CREST + 0.6, (DAM_Z0 + DAM_Z1) / 2);
@@ -240,6 +244,10 @@ export const THREE_GORGES: SiteDef = {
     k.trees(7000, [-6000, -6000, 6000, 6000], avoid, 'mixed', 71);
     return {
       steam: (tag, era) => (tag === 'flood' ? era === 'flood' : true),
+      onBuild: (p) => {
+        // the river runs at 66 m until impoundment, then the pool climbs to 175 m
+        reservoir.position.y = p === null ? 175 : 66 + 69 * THREE.MathUtils.smoothstep(p, 0.42, 0.47) + 40 * THREE.MathUtils.smoothstep(p, 0.6, 0.88);
+      },
       stops: [
         { title: 'Three Gorges', body: 'A concrete gravity dam across the Yangtze, finished in 2006, with the last unit commissioned in 2012. It holds back a reservoir 600 km long and generates more electricity than any other power station on Earth.', cam: [2800, 800, 1800], look: [60, 100, 0] },
         { title: 'On the crest', body: 'Walk mode starts you here, 185 m above sea level. The upstream face drops 110 m to the reservoir floor. Red gantry cranes travel the crest to lift intake gates and trash racks.', cam: [60, 205, -420], look: [0, 190, 200] },

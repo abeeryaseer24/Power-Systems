@@ -115,9 +115,9 @@
   .pv-seg button, .pv-cut { font-size: 13px; padding: 6px 8px; }
   .pv-time input { width: 110px; }
   .pv-quick { display: none; }
-  .pv-caption { left: 10px; right: 10px; width: auto; top: auto; bottom: 150px; padding: 14px; max-height: 38vh; overflow: auto; }
+  .pv-caption { left: 10px; right: 10px; width: auto; top: auto; bottom: calc(var(--bar-h, 90px) + 18px); padding: 14px; max-height: 38vh; overflow: auto; }
   .pv-caption h2 { font-size: 24px; }
-  .pv-joy { bottom: 160px; }
+  .pv-joy { bottom: calc(var(--bar-h, 90px) + 30px); }
   .pv-label { font-size: 12px; }
 }
 
@@ -157,5 +157,24 @@
 .pv-stress-btn { border-color: var(--trip); color: var(--trip); }
 .pv-stress-btn.on { background: var(--trip); color: var(--night); }
 @media (max-width: 760px) {
-  .pv-stress { top: auto; bottom: 120px; left: 10px; right: 10px; width: auto; max-height: 46vh; }
+  .pv-stress { top: auto; bottom: calc(var(--bar-h, 90px) + 18px); left: 10px; right: 10px; width: auto; max-height: 46vh; }
+}
+
+/* ---------------------------------------------------------------- time-lapse */
+.pv-lapse { position: absolute; left: 50%; bottom: calc(var(--bar-h, 60px) + 28px); transform: translateX(-50%); width: min(720px, calc(100% - 28px)); padding: 12px 16px 10px; background: rgba(8, 16, 28, 0.72); backdrop-filter: blur(10px); border-top: 2px solid var(--glaze); }
+.pv-lapse-head { display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; }
+.pv-lapse-head strong { font-family: var(--display); font-weight: 900; font-size: 54px; line-height: 0.9; font-variant-numeric: tabular-nums; color: var(--glaze); }
+.pv-lapse-head p { margin: 0; font-family: var(--display); font-weight: 600; font-size: 20px; line-height: 1.15; animation: pv-in 0.5s ease both; }
+.pv-lapse-head button { all: unset; cursor: pointer; font-size: 22px; padding: 0 4px; align-self: start; }
+.pv-lapse-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.pv-lapse-track { position: relative; flex: 1; }
+.pv-lapse-track input { width: 100%; accent-color: var(--glaze); }
+.pv-ticks span { position: absolute; top: -6px; width: 1px; height: 6px; background: var(--glaze); opacity: 0.7; }
+.pv-lapse-end { font-family: var(--display); font-weight: 600; color: var(--steel); }
+.pv-lapse-btn { border-color: var(--glaze); color: var(--glaze); }
+.pv-lapse-btn.on { background: var(--glaze); color: var(--night); }
+@media (max-width: 760px) {
+  .pv-lapse { bottom: calc(var(--bar-h, 90px) + 18px); }
+  .pv-lapse-head strong { font-size: 38px; }
+  .pv-lapse-head p { font-size: 15px; }
 }

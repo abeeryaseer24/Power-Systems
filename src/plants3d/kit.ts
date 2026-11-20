@@ -8,6 +8,7 @@ import { bands, cladding, concrete, glow, ground, rng, roadLines, waterNormal, w
 
 export type Emitter = { pos: THREE.Vector3; radius: number; rate: number; base?: number; kind: 'steam' | 'smoke' | 'spray' | 'jet'; tag?: string; dir?: THREE.Vector3 };
 export type Collider = { x: number; z: number; hw: number; hd: number; rot: number } | { x: number; z: number; r: number };
+export type Job = Collider & { kind: string };
 export type Cutaway = { plane: THREE.Plane; mats: THREE.Material[]; inside: THREE.Object3D };
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -28,6 +29,8 @@ export function worldBox(w: number, h: number, d: number, tile = 8) {
 export class Kit {
   root = new THREE.Group();
   colliders: Collider[] = [];
+  /** Construction footprints, in build order, for the time-lapse. */
+  jobs: Job[] = [];
   emitters: Emitter[] = [];
   lamps: THREE.Vector3[] = [];
   floods: { pos: THREE.Vector3; r: number }[] = [];
@@ -158,6 +161,7 @@ export class Kit {
       }
     }
     if (opts.collide !== false) this.colliders.push({ x, z, hw: w / 2, hd: d / 2, rot: opts.rot ?? 0 });
+    this.jobs.push({ x, z, hw: w / 2 + 1, hd: d / 2 + 1, rot: opts.rot ?? 0, kind: h > 45 ? 'tall' : 'box' });
     return m;
   }
 
@@ -197,6 +201,7 @@ export class Kit {
       r.rotation.y = Math.PI / 2;
     }
     this.colliders.push({ x, z, hw: w / 2, hd: d / 2, rot: opts.rot ?? 0 });
+    this.jobs.push({ x, z, hw: w / 2 + 2, hd: d / 2 + 2, rot: opts.rot ?? 0, kind: 'hall' });
     // atmospheric dump / relief valve stacks on the roof: silent until a trip
     for (const s of [-0.3, 0.3]) {
       const p = V(s * w, 0, 0).applyAxisAngle(V(0, 1, 0), opts.rot ?? 0);
@@ -271,6 +276,7 @@ export class Kit {
     if (o.steam !== false && (o.built ?? 1) >= 1) this.emitters.push({ pos: V(x, y0 + top, z), radius: r(top) * 0.95, rate: 1, kind: 'steam', tag: o.tag });
     if (o.h > 90 && (o.built ?? 1) >= 1) for (let k = 0; k < 4; k++) this.beacons.push(V(x + Math.cos(k * 1.57) * r(top), y0 + top + 1, z + Math.sin(k * 1.57) * r(top)));
     this.colliders.push({ x, z, r: rb + 3 });
+    this.jobs.push({ x, z, r: rb + 4, kind: 'tower' });
     this.uplights.push({ pos: V(x + rb + 20, y0 + 2, z + rb * 0.5), at: V(x, y0 + top * 0.55, z) });
     return { grp, rTop: r(top), top };
   }
@@ -319,6 +325,7 @@ export class Kit {
       grp.add(o.inside);
     }
     this.colliders.push({ x, z, r: o.r + 1 });
+    this.jobs.push({ x, z, r: o.r + 3, kind: 'containment' });
     for (let k = 0; k < 6; k++) this.floods.push({ pos: V(x + Math.cos(k) * (o.r + 6), y0, z + Math.sin(k) * (o.r + 6)), r: 14 });
     for (const a of [0.8, 2.4]) this.uplights.push({ pos: V(x + Math.cos(a) * (o.r + 18), y0 + 2, z + Math.sin(a) * (o.r + 18)), at: V(x, y0 + o.h * 0.8, z) });
     return { grp, mat };
@@ -350,6 +357,7 @@ export class Kit {
     this.uplights.push({ pos: V(x + o.rb + 14, y0 + 2, z + 6), at: V(x, y0 + o.h * 0.6, z) });
     if (o.smoke) this.emitters.push({ pos: V(x, y0 + o.h, z), radius: o.rt * 0.7, rate: 0.5, kind: 'smoke', tag: o.tag });
     this.colliders.push({ x, z, r: o.rb + 1 });
+    this.jobs.push({ x, z, r: o.rb + 4, kind: 'chimney' });
   }
 
   /** Exhaust stack in a steel lattice frame, as at Fukushima Daiichi and Chernobyl. */
@@ -373,6 +381,7 @@ export class Kit {
     }
     this.beacons.push(V(x, y0 + h + 1, z), V(x + top / 2, y0 + h * 0.6, z));
     this.colliders.push({ x, z, r: base / 2 });
+    this.jobs.push({ x, z, r: base / 2 + 3, kind: 'chimney' });
   }
 
   /** A thin box from a to b, instanced. Used for every lattice member in the scene. */
@@ -412,6 +421,7 @@ export class Kit {
       for (let j = 0; j < 7; j++) this.mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.18, 12), this.plain('#7a4a2e', 0.4), -3 + k * 3, 8.6 + j * 0.65, 1, grp, false);
     }
     this.colliders.push({ x, z, hw: 7 * s, hd: 4 * s, rot });
+    this.jobs.push({ x, z, hw: 8 * s, hd: 8 * s, rot, kind: 'yard' });
     const off = V(0, 0, 6.5 * s).applyAxisAngle(V(0, 1, 0), rot);
     this.prop('utility_box_02', x + off.x, z + off.z, rot);
     this.prop('utility_box_02', x + off.x + 1.2 * Math.cos(rot), z + off.z - 1.2 * Math.sin(rot), rot);
@@ -454,6 +464,7 @@ export class Kit {
       }
     }
     this.colliders.push({ x, z, hw: w / 2, hd: d / 2, rot: o.rot ?? 0 });
+    this.jobs.push({ x, z, hw: w / 2 + 2, hd: d / 2 + 2, rot: o.rot ?? 0, kind: 'yard' });
     this.yards.push(V(x, y0 + H * 0.6, z));
     for (let k = 0; k < 6; k++) this.lamps.push(P(-w / 2 + (w * k) / 5, 12, -d / 2));
   }
@@ -516,6 +527,7 @@ export class Kit {
     this.mesh(new THREE.CylinderGeometry(r, r, h, 32), m, x, y0 + h / 2, z);
     this.mesh(new THREE.SphereGeometry(r, 32, 8, 0, Math.PI * 2, 0, 0.35), m, x, y0 + h - r * Math.cos(0.35), z);
     this.colliders.push({ x, z, r });
+    this.jobs.push({ x, z, r: r + 2, kind: 'box' });
   }
 
   /** Instanced field of identical tanks, e.g. Fukushima's treated-water farm. */
@@ -532,6 +544,7 @@ export class Kit {
     im.castShadow = im.receiveShadow = true;
     this.add(im, parent);
     this.colliders.push({ x, z, hw: cols * (r + gap / 2), hd: rows * (r + gap / 2), rot: 0 });
+    this.jobs.push({ x, z, hw: cols * (r + gap / 2) + 4, hd: rows * (r + gap / 2) + 4, rot: 0, kind: 'late' });
   }
 
   road(pts: [number, number][], w = 8, lit = true) {
