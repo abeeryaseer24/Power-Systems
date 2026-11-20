@@ -16,6 +16,19 @@ import { BuildLapse, type Lapse } from './build';
 export type Stop = { title: string; body: string; cam: [number, number, number]; look: [number, number, number] };
 export type Mode = 'orbit' | 'tour' | 'walk' | 'axo';
 
+/** Flood scenario: water rises from `normal` and arrives from one side as a front. */
+export type FloodDef = {
+  from: 'east' | 'west';
+  normal: number;
+  max: number;
+  start: number; // x where the front starts
+  finish: number; // x the front reaches
+  marks: [number, string][];
+  equipment: { name: string; elev: number; note?: string }[];
+  note: string;
+  scenario?: { label: string; clock0: number; level: [number, number][]; front: [number, number][]; events: [number, string][]; quakeAt?: number };
+};
+
 export type SiteDef = {
   id: string;
   name: string;
@@ -28,6 +41,7 @@ export type SiteDef = {
   cutaway?: string;
   grid?: GridDef;
   lapse?: Lapse;
+  flood?: FloodDef;
   focus: [number, number, number];
   cam: [number, number, number];
   spawn: [number, number];
@@ -93,6 +107,10 @@ export class PlantScene {
   private lapseObj: BuildLapse | null = null;
   private buildP: number | null = null;
   private onBuild?: (p: number | null) => void;
+  private floodMesh: THREE.Mesh | null = null;
+  private floodPlane = new THREE.Plane();
+  private foam: THREE.Mesh | null = null;
+  private waveEm: Emitter[] = [];
 
   constructor(private host: HTMLElement, private overlay: HTMLElement, public site: SiteDef) {
     const mobile = matchMedia('(max-width: 760px)').matches;
@@ -392,6 +410,46 @@ export class PlantScene {
     this.arcLight.intensity = arc * 3e5;
   }
 
+  /** Flood water at `level` (m), arriving as a front at x = `front`; null removes it. */
+  setFlood(level: number | null, front: number | null = null) {
+    const f = this.site.flood;
+    if (!f) return;
+    if (level === null) {
+      if (this.floodMesh) this.floodMesh.visible = false;
+      if (this.foam) this.foam.visible = false;
+      this.waveEm.forEach((e) => { e.rate = 0; });
+      return;
+    }
+    if (!this.floodMesh) {
+      const S = this.site.extent * 4;
+      const m = new THREE.MeshStandardMaterial({ color: f.from === 'east' ? '#2e4a50' : '#6a6450', roughness: 0.18, metalness: 0, transparent: true, opacity: 0.93, normalMap: (this.water[0]?.normalMap?.clone() ?? null), clippingPlanes: [this.floodPlane] });
+      this.floodMesh = new THREE.Mesh(new THREE.PlaneGeometry(S, S), m);
+      this.floodMesh.rotation.x = -Math.PI / 2;
+      this.floodMesh.name = 'flood';
+      this.scene.add(this.floodMesh);
+      this.foam = new THREE.Mesh(new THREE.BoxGeometry(14, 3, S), new THREE.MeshStandardMaterial({ color: '#e9efee', roughness: 0.9, transparent: true, opacity: 0.85 }));
+      this.scene.add(this.foam);
+      for (let i = 0; i < 10; i++) {
+        const e: Emitter = { pos: new THREE.Vector3(), radius: 30, rate: 0, kind: 'spray', tag: 'wave', dir: new THREE.Vector3(f.from === 'east' ? -18 : 18, 14, 0) };
+        this.waveEm.push(e);
+      }
+      this.plumes.addEmitters(this.waveEm);
+    }
+    const s = f.from === 'east' ? 1 : -1;
+    const fx = front ?? (f.from === 'east' ? -1e5 : 1e5);
+    // keep the water on the sea side of the front
+    this.floodPlane.set(new THREE.Vector3(s, 0, 0), -s * fx);
+    this.floodMesh.visible = true;
+    this.floodMesh.position.y = level;
+    const moving = front !== null && Math.abs(fx - f.finish) > 5 && level > f.normal + 1;
+    this.foam!.visible = moving;
+    this.foam!.position.set(fx, level, this.site.focus[2]);
+    this.waveEm.forEach((e, i) => {
+      e.pos.set(fx, level + 1, this.site.focus[2] - 900 + i * 200);
+      e.rate = moving ? 1 : 0;
+    });
+  }
+
   /** Construction time-lapse: p in 0..1 from empty site to commissioning, null to leave. */
   setBuild(p: number | null) {
     if (p !== null && !this.lapseObj) {
@@ -449,6 +507,7 @@ export class PlantScene {
     this.moon.position.copy(focus).add(tmp.set(-800, 1600, 600));
     this.plumes.update(dt, this.active);
     if (this.propsState === 'idle' && (this.mode === 'walk' || this.camera.position.distanceTo(this.controls.target) < 500)) this.loadProps();
+    if (this.floodMesh?.visible) { const nm = (this.floodMesh.material as THREE.MeshStandardMaterial).normalMap; if (nm) nm.offset.set(t * 0.02, t * 0.01); }
     for (const m of this.water) if (m.normalMap) { m.normalMap.offset.x = t * 0.004; m.normalMap.offset.y = t * 0.006; }
     const bm = this.beaconPts.material as THREE.PointsMaterial;
     bm.opacity = (0.25 + 0.75 * this.night) * (Math.sin(t * 3.2) > 0.2 ? 1 : 0.05);
@@ -554,6 +613,28 @@ class Plumes {
     });
     this.points = new THREE.Points(g, this.mat);
     this.points.frustumCulled = false;
+  }
+
+  addEmitters(list: Emitter[]) {
+    const old = this.em.length;
+    this.em.push(...list);
+    const add = list.reduce((s, e) => s + MAXP[e.kind], 0);
+    const n = this.age.length + add;
+    const grow = <T extends Float32Array | Int16Array>(a: T, fill = 0): T => { const b = new (a.constructor as { new (n: number): T })(n); b.set(a); if (fill) b.fill(fill, a.length); return b; };
+    const pos = new Float32Array(n * 3); pos.set(this.pos.subarray(0, (n - add) * 3)); this.pos = pos;
+    const vel = new Float32Array(n * 3); vel.set(this.vel.subarray(0, (n - add) * 3)); this.vel = vel;
+    this.age = grow(this.age, 999);
+    this.life = grow(this.life, 1);
+    this.size = grow(this.size);
+    this.alpha = grow(this.alpha);
+    const owner = new Int16Array(n); owner.set(this.owner);
+    let o = n - add;
+    list.forEach((e, k) => { for (let i = 0; i < MAXP[e.kind]; i++) owner[o++] = old + k; });
+    this.owner = owner;
+    const g = this.points.geometry;
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    g.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1));
+    g.setAttribute('aAlpha', new THREE.BufferAttribute(this.alpha, 1));
   }
 
   clear() {

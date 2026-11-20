@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ELEVATIONS, SITES, siteById, type El } from '../plants3d/sites';
-import type { Mode, PlantScene, SiteDef } from '../plants3d/PlantScene';
+import type { FloodDef, Mode, PlantScene, SiteDef } from '../plants3d/PlantScene';
+import { at } from '../controlroom/timelines';
 import { SCENARIOS, StressSim, type GridDef } from '../plants3d/stress';
 import type { Lapse } from '../plants3d/build';
 import '../plants.css';
@@ -102,6 +103,7 @@ function Viewer({ site }: { site: SiteDef }) {
   const [play, setPlay] = useState(false);
   const [stress, setStress] = useState(false);
   const [lapse, setLapse] = useState(false);
+  const [flood, setFlood] = useState(false);
   const touch = typeof window !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   useEffect(() => {
@@ -145,6 +147,11 @@ function Viewer({ site }: { site: SiteDef }) {
     return () => removeEventListener('keydown', k);
   }, [mode, stop]);
 
+  const openFlood = () => {
+    if (!flood) { setStress(false); setLapse(false); eng.current?.setStress(null); if (s.eras) setEra(s.eras[0].id); }
+    setFlood(!flood);
+    setFacts(false);
+  };
   const openLapse = () => {
     if (!lapse) { setStress(false); eng.current?.setStress(null); if (s.eras) setEra(s.eras[0].id); }
     setLapse(!lapse);
@@ -183,6 +190,7 @@ function Viewer({ site }: { site: SiteDef }) {
         )}
       </aside>
 
+      {flood && s.flood && <FloodPanel flood={s.flood} eng={eng} onClose={openFlood} />}
       {lapse && s.lapse && <LapsePanel lapse={s.lapse} eng={eng} onClose={openLapse} />}
       {stress && s.grid && <StressPanel grid={s.grid} eng={eng} onClose={openStress} />}
 
@@ -227,6 +235,7 @@ function Viewer({ site }: { site: SiteDef }) {
           </div>
         )}
         {(s.id === 'tmi' || s.id === 'chernobyl') && <Link className="pv-cut pv-room-btn" to={`/control-room/${s.id}`}>Control room</Link>}
+        {s.flood && <button className={`pv-cut pv-flood-btn ${flood ? 'on' : ''}`} onClick={openFlood} aria-pressed={flood}>Flood</button>}
         {s.lapse && <button className={`pv-cut pv-lapse-btn ${lapse ? 'on' : ''}`} onClick={openLapse} aria-pressed={lapse}>Time-lapse</button>}
         {s.grid && <button className={`pv-cut pv-stress-btn ${stress ? 'on' : ''}`} onClick={openStress} aria-pressed={stress}>Stress test</button>}
         {s.cutaway && (
@@ -342,6 +351,88 @@ function LapsePanel({ lapse, eng, onClose }: { lapse: Lapse; eng: React.RefObjec
         <span className="pv-lapse-end">{Math.floor(lapse.to)}</span>
       </div>
     </section>
+  );
+}
+
+function FloodPanel({ flood, eng, onClose }: { flood: FloodDef; eng: React.RefObject<PlantScene | null>; onClose: () => void }) {
+  const sc = flood.scenario;
+  const [level, setLevel] = useState(flood.normal);
+  const [front, setFront] = useState<number | null>(null);
+  const [t, setT] = useState<number | null>(null); // scenario minutes
+  const [failed, setFailed] = useState<Set<string>>(new Set());
+  const [run, setRun] = useState(false);
+  useEffect(() => { eng.current?.setFlood(level, front); }, [level, front, eng]);
+  useEffect(() => () => { eng.current?.setFlood(null); eng.current?.setStress(null); }, [eng]);
+  // scenario playback: one real minute per second
+  useEffect(() => {
+    if (!run || !sc) return;
+    let last = performance.now(), raf = 0;
+    const loop = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setT((x) => {
+        const n = Math.min(70, (x ?? 0) + dt);
+        if (n >= 70) setRun(false);
+        return n;
+      });
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [run, sc]);
+  useEffect(() => {
+    if (t === null || !sc) return;
+    const lv = at(sc.level, t), fr = at(sc.front, t);
+    setLevel(lv);
+    setFront(fr);
+    setFailed((f) => {
+      const n = new Set(f);
+      for (const q of flood.equipment) if (lv > q.elev) n.add(q.name);
+      return n;
+    });
+    // station lighting: offsite power lost at the quake, diesels pick up, then the water takes them
+    const offsite = t < (sc.quakeAt ?? 0);
+    const diesels = t > (sc.quakeAt ?? 0) + 1 && !failed.has(flood.equipment[1]?.name);
+    eng.current?.setStress({ lights: offsite ? 1 : diesels ? 0.4 : t < (sc.quakeAt ?? 0) + 1 ? 0.05 : 0.02, arc: 0, steam: 1, dump: 0 } as never);
+  }, [t]); // eslint-disable-line react-hooks/exhaustive-deps
+  const manual = (v: number) => {
+    setRun(false); setT(null); setFront(null); setLevel(v);
+    setFailed(new Set(flood.equipment.filter((q) => v > q.elev).map((q) => q.name)));
+    eng.current?.setStress(null);
+  };
+  const ev = sc && t !== null ? [...sc.events].reverse().find(([m]) => t >= m) : undefined;
+  const clk = sc && t !== null ? sc.clock0 + Math.floor(t) * 60 : null;
+  const sbo = failed.size >= 2 && (t === null || t > (sc?.quakeAt ?? 0));
+  return (
+    <aside className="pv-stress pv-flood" aria-label="Flood scenario">
+      <header>
+        <span>Flood · {flood.from === 'east' ? 'tsunami' : 'river flood'}</span>
+        <button onClick={onClose} aria-label="Close flood panel">×</button>
+      </header>
+      <div className="pv-freq ok">
+        <strong>{level.toFixed(1)}</strong><span>m</span>
+        <em>{clk !== null ? `${String(Math.floor(clk / 3600)).padStart(2, '0')}:${String(Math.floor((clk % 3600) / 60)).padStart(2, '0')}` : 'water level'}</em>
+      </div>
+      <label className="pv-flood-slider">
+        <input type="range" min={flood.normal} max={flood.max} step={0.1} value={level} onChange={(e) => manual(Number(e.target.value))} aria-label="Water level" />
+        <span className="pv-flood-marks" aria-hidden="true">
+          {flood.marks.map(([v, txt]) => <i key={txt} style={{ left: `${((v - flood.normal) / (flood.max - flood.normal)) * 100}%` }} title={txt} />)}
+        </span>
+      </label>
+      <ul className="pv-flood-legend">
+        {flood.marks.map(([v, txt]) => <li key={txt} className={level >= v ? 'past' : ''}><b>{v > 0 ? '+' : ''}{v} m</b> {txt}</li>)}
+      </ul>
+      {sc && <button className="pv-flood-play" onClick={() => { if (t === null || t >= 70) { setFailed(new Set()); setT(0); } setRun(!run); }}>{run ? 'Pause' : t === null || t >= 70 ? `Play ${sc.label}` : 'Resume'}</button>}
+      {ev && <p className="pv-flood-ev" key={ev[1]}>{ev[1]}</p>}
+      <ol className="pv-equip">
+        {flood.equipment.map((q) => {
+          const dead = failed.has(q.name);
+          return <li key={q.name} className={dead ? 'bad' : ''}><span className="dot" /><span>{q.name}<small>{q.elev < 15 ? `${q.elev > 0 ? '+' : ''}${q.elev} m` : ''}{q.note ? ` · ${q.note}` : ''}</small></span><b>{dead ? 'Flooded' : 'OK'}</b></li>;
+        })}
+      </ol>
+      {flood.from === 'east' && <div className={`pv-sbo ${sbo ? 'on' : ''}`}>{sbo ? 'STATION BLACKOUT' : 'AC power available'}</div>}
+      <p className="pv-hint2">{flood.note}</p>
+    </aside>
   );
 }
 

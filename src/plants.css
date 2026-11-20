@@ -123,7 +123,7 @@
 
 /* ---------------------------------------------------------------- stress test */
 .pv-stress {
-  position: absolute; top: 18px; right: 22px; width: 330px; max-height: calc(100% - 130px); overflow: auto;
+  position: absolute; top: 18px; right: 22px; width: 330px; max-height: calc(100% - var(--bar-h, 60px) - 50px); overflow: auto;
   background: rgba(8, 16, 28, 0.8); backdrop-filter: blur(12px); border-top: 2px solid var(--trip); padding: 12px 14px 14px;
 }
 .pv-stress header { display: flex; justify-content: space-between; align-items: center; font-family: var(--display); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px; color: var(--steel); }
@@ -181,3 +181,26 @@
 
 .pv-room-btn { text-decoration: none; border-color: var(--porcelain); }
 .pv-room-btn:hover { background: var(--porcelain); color: var(--night); }
+
+/* ---------------------------------------------------------------- flood */
+.pv-flood { border-top-color: var(--glaze); }
+.pv-flood .pv-freq strong { color: var(--glaze); }
+.pv-flood-slider { display: block; position: relative; margin: 6px 0 2px; }
+.pv-flood-slider input { width: 100%; accent-color: var(--glaze); }
+.pv-flood-marks i { position: absolute; top: -4px; width: 2px; height: 8px; background: var(--sodium); }
+.pv-flood-legend { list-style: none; margin: 4px 0 8px; padding: 0; font-size: 13px; color: var(--dim); }
+.pv-flood-legend li.past { color: var(--porcelain); }
+.pv-flood-legend b { display: inline-block; min-width: 54px; font-family: var(--display); color: var(--sodium); }
+.pv-flood-play { all: unset; cursor: pointer; display: block; width: 100%; box-sizing: border-box; text-align: center; font-family: var(--display); font-weight: 700; font-size: 16px; padding: 8px; background: var(--glaze); color: var(--night); margin-bottom: 8px; }
+.pv-flood-ev { margin: 0 0 8px; padding: 8px 10px; background: rgba(134, 197, 218, 0.1); border-left: 2px solid var(--glaze); font-size: 14px; line-height: 1.45; animation: pv-in 0.5s ease both; }
+.pv-equip { list-style: none; margin: 0 0 8px; padding: 0; }
+.pv-equip li { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.pv-equip small { display: block; color: var(--dim); font-size: 12px; }
+.pv-equip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.pv-equip b { font-family: var(--display); font-weight: 600; color: var(--ok); }
+.pv-equip li.bad .dot { background: var(--trip); }
+.pv-equip li.bad b { color: var(--trip); }
+.pv-sbo { text-align: center; font-family: var(--display); font-weight: 800; letter-spacing: 0.08em; padding: 8px; border: 1px solid var(--rule-strong); color: var(--steel); }
+.pv-sbo.on { background: var(--trip); color: var(--night); border-color: var(--trip); animation: pv-pulse 1s steps(2) infinite; }
+.pv-flood-btn { border-color: var(--glaze); color: var(--glaze); }
+.pv-flood-btn.on { background: var(--glaze); color: var(--night); }
