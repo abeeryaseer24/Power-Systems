@@ -153,7 +153,7 @@ def rule(days, t, soc, ccp):
     return cc, batt, ic
 
 
-def lp(L, R, pr, soc0, cc0, horizon_soc_value=True):
+def lp(L, R, pr, soc0, cc0, soc_value=C_SOC * 0.999):
     """Dispatch LP over len(L) steps for one day. Returns the first-step (cc, batt, ic) and the full plan."""
     H = len(L)
     names = ['cc', 'oc', 'oil', 'ch', 'dis', 'soc', 'imp', 'exp', 'curt', 'bk', 'uns']
@@ -164,8 +164,7 @@ def lp(L, R, pr, soc0, cc0, horizon_soc_value=True):
         c[ix('dis', t)] = C_DEG * DT; c[ix('imp', t)] = pr[t] * DT; c[ix('exp', t)] = -pr[t] * DT
         c[ix('bk', t)] = C_BK * DT; c[ix('uns', t)] = C_VOLL * DT
         c[ix('ch', t)] = 1e-3; c[ix('curt', t)] = 1e-3   # tie-breaks: don't cycle or spill for nothing
-    if horizon_soc_value:
-        c[ix('soc', H - 1)] -= C_SOC * 0.999   # stored energy at the end is worth the payback price
+    c[ix('soc', H - 1)] -= soc_value   # what a MWh left in storage at the end is worth (default: the payback price)
     bounds = []
     for k in names:
         for t in range(H):
@@ -191,16 +190,19 @@ def lp(L, R, pr, soc0, cc0, horizon_soc_value=True):
     r = linprog(c, A_ub=np.array(Au), b_ub=np.array(bu), A_eq=np.array(Ae), b_eq=np.array(be), bounds=bounds, method='highs')
     x = r.x
     get = lambda k: x[names.index(k) * H:(names.index(k) + 1) * H]
-    return (get('cc')[0], get('dis')[0] - get('ch')[0], get('imp')[0] - get('exp')[0]), {k: get(k) for k in names}
+    plan = {k: get(k) for k in names}
+    plan['lam'] = -r.eqlin.marginals[1::2]  # value of one more MWh in storage at the end of each step, $/MWh
+    return (get('cc')[0], get('dis')[0] - get('ch')[0], get('imp')[0] - get('exp')[0]), plan
 
 
-def mpc(days, t, soc, ccp, H=12):
+def mpc(days, t, soc, ccp, value=None):
+    """Rolling LP over the forecast window. value: optional $/MWh for energy left in storage at the
+    end of the window, per day (the learned hybrid); by default the fixed payback price."""
     n = len(soc); Lf, Rf, pf = forecasts(days, t)
     out = np.zeros((3, n))
     for d in range(n):
-        h = min(H, K)
-        L, R, pr = Lf[d, :h], Rf[d, :h], pf[d, :h]
-        out[:, d] = lp(L, R, pr, soc[d], ccp[d], horizon_soc_value=True)[0]
+        v = C_SOC * 0.999 if value is None else float(value[d])
+        out[:, d] = lp(Lf[d], Rf[d], pf[d], soc[d], ccp[d], soc_value=v)[0]
     return out[0], out[1], out[2]
 
 
@@ -239,9 +241,21 @@ def act_to_mw(a):
     return (a[:, 0] + 1) / 2 * CC, a[:, 1] * BP, np.where(a[:, 2] > 0, a[:, 2] * IMP, a[:, 2] * EXP)
 
 
-def train_ppo(iters, n_env=256, seed0=100000):
+def evaluate(net, days):
+    return float(run(days, ppo_policy(net))['total'].mean())
+
+
+def train_ppo(iters, n_env=256, seed0=100000, net=None, lr=3e-4, logstd=None, critic_warm=0, val=None):
+    """PPO. With a warm start, the critic is fitted first (policy frozen) so the first policy updates
+    use sensible advantages; with validation days, the best policy on them is kept (never the test days)."""
+    import copy
     torch.manual_seed(0); np.random.seed(0)
-    net = Policy(); opt = torch.optim.Adam(net.parameters(), 3e-4)
+    net = net or Policy()
+    if logstd is not None:
+        net.logstd.data[:] = logstd
+    opt = torch.optim.Adam(net.parameters(), lr)
+    best = (evaluate(net, val), copy.deepcopy(net.state_dict())) if val is not None else None
+    if best: print(f'  start: validation ${best[0] / 1e6:.4f} M')
     gamma, lam, clip = 0.995, 0.95, 0.2
     hist = []
     for it in range(iters):
@@ -274,12 +288,17 @@ def train_ppo(iters, n_env=256, seed0=100000):
                 ratio = (lp_ - LP_[b]).exp()
                 pl = -torch.min(ratio * AD[b], ratio.clamp(1 - clip, 1 + clip) * AD[b]).mean()
                 vl = ((net.v(O_[b])[:, 0] - RT[b]) ** 2).mean()
-                loss = pl + 0.5 * vl - 0.002 * d.entropy().sum(1).mean()
+                loss = 0.5 * vl if it < critic_warm else pl + 0.5 * vl - 0.002 * d.entropy().sum(1).mean()
                 opt.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 0.5); opt.step()
         day_cost = -Rw.sum(0).mean() * 2e5
         hist.append(round(float(day_cost)))
         if it % 20 == 0 or it == iters - 1:
             print(f'  iter {it:4d}  mean day cost ${day_cost / 1e6:.3f} M  std {net.logstd.exp().detach().numpy().round(3)}')
+        if val is not None and it >= critic_warm and (it % 10 == 0 or it == iters - 1):
+            v = evaluate(net, val)
+            if v < best[0]:
+                best = (v, copy.deepcopy(net.state_dict())); print(f'  iter {it:4d}  new best on validation ${v / 1e6:.4f} M')
+    if best: net.load_state_dict(best[1])
     return net, hist
 
 
@@ -289,6 +308,55 @@ def ppo_policy(net):
             a = net.mu(torch.tensor(obs(days, t, soc, ccp))).numpy()
         return act_to_mw(a)
     return pol
+
+
+# ---------------------------------------------------------------- learning from hindsight
+
+def hindsight(seeds):
+    """Perfect-foresight plans for training days: what an all-knowing dispatcher would have done at each
+    half hour, and what stored energy turned out to be worth. Features are only what was known then."""
+    days = make_days(seeds); n = len(seeds)
+    X, A, V = [], [], []
+    plans = [lp(days['L'][d], days['R'][d], days['price'][d], SOC0, 600.0)[1] for d in range(n)]
+    for t in range(T):
+        soc = np.array([SOC0 if t == 0 else p['soc'][t - 1] for p in plans])
+        ccp = np.array([600.0 if t == 0 else p['cc'][t - 1] for p in plans])
+        X.append(obs(days, t, soc, ccp))
+        cc = np.array([p['cc'][t] for p in plans]); b = np.array([p['dis'][t] - p['ch'][t] for p in plans]); ic = np.array([p['imp'][t] - p['exp'][t] for p in plans])
+        A.append(np.stack([cc / CC * 2 - 1, b / BP, np.where(ic > 0, ic / IMP, ic / EXP)], 1))
+        te = t + K - 1  # the end of the forecast window the MPC sees
+        V.append(np.array([p['lam'][te] if te < T - 1 else C_SOC for p in plans]))
+    return np.concatenate(X), np.concatenate(A).astype(np.float32), np.concatenate(V)
+
+
+def fit_value(X, V):
+    import lightgbm as lgb
+    m = lgb.LGBMRegressor(n_estimators=600, learning_rate=0.05, num_leaves=63, min_child_samples=40, verbose=-1)
+    m.fit(X, np.clip(V, -50, 600))
+    return m
+
+
+def mpc_learned(model):
+    def pol(days, t, soc, ccp):
+        v = np.clip(model.predict(obs(days, t, soc, ccp)), 0, 600)
+        return mpc(days, t, soc, ccp, value=v)
+    return pol
+
+
+def imitate(X, A, epochs=40):
+    """Behaviour cloning: the policy learns to copy the perfect-foresight decisions from forecasts alone."""
+    torch.manual_seed(0)
+    net = Policy(); opt = torch.optim.Adam(net.mu.parameters(), 1e-3)
+    Xt, At = torch.tensor(X), torch.tensor(A)
+    for ep in range(epochs):
+        tot = 0.0
+        for b in torch.randperm(len(Xt)).split(1024):
+            loss = ((net.mu(Xt[b]) - At[b]) ** 2).mean()
+            opt.zero_grad(); loss.backward(); opt.step(); tot += loss.item() * len(b)
+        if ep % 10 == 0 or ep == epochs - 1:
+            print(f'  imitation epoch {ep:3d}  mse {tot / len(Xt):.4f}')
+    # the value head starts untrained; PPO fits it in its first rounds
+    return net
 
 
 # ---------------------------------------------------------------- main
