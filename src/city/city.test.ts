@@ -181,3 +181,16 @@ describe('city blackout', () => {
     expect(c.events.length).toBeGreaterThan(6);
   });
 });
+
+describe('data centre', () => {
+  it('PUE rises with heat; no chilled-water tank means throttling', async () => {
+    const { dcDay, dcOutage, DEFAULT_DC, pue } = await import('./datacentre');
+    expect(pue(35, false)).toBeGreaterThan(pue(20, false));
+    expect(pue(35, true)).toBeLessThan(pue(35, false));
+    const d = dcDay(M, DEFAULT_DC, { season: 'summer', day: 'weekday', heat: 0 });
+    expect(Math.max(...d.map((x) => x.total))).toBeGreaterThan(DEFAULT_DC.itMW);
+    const noTes = dcOutage({ ...DEFAULT_DC, tesMin: 0 }, 34);
+    const tes = dcOutage({ ...DEFAULT_DC, tesMin: 15 }, 34);
+    expect(Math.max(...noTes.secs.map((s) => s.inlet))).toBeGreaterThan(Math.max(...tes.secs.map((s) => s.inlet)));
+  });
+});

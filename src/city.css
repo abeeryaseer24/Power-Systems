@@ -294,3 +294,24 @@ circle.hp-dead { fill: #33445a; stroke: none; }
 .cy-city-models { flex-wrap: wrap; }
 .cy-city-models a { flex: 1 0 auto; padding: 10px 16px; }
 .cy-city-models a.hot { color: var(--trip); }
+
+/* ---------------------------------------------------------------- data centre (dc-) */
+.dc-page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'head' 'scale' 'day' 'out' 'bar'; gap: 14px; align-content: start; padding: 18px 22px 0; background: radial-gradient(ellipse at 70% 10%, #1b1d3a, var(--night) 65%); }
+.dc-page h2 { font-family: var(--display); font-weight: 700; font-size: 22px; margin: 0 0 8px; }
+.dc-scale { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); border-top: 1px solid var(--rule-strong); border-left: 1px solid var(--rule-strong); }
+.dc-scale div { padding: 12px 16px; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); display: grid; gap: 2px; }
+.dc-scale span { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--steel); }
+.dc-scale b { font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; }
+.dc-scale small { color: var(--steel); font-size: 12.5px; }
+.dc-day svg { width: 100%; height: 110px; display: block; }
+.dc-k { display: inline-block; width: 10px; height: 10px; margin: 0 6px 0 10px; vertical-align: -1px; }
+.dc-out { display: grid; gap: 10px; }
+.dc-chain { display: flex; flex-wrap: wrap; gap: 0; align-items: center; }
+.dc-chain span { font-family: var(--display); font-weight: 700; font-size: 18px; padding: 10px 18px; border: 1px solid #2f4258; color: var(--dim); position: relative; margin-right: 26px; }
+.dc-chain span::after { content: '→'; position: absolute; right: -22px; color: var(--dim); }
+.dc-chain span:last-child::after { content: ''; }
+.dc-chain span.on { border-color: var(--sodium); color: var(--porcelain); background: rgba(255, 176, 77, 0.1); }
+.dc-rows { max-width: 520px; }
+.dc-scale { grid-area: scale; }
+.dc-day { grid-area: day; }
+.dc-out { grid-area: out; }
