@@ -34,6 +34,7 @@ const Fallout = lazy(() => import('./pages/Fallout'));
 const Cities = lazy(() => import('./pages/Cities'));
 const CityTwin = lazy(() => import('./pages/CityTwin'));
 const Hospital = lazy(() => import('./pages/Hospital'));
+const Blackout = lazy(() => import('./pages/Blackout'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="/city/:id/ev" element={<CityTwinRoute mode="ev" />} />
           <Route path="/city/:id/water" element={<CityTwinRoute mode="water" />} />
           <Route path="/city/:id/hospital" element={<Hospital />} />
+          <Route path="/city/:id/blackout" element={<Blackout />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />

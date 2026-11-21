@@ -74,19 +74,19 @@ export type TelecomRun = {
 };
 
 /** Minute-by-minute run of the network against the day's outage pattern. */
-export function runTelecom(c: CityData, net: Network, o: TelecomOpts, districtUp: (m: number, d: number) => boolean): TelecomRun {
+export function runTelecom(c: CityData, net: Network, o: TelecomOpts, districtUp: (m: number, d: number) => boolean, M = 1440, h0 = 0): TelecomRun {
   const { sites, hubs, age, gRoll } = net;
   const S = sites.length, H = hubs.length;
   sites.forEach((s, i) => { s.batKWh = o.batteryH * 3 * age[i]; s.genset = gRoll[i] < o.gensetShare; });
-  const state = new Uint8Array(S * 1440), soc = new Uint8Array(S * 1440), hubState = new Uint8Array(H * 1440);
+  const state = new Uint8Array(S * M), soc = new Uint8Array(S * M), hubState = new Uint8Array(H * M);
   const bat = sites.map((s) => s.batKWh), off = new Float64Array(S); // minutes without mains
   const hbat = hubs.map((h) => h.batKWh), hoff = new Float64Array(H), hfuel = hubs.map((h) => h.fuelH * 60);
   const fuel = sites.map(() => 24 * 60);
   const pop = sites.reduce((a, s) => a + s.pop, 0);
   const mins: TelecomRun['mins'] = [];
   const dt = 1 / 60; // h
-  for (let m = 0; m < 1440; m++) {
-    const h = m / 60, kw = siteKw(h);
+  for (let m = 0; m < M; m++) {
+    const h = h0 + m / 60, kw = siteKw(h);
     // exchanges first: they decide whether a powered site can carry traffic
     const hubUp = new Uint8Array(H);
     for (let k = 0; k < H; k++) {
@@ -100,7 +100,7 @@ export function runTelecom(c: CityData, net: Network, o: TelecomOpts, districtUp
         else if (hbat[k] > 0) { st = ST.battery; hbat[k] -= hb.kw * dt; }
         else st = ST.down;
       }
-      hubState[k * 1440 + m] = st;
+      hubState[k * M + m] = st;
       hubUp[k] = st === ST.down ? 0 : 1;
     }
     let g = 0, b = 0, gs = 0, iso = 0, dn = 0, served = 0, mw = 0;
@@ -118,8 +118,8 @@ export function runTelecom(c: CityData, net: Network, o: TelecomOpts, districtUp
         else st = ST.down;
       }
       if (st !== ST.down && !hubUp[s.hub]) st = ST.isolated;
-      state[i * 1440 + m] = st;
-      soc[i * 1440 + m] = s.batKWh > 0 ? Math.round((100 * Math.max(0, bat[i])) / s.batKWh) : 0;
+      state[i * M + m] = st;
+      soc[i * M + m] = s.batKWh > 0 ? Math.round((100 * Math.max(0, bat[i])) / s.batKWh) : 0;
       if (st === ST.grid) g++; else if (st === ST.battery) b++; else if (st === ST.genset) gs++; else if (st === ST.isolated) iso++; else dn++;
       if (st <= ST.genset) served += s.pop;
     }

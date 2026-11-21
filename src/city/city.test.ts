@@ -162,3 +162,22 @@ describe('ev and water', () => {
     expect(Math.max(p(14), p(16), p(19))).toBeGreaterThan(0);
   });
 });
+
+describe('city blackout', () => {
+  it('signals fail first, phones within hours, water later; restoration brings them back', async () => {
+    const { CityEngine } = await import('./engine');
+    const { runCascade, DEFAULT_CASCADE } = await import('./cascade');
+    const e = new CityEngine(M);
+    const c = runCascade(M, e, { ...DEFAULT_CASCADE, hours: 16 });
+    const L = c.lanes, t0 = c.t0;
+    expect(L.grid[t0 - 5].v).toBeCloseTo(1, 6);
+    expect(L.grid[t0 + 5].v).toBe(0);
+    expect(L.signals[t0 + 5].v).toBeLessThan(0.3);
+    expect(L.telecom[t0 + 5].v).toBeGreaterThan(0.95); // batteries hold at first
+    expect(L.telecom[t0 + 6 * 60].v).toBeLessThan(0.5);
+    expect(L.water[t0 + 30].v).toBeGreaterThan(0.9);
+    expect(L.water[t0 + 12 * 60].v).toBeLessThan(0.5);
+    expect(L.grid[c.M - 1].v).toBeCloseTo(1, 6);
+    expect(c.events.length).toBeGreaterThan(6);
+  });
+});

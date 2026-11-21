@@ -37,16 +37,16 @@ export type WaterRun = {
   mins: { mw: number; full: number; low: number; dry: number }[]; // population shares
 };
 
-export function runWater(c: CityData, st: Station[], o: WaterOpts, districtUp: (m: number, d: number) => boolean): WaterRun {
+export function runWater(c: CityData, st: Station[], o: WaterOpts, districtUp: (m: number, d: number) => boolean, M = 1440, h0 = 0): WaterRun {
   const R = rng(5150);
   const D = c.districts.length;
   st.forEach((s) => { s.genset = R() < o.pumpGenShare; });
-  const level = new Float32Array(D * 1440), pressure = new Uint8Array(D * 1440);
+  const level = new Float32Array(D * M), pressure = new Uint8Array(D * M);
   const lvl = new Float64Array(D).fill(0.85);
   const mins: WaterRun['mins'] = [];
   const pop = c.population || 1;
-  for (let m = 0; m < 1440; m++) {
-    const h = m / 60;
+  for (let m = 0; m < M; m++) {
+    const h = h0 + m / 60;
     let mw = 0, full = 0, low = 0, dry = 0;
     for (let d = 0; d < D; d++) {
       const dd = c.districts[d];
@@ -61,8 +61,8 @@ export function runWater(c: CityData, st: Station[], o: WaterOpts, districtUp: (
       lvl[d] = Math.min(1, Math.max(0, lvl[d] + (pump - outflow) / tank / 60));
       if (powered) mw += (pump * KWH_M3) / 1000;
       const p = lvl[d] > 0.25 ? 0 : lvl[d] > 0.02 ? 1 : 2;
-      level[d * 1440 + m] = lvl[d];
-      pressure[d * 1440 + m] = p;
+      level[d * M + m] = lvl[d];
+      pressure[d * M + m] = p;
       if (p === 0) full += dd.pop; else if (p === 1) low += dd.pop; else dry += dd.pop;
     }
     mins.push({ mw, full: full / pop, low: low / pop, dry: dry / pop });

@@ -14,7 +14,7 @@ export default function Cities() {
       <header className="cy-ihead">
         <p className="pv-kicker">City models</p>
         <h1>How a city runs on power</h1>
-        <p>Each city runs the same models: a full day of demand built up from homes, offices, industry, hospitals and street lights, and the metro simulated train by train on its DC overhead line. Real cities are built from OpenStreetMap and official population counts. Meridia is a made-up test city where each model is built first.</p>
+        <p>Each city runs the same models: a full day of demand built up from homes, offices, industry, hospitals and street lights; the metro simulated train by train on its DC overhead line; the mobile network, EV charging and water supply; and a whole-city blackout where every system fails on its own clock. Real cities are built from OpenStreetMap and official population counts. Meridia is a made-up test city where each model is built first.</p>
       </header>
 
       {real.length > 0 && (
@@ -43,7 +43,11 @@ function Card({ c }: { c: CityIndexEntry }) {
       </Link>
       <span className="cy-city-models">
         <Link to={`/city/${c.id}`}>City Day</Link>
-        {c.lines > 0 && <Link to={`/city/${c.id}/metro`}>Metro traction</Link>}
+        {c.lines > 0 && <Link to={`/city/${c.id}/metro`}>Metro</Link>}
+        <Link to={`/city/${c.id}/telecom`}>Phones</Link>
+        <Link to={`/city/${c.id}/ev`}>EVs</Link>
+        <Link to={`/city/${c.id}/water`}>Water</Link>
+        <Link to={`/city/${c.id}/blackout`} className="hot">Blackout</Link>
       </span>
     </li>
   );

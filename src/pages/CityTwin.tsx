@@ -187,6 +187,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
           <Link to={`/city/${cityId}/ev`} className={mode === 'ev' ? 'on' : ''}>EV charging</Link>
           <Link to={`/city/${cityId}/water`} className={mode === 'water' ? 'on' : ''}>Water</Link>
           {cityId === 'meridia' && <Link to={`/city/${cityId}/hospital`}>Hospital</Link>}
+          <Link to={`/city/${cityId}/blackout`} className="cy-switch-hot">City blackout</Link>
         </nav>
       </header>
 
