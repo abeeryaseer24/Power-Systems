@@ -1,0 +1,34 @@
+/* GB demand forecast page (fc- prefix) */
+.fc-page { max-width: 1120px; display: grid; gap: 26px; padding-bottom: 40px; }
+.fc-head h1 { font-family: var(--display); font-weight: 900; font-size: clamp(44px, 6vw, 84px); line-height: 0.9; margin: 0 0 14px; }
+.fc-head p { color: var(--steel); font-size: 17px; line-height: 1.55; max-width: 820px; margin: 0; }
+.fc-block h2 { font-family: var(--display); font-weight: 700; font-size: 26px; margin: 0 0 10px; }
+.fc-p { color: var(--steel); max-width: 820px; margin: 0 0 12px; line-height: 1.55; }
+.fc-chart svg { width: 100%; height: 220px; display: block; }
+.fc-band { fill: rgba(255, 176, 77, 0.18); }
+.fc-ours { fill: none; stroke: var(--sodium); stroke-width: 2.2; vector-effect: non-scaling-stroke; }
+.fc-neso { fill: none; stroke: var(--glaze); stroke-width: 1.6; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
+.fc-out { fill: none; stroke: var(--porcelain); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.fc-bar-neso { fill: var(--glaze); opacity: 0.75; }
+.fc-bar-ours { fill: var(--sodium); }
+.fc-legend { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--steel); }
+.fc-legend i { display: inline-block; width: 18px; height: 3px; margin-right: 6px; vertical-align: 3px; }
+.fc-legend .k-ours { background: var(--sodium); }
+.fc-legend .k-neso { background: repeating-linear-gradient(90deg, var(--glaze) 0 6px, transparent 6px 10px); }
+.fc-legend .k-band { height: 10px; vertical-align: -1px; background: rgba(255, 176, 77, 0.3); }
+.fc-legend .k-out { background: var(--porcelain); }
+.fc-legend .fc-scale { margin-left: auto; color: var(--dim); }
+.fc-scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: 6px 0 16px; border-top: 1px solid var(--rule-strong); border-left: 1px solid var(--rule-strong); }
+.fc-scores div { padding: 12px 16px; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); display: grid; gap: 2px; }
+.fc-scores dt { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--steel); }
+.fc-scores dd { margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.fc-scores small { color: var(--steel); font-size: 12.5px; }
+.fc-scores .ours dd { color: var(--sodium); }
+.fc-small dd { font-size: 28px; }
+.fc-seg { border: 1px solid var(--rule-strong); width: max-content; margin-bottom: 8px; }
+.fc-imp { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; max-width: 760px; }
+.fc-imp li { display: grid; grid-template-columns: 260px 1fr 50px; gap: 10px; align-items: center; font-size: 14px; color: var(--steel); }
+.fc-imp i { height: 10px; background: var(--sodium); display: block; }
+.fc-imp b { font-family: var(--display); color: var(--porcelain); text-align: right; }
+.fc-notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--steel); max-width: 860px; line-height: 1.5; }
+@media (max-width: 760px) { .fc-imp li { grid-template-columns: 1fr 44px; } .fc-imp i { grid-column: 1 / 3; } .fc-chart svg { height: 170px; } }

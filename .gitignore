@@ -6,3 +6,6 @@ dist/
 coverage/
 scratch-*.log
 scripts/osm/.cache/
+ml/.venv/
+ml/data/
+ml/runs/
