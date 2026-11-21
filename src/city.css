@@ -321,3 +321,6 @@ circle.hp-dead { fill: #33445a; stroke: none; }
 .cy-net { fill: none; stroke: #ffe08a; stroke-width: 1.6; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; }
 .cy-tour { top: 170px; z-index: 4; pointer-events: auto; }
 .cy-tour .pv-capnav button[disabled] { opacity: 0.4; cursor: wait; }
+.cy-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.cy-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.03em; padding: 2px 8px 2px 13px; margin: -10px 0 0; color: var(--night); background: var(--porcelain); clip-path: polygon(7px 0, 100% 0, 100% 100%, 7px 100%, 0 50%); transition: opacity 0.25s; }
+.cy-insp-act .cy-look { background: var(--sodium) !important; color: var(--night); border-color: var(--sodium) !important; }

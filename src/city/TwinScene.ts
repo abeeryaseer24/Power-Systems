@@ -14,6 +14,7 @@ import { TRAIN, type TractionSim } from './metro';
 import type { Network } from './telecom';
 import type { Hub as EvHub } from './ev';
 import type { Station } from './water';
+import { cellSite, gridSub, tractionSub, type CloseUp } from './closeups';
 
 const KIND_INDEX: Record<Kind, number> = { res: 0, com: 1, ind: 2, inst: 3 };
 export const MAXD = 64;
@@ -58,6 +59,7 @@ export class TwinScene {
     uOn: { value: new Array(MAXD).fill(1) as number[] },
     uNight: { value: 0 },
     uHi: { value: -1 },
+    uClear: { value: new THREE.Vector3(0, 0, 0) },
   };
   private gUniforms = {
     uStreet: { value: new Array(MAXD + 1).fill(0) as number[] },
@@ -86,6 +88,10 @@ export class TwinScene {
   state?: SceneState;
   selected: Pick | null = null;
   private ring: THREE.Mesh;
+  private overlay: HTMLDivElement;
+  private close: { pick: Pick; cu: CloseUp; els: HTMLElement[]; hidden: THREE.Object3D[]; mastIdx?: number } | null = null;
+  private subMeshes: THREE.Object3D[][] = [];
+  private tssBoxes: THREE.Object3D[][] = [];
   private evl?: { hubs: EvHub[]; canopies: THREE.InstancedMesh; glow: THREE.Sprite[] };
   private wat?: { st: Station[]; towers: THREE.Group[]; tanks: THREE.Mesh[] };
   private tel?: { net: Network; hex: THREE.InstancedMesh; masts: THREE.InstancedMesh; lights: THREE.Points; hubs: THREE.InstancedMesh };
@@ -102,6 +108,9 @@ export class TwinScene {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.shadowMap.autoUpdate = false;
     host.appendChild(this.renderer.domElement);
+    this.overlay = document.createElement('div');
+    this.overlay.className = 'cy-overlay';
+    host.appendChild(this.overlay);
     const w = host.clientWidth, h = host.clientHeight;
     this.camera = new THREE.PerspectiveCamera(40, w / h, 5, 90000);
 
@@ -328,18 +337,20 @@ export class TwinScene {
     mat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, U);
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute vec4 aInfo; varying vec4 vInfo; varying vec3 vW; varying vec3 vWN;')
+        .replace('#include <common>', '#include <common>\nattribute vec4 aInfo; varying vec4 vInfo; varying vec3 vW; varying vec3 vWN; varying vec2 vC;')
         .replace('#include <project_vertex>', `#include <project_vertex>
           vInfo = aInfo;
           vW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
-          vWN = normalize(mat3(modelMatrix * instanceMatrix) * objectNormal);`);
+          vWN = normalize(mat3(modelMatrix * instanceMatrix) * objectNormal);
+          vC = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;`);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
           varying vec4 vInfo; varying vec3 vW; varying vec3 vWN;
-          uniform vec4 uLit[12]; uniform float uOn[12]; uniform float uNight; uniform float uHi;
+          uniform vec4 uLit[${MAXD}]; uniform float uOn[${MAXD}]; uniform float uNight; uniform float uHi; uniform vec3 uClear; varying vec2 vC;
           float h21(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
           float winMask; float winLit;`)
         .replace('#include <color_fragment>', `#include <color_fragment>
+          if (uClear.z > 0.0 && distance(vC, uClear.xy) < uClear.z) discard;
           {
             int di = int(vInfo.x + 0.5); int kind = int(vInfo.y + 0.5);
             vec4 L = uLit[di];
@@ -391,6 +402,18 @@ export class TwinScene {
       info.set([b.district, KIND_INDEX[b.kind], b.seed, 0], i * 4);
     });
     geo.setAttribute('aInfo', new THREE.InstancedBufferAttribute(info, 4));
+    // cleared buildings must not cast shadows either
+    const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    depth.onBeforeCompile = (sh) => {
+      sh.uniforms.uClear = U.uClear;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+varying vec2 vC;`).replace('#include <project_vertex>', `#include <project_vertex>
+vC = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;`);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec2 vC; uniform vec3 uClear;`).replace('void main() {', `void main() {
+  if (uClear.z > 0.0 && distance(vC, uClear.xy) < uClear.z) discard;`);
+    };
+    im.customDepthMaterial = depth;
     im.castShadow = true;
     im.receiveShadow = true;
     this.scene.add(im);
@@ -443,10 +466,12 @@ export class TwinScene {
       for (const t of l.tss) {
         const a = along(l.path, t.s);
         const ox = -a.tz * 45, oz = a.tx * 45;
-        const b = new THREE.BoxGeometry(34, 8, 18);
-        b.rotateY(Math.atan2(a.tx, a.tz));
-        b.translate(a.x + ox, 4, a.z + oz);
-        pierG.push(b);
+        const bm = new THREE.Mesh(new THREE.BoxGeometry(34, 8, 18), concrete);
+        bm.rotation.y = Math.atan2(a.tx, a.tz);
+        bm.position.set(a.x + ox, 4, a.z + oz);
+        bm.castShadow = true;
+        this.scene.add(bm);
+        (this.tssBoxes[li] ??= []).push(bm);
         const pos = new THREE.Vector3(a.x + ox, 16, a.z + oz);
         this.tssPos[li].push(pos);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: '#86c5da', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
@@ -485,12 +510,15 @@ export class TwinScene {
       pad.position.set(s.x, 0.3, s.z);
       pad.receiveShadow = true;
       this.scene.add(pad);
+      const parts: THREE.Object3D[] = [pad];
       for (let i = 0; i < 3; i++) {
         const t = new THREE.Mesh(new THREE.BoxGeometry(14, 9, 10), tx);
         t.position.set(s.x - 40 + i * 40, 4.5, s.z);
         t.castShadow = true;
         this.scene.add(t);
+        parts.push(t);
       }
+      this.subMeshes.push(parts);
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: '#86c5da', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
       sp.position.set(s.x, 30, s.z);
       sp.scale.setScalar(260);
@@ -630,6 +658,61 @@ export class TwinScene {
       tanks.push(tank);
     }
     this.wat = { st, towers, tanks };
+  }
+
+  /** Build a detailed model of a substation, traction substation or cell site, fly to it and label it. */
+  closeUp(p: Pick | null) {
+    if (this.close) {
+      this.scene.remove(this.close.cu.group);
+      this.close.cu.group.traverse((o) => { (o as THREE.Mesh).geometry?.dispose(); });
+      this.close.els.forEach((el) => el.remove());
+      this.close.hidden.forEach((o) => { o.visible = true; });
+      if (this.close.mastIdx !== undefined && this.tel) { this.tel.masts.setMatrixAt(this.close.mastIdx, new THREE.Matrix4().makeTranslation(this.tel.net.sites[this.close.mastIdx].x, 0, this.tel.net.sites[this.close.mastIdx].z)); this.tel.masts.instanceMatrix.needsUpdate = true; }
+      this.close = null;
+      this.bUniforms.uClear.value.set(0, 0, 0);
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+    if (!p) return false;
+    let cu: CloseUp | null = null, hidden: THREE.Object3D[] = [], mastIdx: number | undefined;
+    if (p.type === 'sub') {
+      const i = this.city.subs.findIndex((x) => x.id === p.id);
+      if (i < 0) return false;
+      cu = gridSub(this.city.subs[i].x, this.city.subs[i].z);
+      hidden = this.subMeshes[i] ?? [];
+    } else if (p.type === 'tss') {
+      const l = this.city.lines[p.line], t = l.tss[p.idx];
+      const a = along(l.path, t.s);
+      const pos = this.tssPos[p.line][p.idx];
+      cu = tractionSub(pos.x, pos.z, Math.atan2(a.tx, a.tz) + Math.PI / 2);
+      hidden = [this.tssBoxes[p.line]?.[p.idx]].filter(Boolean) as THREE.Object3D[];
+    } else if (p.type === 'site' && this.tel) {
+      const q = this.tel.net.sites[p.idx];
+      cu = cellSite(q.x, q.z, q.genset);
+      mastIdx = p.idx;
+      this.tel.masts.setMatrixAt(p.idx, new THREE.Matrix4().makeScale(0, 0, 0));
+      this.tel.masts.instanceMatrix.needsUpdate = true;
+    }
+    if (!cu) return false;
+    hidden.forEach((o) => { o.visible = false; });
+    // clear the buildings around it, like a diorama
+    this.bUniforms.uClear.value.set(cu.at.x, cu.at.z, p.type === 'sub' ? 120 : p.type === 'tss' ? 70 : 30);
+    this.renderer.shadowMap.needsUpdate = true;
+    this.scene.add(cu.group);
+    const els = cu.labels.map((l) => {
+      const el = document.createElement('div');
+      el.className = 'cy-label';
+      el.textContent = l.text;
+      this.overlay.appendChild(el);
+      return el;
+    });
+    this.close = { pick: p, cu, els, hidden, mastIdx };
+    this.flyTo(cu.cam, cu.at);
+    this.renderer.shadowMap.needsUpdate = true;
+    return true;
+  }
+
+  get closePick() {
+    return this.close?.pick ?? null;
   }
 
   setHighlight(k: number) {
@@ -801,6 +884,23 @@ export class TwinScene {
         else v.set(0.95, 0.2, 0.15, 0.55);
       });
     }
+    // close-up: live state and labels
+    if (this.close) {
+      const c = this.close, p = c.pick;
+      let load = 0, on = true, soc: number | undefined;
+      if (p.type === 'sub') { const i = this.city.subs.findIndex((x) => x.id === p.id); load = st.subs[i]?.load ?? 0; on = st.subs[i]?.up ?? true; }
+      else if (p.type === 'tss') { const t = st.sim.lines[p.line].tss[p.idx]; load = Math.max(0, t.p) / 1e6 / st.sim.dc.tssRating; on = t.on; }
+      else if (p.type === 'site' && st.telecom) { soc = st.telecom.soc[p.idx * 1440 + st.telecom.minute] / 100; if (st.telecom.state[p.idx * 1440 + st.telecom.minute] === 0) soc = 1; }
+      c.cu.update({ load, on, soc, night: this.night });
+      const r = this.renderer.domElement.getBoundingClientRect();
+      c.cu.labels.forEach((l, i) => {
+        const v = l.pos.clone().project(this.camera);
+        const el = c.els[i];
+        const vis = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+        el.style.opacity = vis ? '1' : '0';
+        el.style.transform = `translate(${((v.x * 0.5 + 0.5) * r.width).toFixed(0)}px, ${((-v.y * 0.5 + 0.5) * r.height).toFixed(0)}px)`;
+      });
+    }
     // selection ring
     const sp = this.selPos();
     this.ring.visible = !!sp;
@@ -933,5 +1033,6 @@ export class TwinScene {
     this.composer.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
+    this.overlay.remove();
   }
 }

@@ -110,7 +110,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
 
   useEffect(() => { scn.current?.setHighlight(hi === null ? -1 : HI[hi] ?? -1); }, [hi, ready]);
   useEffect(() => { scn.current?.setFlow(mode === 'metro' && flow); }, [flow, ready, mode]);
-  useEffect(() => { if (scn.current) scn.current.selected = sel; }, [sel]);
+  useEffect(() => { if (scn.current) { scn.current.selected = sel; const cp = scn.current.closePick; if (cp && JSON.stringify(cp) !== JSON.stringify(sel)) scn.current.closeUp(null); } }, [sel]);
   // centre the 3D view in the area above the bottom panels
   useEffect(() => {
     if (!ready) return;
@@ -223,7 +223,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
       {ready && e && now && minute && opts && (
         <>
           {tour === null && <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false), 'Simulating the outage')} onOpts={(o) => rerun((en) => en.setOpts(o, false))} />}
-          <Inspector sel={sel} e={e} now={now} mode={mode} onClose={() => setSel(null)} onFocus={(p) => { const v = scn.current?.posOf(p); if (v) scn.current!.focus(v, p.type === 'district' ? 2600 : 700); }}
+          <Inspector sel={sel} e={e} now={now} mode={mode} onLook={(p) => scn.current?.closeUp(p)} looking={!!scn.current?.closePick} onClose={() => setSel(null)} onFocus={(p) => { const v = scn.current?.posOf(p); if (v) scn.current!.focus(v, p.type === 'district' ? 2600 : 700); }}
             onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false), on ? 'Taking it out of service' : 'Back in service')} trips={trips} />
 
           <div className="cy-tools">
@@ -541,7 +541,7 @@ function LineSchematic({ e, line, setLine, sel, setSel }: { e: CityEngine; line:
 
 // ------------------------------------------------------------------ inspector
 
-function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel: Pick | null; e: CityEngine; now: ReturnType<CityEngine['now']>; mode: Mode; onClose: () => void; onFocus: (p: Pick) => void; onTrip: TripFn; trips: string[] }) {
+function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips, onLook, looking }: { sel: Pick | null; e: CityEngine; now: ReturnType<CityEngine['now']>; mode: Mode; onClose: () => void; onFocus: (p: Pick) => void; onTrip: TripFn; trips: string[]; onLook: (p: Pick | null) => void; looking: boolean }) {
   let body: React.ReactNode;
   let title = '', kicker = '';
   const C = e.city, dc = e.sim.dc;
@@ -718,7 +718,8 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
       {sel && (
         <div className="cy-insp-act">
           <button onClick={() => onFocus(sel)}>Fly to</button>
-          <button onClick={onClose}>Close</button>
+          {(sel.type === 'sub' || sel.type === 'tss' || sel.type === 'site') && <button className="cy-look" onClick={() => onLook(looking ? null : sel)}>{looking ? 'Leave close-up' : 'Look inside'}</button>}
+          <button onClick={() => { onLook(null); onClose(); }}>Close</button>
         </div>
       )}
     </aside>
