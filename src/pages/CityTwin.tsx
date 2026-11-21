@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import type { CityEngine, CityEvent, CityOpts, Minute } from '../city/engine';
 import type { Pick, TwinScene } from '../city/TwinScene';
-import { DISTRICTS, GRID_SUBS, LINES, CITY } from '../city/meridia';
-import { SECTORS, SECTOR_INFO, SEASONS, type Sector } from '../city/demand';
-import { DC, TRAIN } from '../city/metro';
+import type { CityData } from '../city/types';
+import { SECTORS, SECTOR_INFO, type Sector } from '../city/demand';
+import { TRAIN } from '../city/metro';
 import { clock, num } from '../lib/format';
 import '../city.css';
 
@@ -18,11 +18,13 @@ const speedLabel = (s: number) => (s >= 60 ? `${s / 60} min/s` : `${s}×`);
 const HI: Partial<Record<Sector, number>> = { res: 0, com: 1, ind: 2, inst: 3, metro: 4, light: 5 };
 
 export default function CityTwin({ mode }: { mode: Mode }) {
+  const { id: cityId = 'meridia' } = useParams();
+  const [city, setCity] = useState<CityData | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const eng = useRef<CityEngine | null>(null);
   const scn = useRef<TwinScene | null>(null);
   const [ready, setReady] = useState(false);
-  const [busy, setBusy] = useState('Building Meridia');
+  const [busy, setBusy] = useState('Building the city');
   const [tick, setTick] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(SPEEDS[mode][1]);
@@ -34,6 +36,8 @@ export default function CityTwin({ mode }: { mode: Mode }) {
   const [line, setLine] = useState(0);
   const [feed, setFeed] = useState<CityEvent[]>([]);
   const [panel, setPanel] = useState<'inputs' | null>(null);
+  const [graphs, setGraphs] = useState(() => { try { return localStorage.getItem('blackstart.cityGraphs') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('blackstart.cityGraphs', graphs ? '1' : '0'); } catch { /* storage unavailable */ } }, [graphs]);
   const play = useRef({ playing, speed });
   play.current = { playing, speed };
   const lastEv = useRef(0);
@@ -43,14 +47,18 @@ export default function CityTwin({ mode }: { mode: Mode }) {
     let alive = true;
     let scene: TwinScene | null = null;
     (async () => {
-      const [{ CityEngine, DEFAULT_OPTS }, { TwinScene }] = await Promise.all([import('../city/engine'), import('../city/TwinScene')]);
-      await new Promise((r) => setTimeout(r, 30));
+      const [{ CityEngine }, { TwinScene }, { loadCity }] = await Promise.all([import('../city/engine'), import('../city/TwinScene'), import('../city/load')]);
+      const c = await loadCity(cityId);
       if (!alive || !host.current) return;
-      const e = new CityEngine({ ...DEFAULT_OPTS });
+      setCity(c);
+      setBusy(`Simulating a day in ${c.name}`);
+      await new Promise((r) => setTimeout(r, 40));
+      if (!alive || !host.current) return;
+      const e = new CityEngine(c);
       e.seek(mode === 'metro' ? 8.1 : 17.5);
       eng.current = e;
       setOpts({ ...e.opts });
-      scene = new TwinScene(host.current, { view: mode === 'metro' ? 'metro' : 'city' });
+      scene = new TwinScene(host.current, c, { view: mode === 'metro' && c.lines.length ? 'metro' : 'city' });
       scn.current = scene;
       if (import.meta.env.DEV) (window as unknown as { __city: unknown }).__city = { e, scene };
       scene.onFrame = (dt) => {
@@ -69,7 +77,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
       scn.current = null;
       eng.current = null;
     };
-  }, [mode]);
+  }, [mode, cityId]);
 
   // the UI reads the engine a few times a second, not every frame
   useEffect(() => {
@@ -94,13 +102,22 @@ export default function CityTwin({ mode }: { mode: Mode }) {
   useEffect(() => {
     if (!ready) return;
     const fit = () => {
-      const top = document.querySelector(mode === 'metro' ? '.cy-schem' : '.cy-strip')?.getBoundingClientRect().top;
+      const top = (document.querySelector('.cy-schem') ?? document.querySelector('.cy-strip'))?.getBoundingClientRect().top;
       if (top) scn.current?.setInset(innerHeight - top);
     };
     fit();
     addEventListener('resize', fit);
     return () => removeEventListener('resize', fit);
-  }, [ready, mode]);
+  }, [ready, mode, graphs]);
+
+  useEffect(() => {
+    const key = (ev: KeyboardEvent) => {
+      if ((ev.target as HTMLElement)?.closest('input, select, textarea')) return;
+      if (ev.key === 'g' || ev.key === 'G') setGraphs((g) => !g);
+    };
+    addEventListener('keydown', key);
+    return () => removeEventListener('keydown', key);
+  }, []);
 
   const rerun = useCallback((fn: (e: CityEngine) => void, msg = 'Re-running the day') => {
     const e = eng.current;
@@ -138,7 +155,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
   void tick;
 
   return (
-    <main id="main" className={`cy-viewer cy-${mode} ${night ? 'is-night' : ''}`}>
+    <main id="main" className={`cy-viewer cy-${mode} ${night ? 'is-night' : ''} ${graphs ? '' : 'cy-nographs'}`}>
       <div
         className="cy-canvas"
         ref={host}
@@ -148,17 +165,17 @@ export default function CityTwin({ mode }: { mode: Mode }) {
       {busy && (
         <div className={`cy-busy ${ready ? 'soft' : ''}`} role="status">
           <span>{busy}</span>
-          <small>{ready ? 'every train, every minute, 00:00 to 24:00' : `${num(CITY.population / 1e6, 1)} million people · ${LINES.length} metro lines · ${GRID_SUBS.length} substations`}</small>
+          <small>{ready ? 'every train, every minute, 00:00 to 24:00' : city ? `${num(city.population / 1e6, 1)} million people · ${city.lines.length} metro line${city.lines.length === 1 ? '' : 's'} · ${city.subs.length} substations` : 'loading map data'}</small>
         </div>
       )}
 
       <header className="cy-title">
         <Link to="/cities" className="pv-back">Cities</Link>
-        <p className="cy-kicker">Meridia · {mode === 'day' ? 'Model 01' : 'Model 02'}</p>
+        <p className="cy-kicker">{city ? <>{city.name} · <span className={`cy-badge cy-badge-${city.kind}`}>{city.kind === 'prototype' ? 'Prototype city' : 'Real city · OpenStreetMap'}</span></> : ' '}</p>
         <h1>{mode === 'day' ? 'City Day' : 'Metro traction'}</h1>
         <nav className="cy-switch" aria-label="Models">
-          <Link to="/city" className={mode === 'day' ? 'on' : ''}>City Day</Link>
-          <Link to="/city/metro" className={mode === 'metro' ? 'on' : ''}>Metro traction</Link>
+          <Link to={`/city/${cityId}`} className={mode === 'day' ? 'on' : ''}>City Day</Link>
+          {(!city || city.lines.length > 0) && <Link to={`/city/${cityId}/metro`} className={mode === 'metro' ? 'on' : ''}>Metro traction</Link>}
         </nav>
       </header>
 
@@ -177,9 +194,9 @@ export default function CityTwin({ mode }: { mode: Mode }) {
             {mode === 'metro' && <button className={`pv-cut ${flow ? 'on' : ''}`} onClick={() => setFlow(!flow)} aria-pressed={flow}>Current flow</button>}
             <button className={`pv-cut ${panel === 'inputs' ? 'on' : ''}`} onClick={() => setPanel(panel === 'inputs' ? null : 'inputs')} aria-expanded={panel === 'inputs'}>Model inputs</button>
           </div>
-          {panel === 'inputs' && <Inputs mode={mode} opts={opts} trips={trips} onOpts={(o) => rerun((en) => en.setOpts(o))} onTrip={(id, on) => rerun((en) => en.trip(id, on))} onClose={() => setPanel(null)} />}
+          {panel === 'inputs' && <Inputs city={e.city} mode={mode} opts={opts} trips={trips} onOpts={(o) => rerun((en) => en.setOpts(o))} onTrip={(id, on) => rerun((en) => en.trip(id, on))} onClose={() => setPanel(null)} />}
 
-          {mode === 'metro' && <LineSchematic e={e} line={line} setLine={setLine} sel={sel} setSel={setSel} />}
+          {mode === 'metro' && graphs && <LineSchematic e={e} line={line} setLine={setLine} sel={sel} setSel={setSel} />}
 
           <section className="cy-strip" aria-label="Timeline">
             <div className="cy-controls">
@@ -189,11 +206,12 @@ export default function CityTwin({ mode }: { mode: Mode }) {
               <div className="pv-seg" role="group" aria-label="Speed">
                 {SPEEDS[mode].map((s) => <button key={s} className={speed === s ? 'on' : ''} onClick={() => setSpeed(s)}>{speedLabel(s)}</button>)}
               </div>
+              <button className={`cy-hide ${graphs ? '' : 'off'}`} onClick={() => setGraphs(!graphs)} aria-pressed={!graphs} title="Show or hide the graphs (G)">{graphs ? 'Hide graphs' : 'Show graphs'}</button>
               <span className="cy-sum">
                 {mode === 'day' ? <>Demand <b>{num(now.total)}</b> MW{now.unserved > 1 && <em> · {num(now.unserved)} MW unserved</em>}</> : <>Traction <b>{num(now.metro, 1)}</b> MW · <b>{e.sim.trains.length}</b> trains · headway <b>{Number.isFinite(now.hw) ? `${num(now.hw / 60, 1)} min` : 'no service'}</b></>}
               </span>
             </div>
-            {mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} /> : <TractionChart e={e} hour={now.h} seek={seek} />}
+            {!graphs ? null : mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} /> : <TractionChart e={e} hour={now.h} seek={seek} />}
           </section>
         </>
       )}
@@ -375,10 +393,12 @@ function TractionChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (
 // ------------------------------------------------------------------ line schematic
 
 function LineSchematic({ e, line, setLine, sel, setSel }: { e: CityEngine; line: number; setLine: (n: number) => void; sel: Pick | null; setSel: (p: Pick) => void }) {
+  const C = e.city, dc = e.sim.dc;
   const ln = e.sim.lines[line];
   const L = ln.L, SW = 1000, SH = 150, top = 22, vh = 70;
   const x = (s: number) => 20 + (s / L) * (SW - 40);
-  const vy = (v: number) => top + vh - ((Math.min(1850, Math.max(900, v)) - 900) / 950) * vh;
+  const lo = dc.Vmin * 0.9, hi = dc.Vregen * 1.03;
+  const vy = (v: number) => top + vh - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * vh;
   // voltage profile from the solved nodes
   const nodes: [number, number][] = [];
   ln.tss.forEach((t) => { if (t.on) nodes.push([t.s, t.v]); });
@@ -389,25 +409,25 @@ function LineSchematic({ e, line, setLine, sel, setSel }: { e: CityEngine; line:
     <section className="cy-schem" aria-label="Line schematic">
       <div className="cy-schem-head">
         <div className="pv-seg" role="group" aria-label="Line">
-          {LINES.map((l, i) => <button key={l.id} className={line === i ? 'on' : ''} onClick={() => setLine(i)}><i style={{ background: l.colour }} />{l.name}</button>)}
+          {C.lines.map((l, i) => <button key={l.id} className={line === i ? 'on' : ''} onClick={() => setLine(i)}><i style={{ background: l.colour }} />{l.name}</button>)}
         </div>
         <span>Pantograph voltage along the line, V</span>
       </div>
       <svg viewBox={`0 0 ${SW} ${SH}`} preserveAspectRatio="none">
-        {[[1800, 'Umax1 1800'], [1500, 'nominal 1500'], [1000, 'Umin1 1000']].map(([v, l]) => (
-          <g key={v} className={`cy-ref ${v === 1500 ? 'nom' : ''}`}><line x1={20} x2={SW - 20} y1={vy(v as number)} y2={vy(v as number)} /><text x={SW - 22} y={vy(v as number) - 3}>{l}</text></g>
+        {[[dc.Vregen, `Umax1 ${dc.Vregen}`], [C.metro.voltage, `nominal ${C.metro.voltage}`], [dc.Vmin, `Umin1 ${dc.Vmin}`]].map(([v, l]) => (
+          <g key={v} className={`cy-ref ${v === C.metro.voltage ? 'nom' : ''}`}><line x1={20} x2={SW - 20} y1={vy(v as number)} y2={vy(v as number)} /><text x={SW - 22} y={vy(v as number) - 3}>{l}</text></g>
         ))}
         <polyline points={prof} className="cy-prof" />
         <line x1={20} x2={SW - 20} y1={118} y2={118} className="cy-track" />
         <line x1={20} x2={SW - 20} y1={128} y2={128} className="cy-track" />
-        {LINES[line].stations.map((st, i) => (
+        {C.lines[line].stations.map((st, i) => (
           <g key={st.name} className="cy-st" onClick={() => setSel({ type: 'station', line, idx: i })}>
             <line x1={x(st.s)} x2={x(st.s)} y1={113} y2={133} />
             <text x={x(st.s)} y={146}>{st.name}</text>
           </g>
         ))}
         {ln.tss.map((t, i) => {
-          const f = Math.max(0, t.p) / 1e6 / DC.tssRating;
+          const f = Math.max(0, t.p) / 1e6 / dc.tssRating;
           const on = sel?.type === 'tss' && sel.line === line && sel.idx === i;
           return (
             <g key={t.name} className={`cy-tss ${!t.on ? 'off' : f > 1 ? 'over' : ''} ${on ? 'sel' : ''}`} onClick={() => setSel({ type: 'tss', line, idx: i })}>
@@ -431,8 +451,9 @@ function LineSchematic({ e, line, setLine, sel, setSel }: { e: CityEngine; line:
 function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel: Pick | null; e: CityEngine; now: ReturnType<CityEngine['now']>; mode: Mode; onClose: () => void; onFocus: (p: Pick) => void; onTrip: (id: string, on: boolean) => void; trips: string[] }) {
   let body: React.ReactNode;
   let title = '', kicker = '';
+  const C = e.city, dc = e.sim.dc;
   if (!sel) {
-    kicker = 'Meridia now';
+    kicker = `${C.name} now`;
     title = mode === 'day' ? `${num(now.total)} MW` : `${num(now.metro, 1)} MW`;
     const peak = Math.max(...e.scenario.mins.map((m) => m.total));
     body = (
@@ -441,21 +462,25 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
           ['Air temperature', `${now.T.toFixed(1)} °C`],
           ['Sun', now.sunEl > 0 ? `${now.sunEl.toFixed(0)}° up` : `${(-now.sunEl).toFixed(0)}° below horizon`],
           ['Today’s peak', `${num(peak)} MW`],
-          ['Season', SEASONS[e.opts.season].label],
-          ['Population', `${num(CITY.population / 1e6, 2)} million`],
+          ['Season', C.climate[e.opts.season].label],
+          ['Population', `${num(C.population / 1e6, 2)} million`],
         ] : [
           ['Trains in service', `${e.sim.trains.length}`],
           ['Substations on', `${e.sim.lines.reduce((a, l) => a + l.tss.filter((t) => t.on).length, 0)} of ${e.sim.lines.reduce((a, l) => a + l.tss.length, 0)}`],
-          ['System', '1500 V DC overhead'],
+          ['System', `${C.metro.voltage} V DC overhead`],
           ['Regenerative braking', e.opts.regen ? 'on' : 'off'],
           ['Substation type', e.opts.reversible ? 'reversible (inverter)' : 'diode rectifier'],
         ]} />
         <p className="cy-hint">Click a {mode === 'day' ? 'district, substation or train' : 'train, substation or station'} in the city to inspect it.</p>
+        <details className="cy-notes">
+          <summary>{C.kind === 'prototype' ? 'This is a prototype city' : 'Where the data comes from'}</summary>
+          <ul>{C.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+        </details>
       </>
     );
   } else if (sel.type === 'district') {
     const x = now.districts.find((d) => d.d.id === sel.id)!;
-    const sub = GRID_SUBS.find((s) => s.id === x.d.sub)!;
+    const sub = C.subs.find((s) => s.id === x.d.sub)!;
     const sn = now.subs.find((s) => s.s.id === sub.id)!;
     kicker = 'District';
     title = x.d.name;
@@ -469,10 +494,10 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
       </>
     );
   } else if (sel.type === 'sub') {
-    const i = GRID_SUBS.findIndex((s) => s.id === sel.id);
+    const i = C.subs.findIndex((s) => s.id === sel.id);
     const s = now.subs[i];
-    const fed = DISTRICTS.filter((d) => d.sub === sel.id);
-    const tssFed = LINES.flatMap((l) => l.tss.filter((t) => t.sub === sel.id).map((t) => t.name));
+    const fed = C.districts.filter((d) => d.sub === sel.id);
+    const tssFed = C.lines.flatMap((l) => l.tss.filter((t) => t.sub === sel.id).map((t) => t.name));
     const tripped = trips.includes(sel.id);
     kicker = '132/33 kV substation';
     title = s.s.name.replace(' 132/33 kV', '');
@@ -486,18 +511,18 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
   } else if (sel.type === 'tss') {
     const t = e.sim.lines[sel.line].tss[sel.idx];
     const id = `tss:${sel.line}:${sel.idx}`;
-    kicker = `${LINES[sel.line].name} · traction substation`;
+    kicker = `${C.lines[sel.line].name} · traction substation`;
     title = t.name.replace(' TSS', '');
     body = (
       <>
-        <Rows rows={[['Output', t.on ? `${num(Math.max(0, t.p) / 1e6, 2)} MW` : 'out of service'], ['Current', t.on ? `${num(Math.max(0, t.i))} A` : '—'], ['Busbar voltage', t.on ? `${num(t.v)} V` : '—'], ['Rating', `${DC.tssRating} MW (2 × 2.5 MW rectifiers)`], ['Fed from', GRID_SUBS.find((g) => g.id === t.sub)!.name]]} />
+        <Rows rows={[['Output', t.on ? `${num(Math.max(0, t.p) / 1e6, 2)} MW` : 'out of service'], ['Current', t.on ? `${num(Math.max(0, t.i))} A` : '—'], ['Busbar voltage', t.on ? `${num(t.v)} V` : '—'], ['Rating', `${dc.tssRating} MW${t.modelled ? ' (position modelled)' : ''}`], ['Fed from', C.subs.find((g) => g.id === t.sub)!.name]]} />
         <button className="cy-trip" onClick={() => onTrip(id, !trips.includes(id))}>{trips.includes(id) ? 'Return to service' : 'Take out of service'}</button>
-        <p className="cy-hint">A diode rectifier only conducts while the line voltage is below its {DC.E} V no-load voltage, so substations share each train’s load by distance.</p>
+        <p className="cy-hint">A diode rectifier only conducts while the line voltage is below its {dc.E} V no-load voltage, so substations share each train’s load by distance.</p>
       </>
     );
   } else if (sel.type === 'train') {
     const t = e.sim.trains.find((x) => x.id === sel.id);
-    kicker = t ? `${LINES[t.line].name} · train ${t.id}` : 'Train';
+    kicker = t ? `${C.lines[t.line].name} · train ${t.id}` : 'Train';
     title = t ? `${num(t.v * 3.6)} km/h` : 'Arrived';
     if (t) {
       const ln = e.sim.lines[t.line];
@@ -506,14 +531,14 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
       const phase = { accel: 'Accelerating', cruise: 'Cruising', brake: 'Braking', dwell: 'At the platform', held: 'Held at signal', stalled: 'Stalled: no traction voltage' }[t.phase];
       body = (
         <>
-          <Rows rows={[['Doing', phase], ['Power', pw >= 0 ? `${num(pw, 2)} MW drawn` : `${num(-pw, 2)} MW regenerated`], ['Pantograph', `${num(t.volt)} V`], ['Passengers', `${num(t.pax)} (${Math.round((t.pax / TRAIN.capacity) * 100)} %)`], ['Mass', `${num(TRAIN.tare + t.pax * 0.07)} t`], ['Next stop', stops[t.next]], ['Towards', stops[stops.length - 1]]]} />
+          <Rows rows={[['Doing', phase], ['Power', pw >= 0 ? `${num(pw, 2)} MW drawn` : `${num(-pw, 2)} MW regenerated`], ['Pantograph', `${num(t.volt)} V`], ['Passengers', `${num(t.pax)} (${Math.round((t.pax / e.sim.cap) * 100)} %)`], ['Mass', `${num(TRAIN.tare + t.pax * 0.07)} t`], ['Next stop', stops[t.next]], ['Towards', stops[stops.length - 1]]]} />
           {t.burnt > 1000 && <p className="cy-hint warn">{num(t.burnt / 1e6, 2)} MW of braking power is being burnt in the roof resistors: no train nearby can take it.</p>}
         </>
       );
     } else body = <p className="cy-hint">This train has reached its terminal and left service.</p>;
   } else {
-    const st = LINES[sel.line].stations[sel.idx];
-    kicker = `${LINES[sel.line].name} · station`;
+    const st = C.lines[sel.line].stations[sel.idx];
+    kicker = `${C.lines[sel.line].name} · station`;
     title = st.name;
     body = <Rows rows={[['Chainage', `${num(st.s / 1000, 2)} km`], ['Platform', '150 m, elevated, 13 m above street'], ['Dwell', '25–50 s, longer at the peak']]} />;
   }
@@ -546,7 +571,7 @@ function Bars({ parts }: { parts: [Sector, number][] }) {
 
 // ------------------------------------------------------------------ inputs
 
-function Inputs({ mode, opts, trips, onOpts, onTrip, onClose }: { mode: Mode; opts: CityOpts; trips: string[]; onOpts: (o: Partial<CityOpts>) => void; onTrip: (id: string, on: boolean) => void; onClose: () => void }) {
+function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city: CityData; mode: Mode; opts: CityOpts; trips: string[]; onOpts: (o: Partial<CityOpts>) => void; onTrip: (id: string, on: boolean) => void; onClose: () => void }) {
   return (
     <aside className="cy-inputs" aria-label="Model inputs">
       <header><h2>Model inputs</h2><button onClick={onClose} aria-label="Close">×</button></header>
@@ -584,16 +609,16 @@ function Inputs({ mode, opts, trips, onOpts, onTrip, onClose }: { mode: Mode; op
         <select value="" onChange={(ev) => ev.target.value && onTrip(ev.target.value, true)}>
           <option value="">Take something out…</option>
           {mode === 'metro'
-            ? LINES.flatMap((l, li) => l.tss.map((t, ti) => <option key={`${li}${ti}`} value={`tss:${li}:${ti}`} disabled={trips.includes(`tss:${li}:${ti}`)}>{l.name}: {t.name}</option>))
-            : GRID_SUBS.map((s) => <option key={s.id} value={s.id} disabled={trips.includes(s.id)}>{s.name}</option>)}
+            ? C.lines.flatMap((l, li) => l.tss.map((t, ti) => <option key={`${li}${ti}`} value={`tss:${li}:${ti}`} disabled={trips.includes(`tss:${li}:${ti}`)}>{l.name}: {t.name}</option>))
+            : C.subs.map((s) => <option key={s.id} value={s.id} disabled={trips.includes(s.id)}>{s.name}</option>)}
         </select>
-        {trips.length > 0 && <ul className="cy-trips">{trips.map((id) => <li key={id}>{labelOf(id)}<button onClick={() => onTrip(id, false)}>Restore</button></li>)}</ul>}
+        {trips.length > 0 && <ul className="cy-trips">{trips.map((id) => <li key={id}>{labelOf(C, id)}<button onClick={() => onTrip(id, false)}>Restore</button></li>)}</ul>}
       </fieldset>
     </aside>
   );
 }
 
-function labelOf(id: string) {
-  if (id.startsWith('tss:')) { const [, l, i] = id.split(':').map(Number); return LINES[l].tss[i].name; }
-  return GRID_SUBS.find((s) => s.id === id)?.name ?? id;
+function labelOf(C: CityData, id: string) {
+  if (id.startsWith('tss:')) { const [, l, i] = id.split(':').map(Number); return C.lines[l].tss[i].name; }
+  return C.subs.find((s) => s.id === id)?.name ?? id;
 }

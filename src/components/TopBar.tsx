@@ -28,9 +28,8 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
   {
     label: 'Cities',
     items: [
-      { to: '/cities', label: 'Meridia', note: 'A prototype city of 2.7 million, system by system' },
-      { to: '/city', label: 'City Day', note: 'Where a city’s demand comes from, hour by hour' },
-      { to: '/city/metro', label: 'Metro traction', note: 'Trains, substations and the 1500 V DC line' },
+      { to: '/cities', label: 'All cities', note: 'Real cities and the Meridia prototype' },
+      { to: '/city/meridia', label: 'Meridia (prototype)', note: 'The fictional test city every model starts in' },
     ],
   },
   {

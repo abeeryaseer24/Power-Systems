@@ -12,7 +12,7 @@
 // The DC network is a chain, so each solve is a tridiagonal system, iterated a
 // few times for the constant-power loads and the diode states.
 
-import { LINES, polyLength, type MetroLine } from './meridia';
+import { polyLength, type CityData, type MetroLine } from './types';
 import { temperature, type DayInputs } from './demand';
 
 export const DC = {
@@ -42,7 +42,6 @@ export const TRAIN = {
 };
 
 export type TractionOpts = { peakHeadway: number; regen: boolean; reversible: boolean; inp: DayInputs };
-export const DEFAULT_TRACTION: Omit<TractionOpts, 'inp'> = { peakHeadway: 180, regen: true, reversible: false };
 
 export type Phase = 'accel' | 'cruise' | 'brake' | 'dwell' | 'held' | 'stalled';
 
@@ -65,7 +64,7 @@ export type Train = {
   aux: number;
 };
 
-export type TssState = { name: string; s: number; sub: string; on: boolean; p: number; i: number; v: number; peak: number };
+export type TssState = { name: string; s: number; sub: string; modelled?: boolean; on: boolean; p: number; i: number; v: number; peak: number };
 export type Segment = { s0: number; s1: number; i: number };
 
 const LF_WD = [0.04, 0.02, 0.02, 0.02, 0.03, 0.12, 0.38, 0.8, 0.95, 0.78, 0.5, 0.42, 0.44, 0.45, 0.44, 0.5, 0.62, 0.82, 0.9, 0.74, 0.52, 0.38, 0.26, 0.12];
@@ -79,14 +78,16 @@ const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 export const SERVICE = { start: 5.5, lastDeparture: 23.5 };
 
 /** Timetable headway in seconds at hour h (Infinity outside service hours). */
-export function headway(h: number, o: Pick<TractionOpts, 'peakHeadway' | 'inp'>) {
-  if (h < SERVICE.start || h >= SERVICE.lastDeparture) return Infinity;
-  if (o.inp.day === 'weekend') return h < 8 || h >= 22 ? 600 : 360;
-  if ((h >= 7 && h < 10) || (h >= 16.5 && h < 20)) return o.peakHeadway;
-  if (h < 7) return 480;
-  if (h < 16.5) return 360;
-  if (h < 22) return 420;
-  return 600;
+export function headway(h: number, o: Pick<TractionOpts, 'peakHeadway' | 'inp'>, m?: { service?: [number, number]; peaks?: [number, number][]; offpeak?: number }) {
+  const [start, last] = m?.service ?? [SERVICE.start, SERVICE.lastDeparture];
+  if (h < start || h >= last) return Infinity;
+  const off = m?.offpeak ?? 360;
+  if (o.inp.day === 'weekend') return h < start + 2.5 || h >= last - 1.5 ? off * 1.6 : off;
+  const peaks = m?.peaks ?? [[7, 10], [16.5, 20]];
+  if (peaks.some(([a, b]) => h >= a && h < b)) return o.peakHeadway;
+  if (h < start + 1.5) return off * 1.3;
+  if (h >= last - 1.5) return off * 1.6;
+  return off;
 }
 
 /** Passenger load factor 0..1 for trains at hour h. */
@@ -121,19 +122,30 @@ export class TractionSim {
   // energy accumulators, J
   eGrid = 0; eTraction = 0; eAux = 0; eRegenUsed = 0; eBurnt = 0; eReturned = 0; eLoss = 0;
 
-  constructor(opts: TractionOpts) {
+  dc: typeof DC;
+  cap: number;
+  vmax: number;
+  private interchange: string;
+
+  constructor(public city: CityData, opts: TractionOpts) {
     this.opts = opts;
-    this.lines = LINES.map((def) => {
+    // EN 50163 limits scale with the nominal voltage (750 V: Umin1 500, Umax1 900)
+    const k = city.metro.voltage / 1500;
+    this.dc = { ...DC, E: city.metro.E, Vregen: DC.Vregen * k, Vinv: DC.Vinv * k, Vmin: DC.Vmin * k, Vfull: DC.Vfull * k, Rint: DC.Rint * k * k, tssRating: city.metro.tssRating };
+    this.cap = city.metro.capacity;
+    this.vmax = city.metro.vmax;
+    this.interchange = city.metro.interchange ?? '';
+    this.lines = city.lines.map((def) => {
       const L = polyLength(def.path);
       const fwd = def.stations.map((s) => s.s);
       return {
         def, L,
         stops: [fwd, fwd.map((s) => L - s).reverse()],
         names: [def.stations.map((s) => s.name), def.stations.map((s) => s.name).reverse()],
-        tss: def.tss.map((t) => ({ ...t, on: true, p: 0, i: 0, v: DC.E, peak: 0 })),
+        tss: def.tss.map((t) => ({ ...t, on: true, p: 0, i: 0, v: this.dc.E, peak: 0 })),
         segs: [],
         lastDep: [-1e9, -1e9],
-        minV: DC.E,
+        minV: this.dc.E,
       };
     });
   }
@@ -153,12 +165,12 @@ export class TractionSim {
 
   step(dt: number) {
     const h = this.hour, o = this.opts;
-    const T = temperature(h, o.inp);
+    const T = temperature(this.city, h, o.inp);
     const auxW = TRAIN.cars * (18 + 3.2 * Math.max(0, T - 22)) * 1000;
     const lf = loadFactor(h, o.inp);
 
     // 1. dispatch from the terminals on the timetable
-    const hw = headway(h, o);
+    const hw = headway(h, o, this.city.metro);
     this.lines.forEach((ln, li) => {
       for (const d of [0, 1] as const) {
         if (this.t - ln.lastDep[d] < hw) continue;
@@ -166,8 +178,8 @@ export class TractionSim {
         const blocked = this.trains.some((tr) => tr.line === li && tr.dir === dir && tr.p < TRAIN.length + 250);
         if (blocked) continue;
         ln.lastDep[d] = this.t;
-        const pax = Math.round(TRAIN.capacity * clamp(lf * (0.85 + 0.3 * this.rand()), 0.01, 1));
-        this.trains.push({ id: this.nextId++, line: li, dir, p: 0, v: 0, next: 1, dwell: 20, phase: 'dwell', pax, pReq: 0, pDel: 0, burnt: 0, volt: DC.E, ratio: 1, desF: 0, aux: auxW });
+        const pax = Math.round(this.cap * clamp(lf * (0.85 + 0.3 * this.rand()), 0.01, 1));
+        this.trains.push({ id: this.nextId++, line: li, dir, p: 0, v: 0, next: 1, dwell: 20, phase: 'dwell', pax, pReq: 0, pDel: 0, burnt: 0, volt: this.dc.E, ratio: 1, desF: 0, aux: auxW });
       }
     });
 
@@ -197,7 +209,7 @@ export class TractionSim {
           tr.phase = 'brake';
           const dec = Math.min(1.3, (tr.v * tr.v) / (2 * Math.max(auth, 0.4)));
           tr.desF = -Math.max(0, mass * dec - R);
-        } else if (auth > 2 && tr.v < TRAIN.vmax - 0.3) {
+        } else if (auth > 2 && tr.v < this.vmax - 0.3) {
           tr.phase = 'accel';
           tr.desF = Math.min(mass * TRAIN.aMax + R, TRAIN.Fmax, TRAIN.Pmax / Math.max(tr.v, 0.5));
         } else if (auth > 2) {
@@ -259,10 +271,10 @@ export class TractionSim {
         }
         tr.next++;
         tr.phase = 'dwell';
-        const inter = ln.names[tr.dir > 0 ? 0 : 1][tr.next - 1] === 'Civic Centre';
+        const inter = ln.names[tr.dir > 0 ? 0 : 1][tr.next - 1] === this.interchange;
         tr.dwell = 25 + 25 * lf + (inter ? 12 : 0);
         // passengers change at each stop
-        tr.pax = Math.round(clamp(tr.pax + (this.rand() - 0.5) * 0.25 * TRAIN.capacity * Math.max(lf, 0.1), 0, TRAIN.capacity));
+        tr.pax = Math.round(clamp(tr.pax + (this.rand() - 0.5) * 0.25 * this.cap * Math.max(lf, 0.1), 0, this.cap));
       } else if (tr.p > target) {
         tr.p = target;
       }
@@ -297,29 +309,29 @@ export class TractionSim {
     const n = nodes.length;
     if (!n) return;
     const g = new Float64Array(Math.max(0, n - 1));
-    for (let i = 0; i < n - 1; i++) g[i] = 1 / (DC.rLoop * Math.max(nodes[i + 1].s - nodes[i].s, 2));
+    for (let i = 0; i < n - 1; i++) g[i] = 1 / (this.dc.rLoop * Math.max(nodes[i + 1].s - nodes[i].s, 2));
     // warm start from the last step's voltages: usually converges in 3-5 passes
     const V = new Float64Array(n);
-    for (let i = 0; i < n; i++) V[i] = nodes[i].tss ? (nodes[i].tss!.v || DC.E) : Math.min(nodes[i].tr!.volt || DC.E, DC.Vregen);
+    for (let i = 0; i < n; i++) V[i] = nodes[i].tss ? (nodes[i].tss!.v || this.dc.E) : Math.min(nodes[i].tr!.volt || this.dc.E, this.dc.Vregen);
     const Gs = new Float64Array(n), J = new Float64Array(n);
     const clampState = new Uint8Array(n);
     const BIG = 50;
     const a = new Float64Array(n), b = new Float64Array(n), c = new Float64Array(n), d = new Float64Array(n), Vn = new Float64Array(n);
-    const uv = (v: number) => clamp((v - DC.Vmin) / (DC.Vfull - DC.Vmin), 0, 1);
+    const uv = (v: number) => clamp((v - this.dc.Vmin) / (this.dc.Vfull - this.dc.Vmin), 0, 1);
     for (let it = 0; it < 24; it++) {
       for (let i = 0; i < n; i++) {
         const nd = nodes[i];
         Gs[i] = 1e-6; J[i] = 0;
         if (nd.tss) {
-          if (V[i] < DC.E) { Gs[i] += 1 / DC.Rint; J[i] += DC.E / DC.Rint; }
-          else if (this.opts.reversible && V[i] > DC.Vinv) { Gs[i] += 1 / DC.Rint; J[i] += DC.Vinv / DC.Rint; }
+          if (V[i] < this.dc.E) { Gs[i] += 1 / this.dc.Rint; J[i] += this.dc.E / this.dc.Rint; }
+          else if (this.opts.reversible && V[i] > this.dc.Vinv) { Gs[i] += 1 / this.dc.Rint; J[i] += this.dc.Vinv / this.dc.Rint; }
         } else if (nd.tr) {
           let P = nd.tr.pReq;
           if (P > 0) P *= uv(V[i]);
           const Vi = Math.max(V[i], 300);
           // a regenerating train injects P/V until the line reaches Umax1, then acts as a voltage limit
-          clampState[i] = P < 0 && BIG * (DC.Vregen - Vi) < -P / Vi ? 1 : 0;
-          if (clampState[i]) { Gs[i] += BIG; J[i] += BIG * DC.Vregen; }
+          clampState[i] = P < 0 && BIG * (this.dc.Vregen - Vi) < -P / Vi ? 1 : 0;
+          if (clampState[i]) { Gs[i] += BIG; J[i] += BIG * this.dc.Vregen; }
           else J[i] -= P / Vi;
         }
       }
@@ -343,7 +355,7 @@ export class TractionSim {
       if (dmax < 0.5 && it > 1) break;
     }
     // read back: substation and train powers, segment currents
-    let minV = DC.E;
+    let minV = this.dc.E;
     ln.segs = [];
     for (let i = 0; i < n - 1; i++) {
       const I = g[i] * (V[i] - V[i + 1]);
@@ -355,11 +367,11 @@ export class TractionSim {
       if (nd.tss) {
         const t = nd.tss;
         let I = 0;
-        if (V[i] < DC.E) I = (DC.E - V[i]) / DC.Rint;
-        else if (this.opts.reversible && V[i] > DC.Vinv) I = (DC.Vinv - V[i]) / DC.Rint;
+        if (V[i] < this.dc.E) I = (this.dc.E - V[i]) / this.dc.Rint;
+        else if (this.opts.reversible && V[i] > this.dc.Vinv) I = (this.dc.Vinv - V[i]) / this.dc.Rint;
         t.i = I; t.v = V[i];
         // grid side: rectifier-transformer losses on top of E·I
-        t.p = I >= 0 ? (DC.E * I) / 0.985 : DC.Vinv * I * 0.97;
+        t.p = I >= 0 ? (this.dc.E * I) / 0.985 : this.dc.Vinv * I * 0.97;
         if (t.p > 0) this.eGrid += t.p * dt;
         else this.eReturned += -t.p * dt;
       } else if (nd.tr) {
@@ -375,8 +387,8 @@ export class TractionSim {
         } else {
           // regenerating: how much the catenary accepted
           const avail = -tr.pReq;
-          const accepted = clamp(Math.min(avail, V[i] * BIG * (DC.Vregen - V[i])), 0, avail);
-          tr.volt = Math.min(V[i], DC.Vregen);
+          const accepted = clamp(Math.min(avail, V[i] * BIG * (this.dc.Vregen - V[i])), 0, avail);
+          tr.volt = Math.min(V[i], this.dc.Vregen);
           tr.pDel = -accepted;
           tr.burnt += avail - accepted;
           tr.ratio = 1;

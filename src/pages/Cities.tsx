@@ -1,39 +1,50 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CITY, DISTRICTS, GRID_SUBS, LINES, polyLength } from '../city/meridia';
+import { cityIndex, type CityIndexEntry } from '../city/load';
 import { num } from '../lib/format';
 import '../city.css';
 
-const MODELS = [
-  { to: '/city', no: '01', name: 'City Day', blurb: 'Twenty-four hours of demand, built up from homes, offices, industry, hospitals and street lights. Every lit window in the city is a number from the model.' },
-  { to: '/city/metro', no: '02', name: 'Metro traction', blurb: 'Two elevated lines on 1500 V DC. Trains driven one by one, the overhead line solved every second: substations sharing load, braking trains feeding accelerating ones.' },
-];
-
 export default function Cities() {
-  const km = LINES.reduce((a, l) => a + polyLength(l.path), 0) / 1000;
+  const [cities, setCities] = useState<CityIndexEntry[] | null>(null);
+  useEffect(() => { cityIndex().then(setCities); }, []);
+  const proto = cities?.filter((c) => c.kind === 'prototype') ?? [];
+  const real = cities?.filter((c) => c.kind === 'real') ?? [];
   return (
     <main id="main" className="page cy-index">
       <header className="cy-ihead">
-        <p className="pv-kicker">Prototype cities</p>
-        <h1>Meridia</h1>
-        <p>A fictional coastal city on a subtropical bay, built to show how a modern city runs on electricity. The numbers are illustrative, calibrated to published figures for hot, dense cities. Each model is one system of the city, on its own page, sharing one clock and one grid.</p>
-        <dl className="cy-facts">
-          <div><dt>People</dt><dd>{num(CITY.population / 1e6, 2)} m</dd></div>
-          <div><dt>Districts</dt><dd>{DISTRICTS.length}</dd></div>
-          <div><dt>132/33 kV substations</dt><dd>{GRID_SUBS.length}</dd></div>
-          <div><dt>Metro</dt><dd>{num(km, 1)} km</dd></div>
-        </dl>
+        <p className="pv-kicker">City models</p>
+        <h1>How a city runs on power</h1>
+        <p>Each city runs the same models: a full day of demand built up from homes, offices, industry, hospitals and street lights, and the metro simulated train by train on its DC overhead line. Real cities are built from OpenStreetMap and official population counts. Meridia is a made-up test city where each model is built first.</p>
       </header>
-      <ol className="cy-models">
-        {MODELS.map((m) => (
-          <li key={m.to}>
-            <Link to={m.to}>
-              <span className="cy-no">{m.no}</span>
-              <span className="cy-name">{m.name}</span>
-              <span className="cy-blurb">{m.blurb}</span>
-            </Link>
-          </li>
-        ))}
-      </ol>
+
+      {real.length > 0 && (
+        <section className="cy-group">
+          <h2>Real cities</h2>
+          <ol className="cy-cities">{real.map((c) => <Card key={c.id} c={c} />)}</ol>
+        </section>
+      )}
+      <section className="cy-group">
+        <h2>Prototype</h2>
+        <ol className="cy-cities">{proto.map((c) => <Card key={c.id} c={c} />)}</ol>
+      </section>
+      {!cities && <p className="cy-hint">Loading…</p>}
     </main>
+  );
+}
+
+function Card({ c }: { c: CityIndexEntry }) {
+  return (
+    <li className={`cy-city cy-city-${c.kind}`}>
+      <Link to={`/city/${c.id}`} className="cy-city-main">
+        <span className={`cy-badge cy-badge-${c.kind}`}>{c.kind === 'prototype' ? 'Prototype · fictional' : `Real city · ${c.country}`}</span>
+        <span className="cy-name">{c.name}</span>
+        <span className="cy-blurb">{c.blurb}</span>
+        <span className="cy-stats">{num(c.population / 1e6, 2)} million people · {c.districts} substation areas · {c.lines ? `${c.lines} metro line${c.lines > 1 ? 's' : ''}` : 'no metro yet'}</span>
+      </Link>
+      <span className="cy-city-models">
+        <Link to={`/city/${c.id}`}>City Day</Link>
+        {c.lines > 0 && <Link to={`/city/${c.id}/metro`}>Metro traction</Link>}
+      </span>
+    </li>
   );
 }

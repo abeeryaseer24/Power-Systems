@@ -160,3 +160,36 @@
   .cy-sum { margin-left: 0; width: 100%; }
   .cy-inputs { left: 12px; right: 12px; width: auto; top: 70px; bottom: auto; max-height: 60vh; }
 }
+
+/* city index cards + badges */
+.cy-group { margin-top: 34px; }
+.cy-group h2 { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--steel); margin: 0 0 10px; }
+.cy-cities { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr)); gap: 0; border-top: 1px solid var(--rule-strong); border-left: 1px solid var(--rule-strong); }
+.cy-city { border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); display: grid; }
+.cy-city-main { display: grid; gap: 6px; padding: 22px 24px 14px; color: inherit; text-decoration: none; transition: background 0.25s; }
+.cy-city-main:hover, .cy-city-main:focus-visible { background: rgba(255, 176, 77, 0.04); }
+.cy-city .cy-name { font-size: 48px; }
+.cy-stats { font-size: 13.5px; color: var(--glaze); }
+.cy-city-models { display: flex; gap: 0; border-top: 1px solid var(--rule); }
+.cy-city-models a { flex: 1; padding: 10px 24px; font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--porcelain); text-decoration: none; }
+.cy-city-models a + a { border-left: 1px solid var(--rule); }
+.cy-city-models a:hover { color: var(--sodium); }
+.cy-badge { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; width: max-content; }
+.cy-badge-prototype { border: 1px dashed var(--arc); color: var(--arc); }
+.cy-badge-real { border: 1px solid var(--ok); color: var(--ok); }
+.cy-title .cy-badge { font-size: 11px; margin-left: 2px; text-shadow: none; background: rgba(8, 16, 28, 0.5); }
+.cy-city-prototype .cy-city-main { background-image: repeating-linear-gradient(135deg, transparent 0 14px, rgba(201, 184, 255, 0.025) 14px 15px); }
+.cy-notes { margin-top: 10px; border-top: 1px solid var(--rule); padding-top: 8px; }
+.cy-notes summary { cursor: pointer; font-family: var(--display); font-weight: 600; font-size: 14px; color: var(--sodium); }
+.cy-notes ul { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 5px; }
+.cy-notes li { font-size: 12.5px; line-height: 1.45; color: var(--steel); }
+
+/* graphs hidden: only the transport bar stays at the bottom */
+.cy-hide { all: unset; cursor: pointer; font-family: var(--display); font-weight: 600; font-size: 14px; padding: 6px 11px; border: 1px solid var(--rule-strong); color: var(--porcelain); }
+.cy-hide.off { border-color: var(--sodium); color: var(--sodium); }
+.cy-hide:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.cy-nographs .cy-tools, .cy-nographs.cy-metro .cy-tools { bottom: 78px; }
+.cy-nographs .cy-insp, .cy-nographs.cy-metro .cy-insp { max-height: calc(100% - 150px); }
+.cy-nographs .cy-inputs, .cy-nographs.cy-metro .cy-inputs { bottom: 122px; max-height: calc(100% - 150px); }
+.cy-nographs .cy-note { display: none; }
+@media (max-width: 900px) { .cy-nographs .cy-insp { bottom: 90px; } .cy-nographs .cy-tools { bottom: auto; } }

@@ -9,10 +9,11 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gsap } from 'gsap';
 import { glow, rng } from '../plants3d/textures';
-import { CITY, DISTRICTS, GRID_SUBS, LINES, RIVER_W, along, coastZ, polyLength, riverX } from './meridia';
-import { generate, KIND_INDEX, wet } from './layout';
-import { DC, TRAIN, type TractionSim } from './metro';
-import { SEASONS, type Season } from './demand';
+import { along, districtAt, polyLength, type CityData, type Kind, type Season } from './types';
+import { TRAIN, type TractionSim } from './metro';
+
+const KIND_INDEX: Record<Kind, number> = { res: 0, com: 1, ind: 2, inst: 3 };
+export const MAXD = 64;
 
 // The 3D twin of Meridia. Everything visible is driven by the engine:
 // window lights follow the demand model, street lighting follows the sun,
@@ -30,7 +31,6 @@ export type SceneState = {
 };
 
 const DECK = 13; // viaduct deck height, m
-const W = 16000, D = 10800, X0 = -8000, Z0 = -6200; // ground texture footprint
 
 export class TwinScene {
   renderer: THREE.WebGLRenderer;
@@ -48,14 +48,13 @@ export class TwinScene {
   private nightDome!: THREE.Mesh;
   private night = 0;
   private bUniforms = {
-    uLit: { value: Array.from({ length: 12 }, () => new THREE.Vector4()) },
-    uOn: { value: new Array(12).fill(1) as number[] },
+    uLit: { value: Array.from({ length: MAXD }, () => new THREE.Vector4()) },
+    uOn: { value: new Array(MAXD).fill(1) as number[] },
     uNight: { value: 0 },
     uHi: { value: -1 },
   };
   private gUniforms = {
-    uStreet: { value: new Array(12).fill(0) as number[] },
-    uRects: { value: DISTRICTS.map((d) => new THREE.Vector4(...d.rect)) },
+    uStreet: { value: new Array(MAXD + 1).fill(0) as number[] },
     uNight: { value: 0 },
     uHi: { value: -1 },
   };
@@ -68,7 +67,8 @@ export class TwinScene {
   private flow: { pts: THREE.Points; s: Float32Array; lat: Float32Array; line: number }[] = [];
   private flowOn = true;
   private stationPos: THREE.Vector3[][] = [];
-  private lineLen = LINES.map((l) => polyLength(l.path));
+  private lineLen: number[];
+  private W: number; private D: number; private X0: number; private Z0: number;
   private trainHeads = new Map<number, THREE.Vector3>();
   private raf = 0;
   private last = performance.now();
@@ -80,7 +80,10 @@ export class TwinScene {
   selected: Pick | null = null;
   private ring: THREE.Mesh;
 
-  constructor(private host: HTMLElement, opts: { view?: 'city' | 'metro' } = {}) {
+  constructor(private host: HTMLElement, public city: CityData, opts: { view?: 'city' | 'metro' } = {}) {
+    const [bx0, bz0, bx1, bz1] = city.bounds;
+    this.X0 = bx0; this.Z0 = bz0; this.W = bx1 - bx0; this.D = bz1 - bz0;
+    this.lineLen = city.lines.map((l) => polyLength(l.path));
     const mobile = matchMedia('(max-width: 760px)').matches;
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.25 : 1.5));
@@ -108,7 +111,7 @@ export class TwinScene {
 
     this.buildGround();
     this.buildWater();
-    this.buildHills();
+    if (city.kind === 'prototype') this.buildHills();
     this.buildBuildings();
     this.buildMetro();
     this.buildGrid();
@@ -179,32 +182,31 @@ export class TwinScene {
   }
 
   private buildGround() {
-    const { streets } = generate();
-    // colour map: land use tints, parks, the river and beaches
+    const c = this.city, { W, D, X0, Z0 } = this;
+    // colour map: land use, parks, water; drawn on a canvas from the city data
     const CW = 2048, CH = Math.round((CW * D) / W);
     const cv = document.createElement('canvas');
     cv.width = CW; cv.height = CH;
     const g = cv.getContext('2d')!;
     const px = (x: number) => ((x - X0) / W) * CW, pz = (z: number) => ((z - Z0) / D) * CH;
-    g.fillStyle = '#6f7556';
+    g.fillStyle = c.ground;
     g.fillRect(0, 0, CW, CH);
     const R = rng(77);
     for (let i = 0; i < 900; i++) {
-      g.fillStyle = `rgba(${90 + R() * 40},${95 + R() * 35},${60 + R() * 20},0.35)`;
+      g.fillStyle = `rgba(${90 + R() * 40},${95 + R() * 35},${60 + R() * 20},0.3)`;
       g.beginPath(); g.ellipse(R() * CW, R() * CH, 10 + R() * 60, 8 + R() * 40, R() * 3, 0, 7); g.fill();
     }
-    for (const d of DISTRICTS) {
-      const [x0, z0, x1, z1] = d.rect;
-      g.fillStyle = d.colour;
-      g.globalAlpha = 0.85;
-      g.fillRect(px(x0), pz(z0), px(x1) - px(x0), pz(z1) - pz(z0));
-      g.globalAlpha = 1;
-      for (let i = 0; i < 14; i++) {
-        g.fillStyle = 'rgba(86,110,64,0.75)';
-        const x = x0 + R() * (x1 - x0), z = z0 + R() * (z1 - z0);
-        if (!wet(x, z)) g.fillRect(px(x), pz(z), 6 + R() * 18, 6 + R() * 14);
-      }
-    }
+    // built-up land is paler than the countryside: tint every district cell
+    const { nx, nz, data } = c.cells;
+    g.fillStyle = 'rgba(160,150,132,0.55)';
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (data[j * nx + i] !== 255) g.fillRect((i / nx) * CW, (j / nz) * CH, CW / nx + 1, CH / nz + 1);
+    const fills: Record<string, string> = { park: 'rgba(78,104,58,0.9)', industrial: 'rgba(132,130,124,0.7)', commercial: 'rgba(150,140,128,0.5)', institution: 'rgba(150,138,112,0.6)', beach: '#b9ad8c', water: '#2f4a52' };
+    const poly = (ctx: CanvasRenderingContext2D, pts: [number, number][], fx: (x: number) => number, fz: (z: number) => number) => {
+      ctx.beginPath();
+      pts.forEach(([x, z], i) => (i ? ctx.lineTo(fx(x), fz(z)) : ctx.moveTo(fx(x), fz(z))));
+      ctx.closePath();
+    };
+    for (const a of c.areas) if (a.kind !== 'water') { g.fillStyle = fills[a.kind]; poly(g, a.pts, px, pz); g.fill(); }
     // the mask: street brightness in one channel, sampled by the night shader
     const MW = 4096, MH = Math.round((MW * D) / W);
     const mv = document.createElement('canvas');
@@ -212,98 +214,75 @@ export class TwinScene {
     const m = mv.getContext('2d')!;
     m.fillStyle = '#000'; m.fillRect(0, 0, MW, MH);
     const mx = (x: number) => ((x - X0) / W) * MW, mz = (z: number) => ((z - Z0) / D) * MH;
-    for (const s of streets) {
-      g.strokeStyle = s.major ? '#4a4a48' : '#5e5d58';
-      g.lineWidth = s.major ? 2.2 : 1;
-      g.beginPath(); g.moveTo(px(s.x0), pz(s.z0)); g.lineTo(px(s.x1), pz(s.z1)); g.stroke();
-      m.strokeStyle = s.major ? '#fff' : '#8a8a8a';
-      m.lineWidth = s.major ? 3.2 : 1.4;
-      m.beginPath(); m.moveTo(mx(s.x0), mz(s.z0)); m.lineTo(mx(s.x1), mz(s.z1)); m.stroke();
+    m.lineCap = g.lineCap = 'round';
+    for (const major of [false, true]) {
+      g.strokeStyle = major ? '#4a4a48' : '#5e5d58';
+      g.lineWidth = major ? 2.2 : 1;
+      m.strokeStyle = major ? '#fff' : '#8a8a8a';
+      m.lineWidth = major ? 3.2 : 1.4;
+      g.beginPath(); m.beginPath();
+      for (const s of c.streets) {
+        if (s.major !== major) continue;
+        s.pts.forEach(([x, z], i) => {
+          if (i) { g.lineTo(px(x), pz(z)); m.lineTo(mx(x), mz(z)); } else { g.moveTo(px(x), pz(z)); m.moveTo(mx(x), mz(z)); }
+        });
+      }
+      g.stroke(); m.stroke();
     }
-    // inter-district highways
-    m.strokeStyle = '#fff'; g.strokeStyle = '#3c3c3b'; m.lineWidth = 4; g.lineWidth = 3;
-    for (const z of [-2600, 900]) { for (const c of [g, m]) { c.beginPath(); c.moveTo(c === g ? px(-7600) : mx(-7600), c === g ? pz(z) : mz(z)); c.lineTo(c === g ? px(7600) : mx(7600), c === g ? pz(z) : mz(z)); c.stroke(); } }
-    // blank the wet parts of the mask, paint the river and shore
-    g.fillStyle = '#2f4a52'; m.fillStyle = '#000';
-    for (let z = Z0; z < Z0 + D; z += 20) {
-      const rx = riverX(z);
-      g.fillRect(px(rx - RIVER_W / 2), pz(z), (RIVER_W / W) * CW, (24 / D) * CH);
-      m.fillRect(mx(rx - RIVER_W / 2 - 8), mz(z), ((RIVER_W + 16) / W) * MW, (24 / D) * MH);
-    }
-    for (let x = X0; x < X0 + W; x += 20) {
-      const cz = coastZ(x);
-      g.fillStyle = '#b9ad8c';
-      g.fillRect(px(x), pz(cz - 50), (24 / W) * CW, (60 / D) * CH);
-      g.fillStyle = '#2f4a52';
-      g.fillRect(px(x), pz(cz), (24 / W) * CW, CH);
-      m.fillRect(mx(x), mz(cz - 20), (24 / W) * MW, MH);
-    }
+    // water over everything; no street light on water
+    g.fillStyle = fills.water; m.fillStyle = '#000';
+    for (const a of c.areas) if (a.kind === 'water') { poly(g, a.pts, px, pz); g.fill(); poly(m, a.pts, mx, mz); m.fill(); }
+    if (c.sea) { poly(g, c.sea, px, pz); g.fill(); poly(m, c.sea, mx, mz); m.fill(); }
     const map = new THREE.CanvasTexture(cv);
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8;
     const mask = new THREE.CanvasTexture(mv);
     mask.anisotropy = 8;
+    // district ids for the street-lighting lookup (nearest, never blended)
+    const dt = new THREE.DataTexture(data, nx, nz, THREE.RedFormat, THREE.UnsignedByteType);
+    dt.magFilter = dt.minFilter = THREE.NearestFilter;
+    dt.flipY = false;
+    dt.needsUpdate = true;
     const mat = new THREE.MeshStandardMaterial({ map, roughness: 0.95 });
     const U = this.gUniforms;
     mat.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, U, { uMask: { value: mask } });
+      Object.assign(sh.uniforms, U, { uMask: { value: mask }, uCells: { value: dt } });
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;').replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed,1.0)).xyz;');
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
-          varying vec3 vW; uniform sampler2D uMask; uniform float uStreet[12]; uniform vec4 uRects[11]; uniform float uNight; uniform float uHi;`)
+          varying vec3 vW; uniform sampler2D uMask; uniform sampler2D uCells; uniform float uStreet[${MAXD + 1}]; uniform float uNight; uniform float uHi;`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          vec2 muv = vec2((vW.x - ${X0.toFixed(1)}) / ${W.toFixed(1)}, 1.0 - (vW.z - ${Z0.toFixed(1)}) / ${D.toFixed(1)});
-          float st = texture2D(uMask, muv).r;
+          vec2 q = vec2((vW.x - ${X0.toFixed(1)}) / ${W.toFixed(1)}, (vW.z - ${Z0.toFixed(1)}) / ${D.toFixed(1)});
+          float st = texture2D(uMask, vec2(q.x, 1.0 - q.y)).r;
+          int di = int(texture2D(uCells, q).r * 255.0 + 0.5);
           float lv = 0.0;
-          for (int i = 0; i < 11; i++) { vec4 r = uRects[i]; if (vW.x > r.x && vW.x < r.z && vW.z > r.y && vW.z < r.w) lv = uStreet[i]; }
-          // highways between districts stay lit as long as any of the grid is up
-          if (lv == 0.0 && st > 0.6) lv = uStreet[11];
+          for (int i = 0; i < ${MAXD}; i++) { if (i == di) lv = uStreet[i]; }
+          // roads outside every district (highways) stay lit while any of the grid is up
+          if (di == 255 && st > 0.6) lv = uStreet[${MAXD}];
           float hi = uHi == 5.0 ? 1.8 : (uHi >= 0.0 ? 0.4 : 1.0);
           totalEmissiveRadiance += vec3(1.0, 0.56, 0.2) * st * st * lv * hi * 1.3;
           if (uHi == 5.0) totalEmissiveRadiance += vec3(1.0, 0.7, 0.3) * st * lv * 0.4 * (1.0 - uNight);`);
     };
-    // flipY: canvas row 0 is the north edge (Z0); plane uv v=1 at the north edge after the rotation
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D), mat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(X0 + W / 2, 0, Z0 + D / 2);
     ground.receiveShadow = true;
     this.scene.add(ground);
-    // countryside beyond the city
-    const far = new THREE.Mesh(new THREE.RingGeometry(9000, 70000, 64, 1), new THREE.MeshStandardMaterial({ color: '#5d6648', roughness: 1 }));
+    const far = new THREE.Mesh(new THREE.PlaneGeometry(160000, 160000), new THREE.MeshStandardMaterial({ color: '#5d6648', roughness: 1 }));
     far.rotation.x = -Math.PI / 2;
-    far.position.y = -0.5;
+    far.position.set(X0 + W / 2, -0.8, Z0 + D / 2);
     this.scene.add(far);
-    const fill = new THREE.Mesh(new THREE.PlaneGeometry(W + 4000, D + 4000), new THREE.MeshStandardMaterial({ color: '#626a4c', roughness: 1 }));
-    fill.rotation.x = -Math.PI / 2;
-    fill.position.set(0, -0.8, (Z0 + D / 2));
-    this.scene.add(fill);
   }
 
   private buildWater() {
-    const shape = new THREE.Shape();
-    const pts: THREE.Vector2[] = [];
-    for (let x = -12000; x <= 12000; x += 100) pts.push(new THREE.Vector2(x, -coastZ(x)));
-    shape.moveTo(-70000, -coastZ(-12000));
-    pts.forEach((p) => shape.lineTo(p.x, p.y));
-    shape.lineTo(70000, -coastZ(12000));
-    shape.lineTo(70000, -70000);
-    shape.lineTo(-70000, -70000);
-    const sea = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshStandardMaterial({ color: '#1d3a46', roughness: 0.16, metalness: 0.15, side: THREE.DoubleSide }));
-    sea.rotation.x = -Math.PI / 2;
-    sea.position.y = 0.6;
-    this.scene.add(sea);
-    const rp: THREE.Vector3[] = [];
-    for (let z = -12000; z <= coastZ(riverX(3000)) + 40; z += 60) rp.push(new THREE.Vector3(riverX(z), 0.7, z));
-    const pos: number[] = [], idx: number[] = [];
-    rp.forEach((p, i) => {
-      pos.push(p.x - RIVER_W / 2, p.y, p.z, p.x + RIVER_W / 2, p.y, p.z);
-      if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
-    });
-    const rg = new THREE.BufferGeometry();
-    rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    rg.setIndex(idx);
-    rg.computeVertexNormals();
-    this.scene.add(new THREE.Mesh(rg, sea.material));
+    const toShape = (pts: [number, number][]) => new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+    const shapes = this.city.areas.filter((a) => a.kind === 'water' && a.pts.length > 2).map((a) => toShape(a.pts));
+    if (this.city.sea) shapes.push(toShape(this.city.sea));
+    if (!shapes.length) return;
+    const water = new THREE.Mesh(new THREE.ShapeGeometry(shapes), new THREE.MeshStandardMaterial({ color: '#1d3a46', roughness: 0.16, metalness: 0.15, side: THREE.DoubleSide }));
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.6;
+    this.scene.add(water);
   }
 
   private buildHills() {
@@ -323,7 +302,7 @@ export class TwinScene {
   }
 
   private buildBuildings() {
-    const { buildings } = generate();
+    const { buildings } = this.city;
     const geo = new THREE.BoxGeometry(1, 1, 1);
     geo.translate(0, 0.5, 0);
     const n = buildings.length;
@@ -404,7 +383,7 @@ export class TwinScene {
   private buildMetro() {
     const concrete = new THREE.MeshStandardMaterial({ color: '#b3ada2', roughness: 0.9 });
     const deckG: THREE.BufferGeometry[] = [], pierG: THREE.BufferGeometry[] = [], railG: THREE.BufferGeometry[] = [];
-    LINES.forEach((l, li) => {
+    this.city.lines.forEach((l, li) => {
       const L = this.lineLen[li];
       const step = 30;
       for (let s = 0; s < L; s += step) {
@@ -471,7 +450,7 @@ export class TwinScene {
     const carG = new THREE.BoxGeometry(2.9, 3.6, TRAIN.length / TRAIN.cars - 1.2);
     carG.translate(0, DECK + 1.25 + 1.8, 0);
     this.carMat = new THREE.MeshStandardMaterial({ color: '#d9dcdc', roughness: 0.35, metalness: 0.5, emissive: '#ffd9a0', emissiveIntensity: 0 });
-    LINES.forEach((l) => {
+    this.city.lines.forEach((l) => {
       const im = new THREE.InstancedMesh(carG, this.carMat.clone(), 90 * TRAIN.cars);
       (im.material as THREE.MeshStandardMaterial).color.set(l.colour).lerp(new THREE.Color('#e8e8e4'), 0.55);
       im.count = 0;
@@ -485,7 +464,7 @@ export class TwinScene {
   private buildGrid() {
     const yard = new THREE.MeshStandardMaterial({ color: '#8d8a80', roughness: 1 });
     const tx = new THREE.MeshStandardMaterial({ color: '#59605f', roughness: 0.6, metalness: 0.4 });
-    for (const s of GRID_SUBS) {
+    for (const s of this.city.subs) {
       const pad = new THREE.Mesh(new THREE.BoxGeometry(150, 0.6, 110), yard);
       pad.position.set(s.x, 0.3, s.z);
       pad.receiveShadow = true;
@@ -505,7 +484,7 @@ export class TwinScene {
   }
 
   private buildFlow() {
-    LINES.forEach((_, li) => {
+    this.city.lines.forEach((_, li) => {
       const N = 700;
       const s = new Float32Array(N), lat = new Float32Array(N);
       const R = rng(40 + li);
@@ -523,12 +502,13 @@ export class TwinScene {
   // ------------------------------------------------------------------ public
 
   view(v: 'city' | 'metro' | 'overhead', animate = true) {
-    const shots = {
-      city: { pos: new THREE.Vector3(4300, 3300, 8200), at: new THREE.Vector3(-200, 0, 400) },
-      metro: { pos: new THREE.Vector3(900, 420, 900), at: new THREE.Vector3(-150, 0, -420) },
-      overhead: { pos: new THREE.Vector3(0, 17000, 1200), at: new THREE.Vector3(0, 0, -800) },
-    }[v];
-    this.flyTo(shots.pos, shots.at, animate);
+    const c = this.city;
+    const [cx0, cz0, cx1, cz1] = c.bounds;
+    const at = (a: number[]) => ({ pos: new THREE.Vector3(a[0], a[1], a[2]), at: new THREE.Vector3(a[3], a[4], a[5]) });
+    const shot = v === 'overhead'
+      ? { pos: new THREE.Vector3((cx0 + cx1) / 2, Math.max(cx1 - cx0, cz1 - cz0) * 1.05, (cz0 + cz1) / 2 + 1200), at: new THREE.Vector3((cx0 + cx1) / 2, 0, (cz0 + cz1) / 2) }
+      : at(c.view[v]);
+    this.flyTo(shot.pos, shot.at, animate);
   }
 
   flyTo(pos: THREE.Vector3, at: THREE.Vector3, animate = true) {
@@ -559,7 +539,7 @@ export class TwinScene {
   }
 
   private setHour(h: number, season: Season) {
-    const lat = THREE.MathUtils.degToRad(CITY.lat), dec = THREE.MathUtils.degToRad(SEASONS[season].dec);
+    const lat = THREE.MathUtils.degToRad(this.city.lat), dec = THREE.MathUtils.degToRad(this.city.climate[season].dec);
     const H = THREE.MathUtils.degToRad((h - 12) * 15);
     const el = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H));
     let az = Math.acos(THREE.MathUtils.clamp((Math.sin(dec) - Math.sin(el) * Math.sin(lat)) / (Math.cos(el) * Math.cos(lat)), -1, 1));
@@ -603,7 +583,7 @@ export class TwinScene {
       this.bUniforms.uOn.value[i] = d.up ? 1 : 0;
       this.gUniforms.uStreet.value[i] = d.up ? d.street * this.night : 0;
     });
-    this.gUniforms.uStreet.value[11] = st.districts.some((d) => d.up) ? this.night : 0;
+    this.gUniforms.uStreet.value[MAXD] = st.districts.some((d) => d.up) ? this.night : 0;
     st.subs.forEach((s, i) => {
       const sp = this.subGlow[i];
       const m = sp.material as THREE.SpriteMaterial;
@@ -617,18 +597,18 @@ export class TwinScene {
     sim.lines.forEach((ln) => ln.tss.forEach((t) => {
       const sp = this.tssGlow[k++];
       const m = sp.material as THREE.SpriteMaterial;
-      const f = Math.max(0, t.p) / 1e6 / DC.tssRating;
+      const f = Math.max(0, t.p) / 1e6 / sim.dc.tssRating;
       m.color.set(!t.on ? '#000' : f > 1 ? '#ff5b4f' : f > 0.05 ? '#ffb04d' : '#86c5da');
       m.opacity = !t.on ? 0 : 0.3 + 0.7 * Math.min(1, f);
       sp.scale.setScalar(70 + 160 * Math.min(1.5, f));
     }));
     // trains
-    const counts = LINES.map(() => 0);
+    const counts = this.city.lines.map(() => 0);
     const glowPos: number[] = [], glowCol: number[] = [];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
     this.trainHeads.clear();
     for (const tr of sim.trains) {
-      const li = tr.line, path = LINES[li].path, L = this.lineLen[li];
+      const li = tr.line, path = this.city.lines[li].path, L = this.lineLen[li];
       const im = this.cars[li];
       const head = tr.dir > 0 ? tr.p : L - tr.p;
       const off = tr.dir > 0 ? -2.2 : 2.2;
@@ -654,7 +634,7 @@ export class TwinScene {
     // flow particles ride the solved catenary currents
     if (this.flowOn) {
       for (const f of this.flow) {
-        const segs = sim.lines[f.line].segs, L = this.lineLen[f.line], path = LINES[f.line].path;
+        const segs = sim.lines[f.line].segs, L = this.lineLen[f.line], path = this.city.lines[f.line].path;
         const P = f.pts.geometry.attributes.position as THREE.BufferAttribute, C = f.pts.geometry.attributes.color as THREE.BufferAttribute;
         for (let i = 0; i < f.s.length; i++) {
           let I = 0;
@@ -688,9 +668,9 @@ export class TwinScene {
     if (s.type === 'train') return this.trainHeads.get(s.id) ?? null;
     if (s.type === 'tss') return this.tssPos[s.line][s.idx];
     if (s.type === 'station') return this.stationPos[s.line][s.idx];
-    if (s.type === 'sub') { const g = GRID_SUBS.find((x) => x.id === s.id)!; return new THREE.Vector3(g.x, 30, g.z); }
-    const d = DISTRICTS.find((x) => x.id === s.id)!;
-    return new THREE.Vector3((d.rect[0] + d.rect[2]) / 2, 0, (d.rect[1] + d.rect[3]) / 2);
+    if (s.type === 'sub') { const g = this.city.subs.find((x) => x.id === s.id)!; return new THREE.Vector3(g.x, 30, g.z); }
+    const d = this.city.districts.find((x) => x.id === s.id)!;
+    return new THREE.Vector3(d.cx, 0, d.cz);
   }
 
   /** World position of a pickable thing, for camera moves. */
@@ -717,15 +697,15 @@ export class TwinScene {
     this.trainHeads.forEach((p, id) => test(p, { type: 'train', id }, 30));
     this.tssPos.forEach((arr, line) => arr.forEach((p, idx) => test(p, { type: 'tss', line, idx })));
     this.stationPos.forEach((arr, line) => arr.forEach((p, idx) => test(p, { type: 'station', line, idx }, 18)));
-    GRID_SUBS.forEach((s) => test(new THREE.Vector3(s.x, 30, s.z), { type: 'sub', id: s.id }));
+    this.city.subs.forEach((s) => test(new THREE.Vector3(s.x, 30, s.z), { type: 'sub', id: s.id }));
     if (best) return best;
     // otherwise: the district under the cursor
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2((x / r.width) * 2 - 1, -(y / r.height) * 2 + 1), this.camera);
     const hit = new THREE.Vector3();
     if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) return null;
-    const d = DISTRICTS.find((dd) => hit.x > dd.rect[0] && hit.x < dd.rect[2] && hit.z > dd.rect[1] && hit.z < dd.rect[3]);
-    return d ? { type: 'district', id: d.id } : null;
+    const k = districtAt(this.city, hit.x, hit.z);
+    return k !== 255 ? { type: 'district', id: this.city.districts[k].id } : null;
   }
 
   /** Screen position of a world point (for labels). */

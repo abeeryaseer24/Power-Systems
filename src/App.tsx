@@ -84,8 +84,10 @@ export default function App() {
           <Route path="/fallout" element={<Fallout />} />
           <Route path="/fallout/:id" element={<Fallout />} />
           <Route path="/cities" element={<Cities />} />
-          <Route path="/city" element={<CityTwin key="day" mode="day" />} />
-          <Route path="/city/metro" element={<CityTwin key="metro" mode="metro" />} />
+          <Route path="/city" element={<Navigate to="/city/meridia" replace />} />
+          <Route path="/city/metro" element={<Navigate to="/city/meridia/metro" replace />} />
+          <Route path="/city/:id" element={<CityTwinRoute mode="day" />} />
+          <Route path="/city/:id/metro" element={<CityTwinRoute mode="metro" />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />
@@ -94,6 +96,12 @@ export default function App() {
       </Suspense>
     </>
   );
+}
+
+// remount the viewer whenever the city or the model changes
+function CityTwinRoute({ mode }: { mode: 'day' | 'metro' }) {
+  const { id = 'meridia' } = useParams();
+  return <CityTwin key={`${id}-${mode}`} mode={mode} />;
 }
 
 // the old lessons now live inside the course
