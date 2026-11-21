@@ -87,7 +87,7 @@ export type Hour = { t: number; mains: boolean; fuel: number; load: number; gens
 export function threeDays(def: HospitalDef, o: HospitalOpts) {
   const ok = Math.max(0, o.gens - o.failToStart);
   const cap = ok * o.genMW;
-  const tank = o.fuelH * o.genMW * 1000 * 0.27; // litres: 0.27 L per kWh at full load
+  const tank = o.fuelH * o.genMW * 1000 * 0.25; // litres: one set at full load burns about 0.25 L per kWh
   let fuel = tank;
   const out: Hour[] = [];
   let firstOut = -1;
@@ -102,11 +102,11 @@ export function threeDays(def: HospitalDef, o: HospitalOpts) {
       load = 0;
     } else {
       const gensUp = ok > 0 && fuel > 0;
-      if (o.refuel && m > 0 && m % (24 * 60) === 0) { fuel = Math.min(tank, fuel + tank * 0.6); refuelNow = true; }
+      if (o.refuel && m > 0 && m % (24 * 60) === 0) { fuel = tank; refuelNow = true; } // a tanker fills the bulk tank
       on = { life: gensUp, critical: gensUp, equipment: gensUp && cap >= ess + eqp, nonEss: gensUp && cap >= ess + eqp + non * 1.15 };
       load = (on.life || on.critical ? ess : 0) + (on.equipment ? eqp : 0) + (on.nonEss ? non : 0);
-      // diesel burn rises less than linearly with load: about 0.08 L/kWh of rated plus 0.2 L/kWh delivered
-      fuel -= ((0.08 * cap + 0.2 * load) * 1000) / 60;
+      // diesel burn: about 0.025 L/kWh of rated capacity just to keep the sets turning, plus 0.22 L/kWh delivered
+      fuel -= ((0.025 * cap + 0.22 * load) * 1000) / 60;
       if (fuel <= 0 && firstOut < 0) firstOut = t;
       fuel = Math.max(0, fuel);
     }

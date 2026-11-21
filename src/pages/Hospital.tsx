@@ -116,7 +116,7 @@ export default function Hospital() {
         <label>lasting <select value={o.duration} onChange={(e) => set({ duration: Number(e.target.value) })}>{[2, 6, 12, 24, 36, 48, 72].map((d) => <option key={d} value={d}>{d} h</option>)}</select></label>
         <label>Generators <select value={o.gens} onChange={(e) => set({ gens: Number(e.target.value) })}>{[2, 3, 4].map((g) => <option key={g} value={g}>{g} × {o.genMW} MW</option>)}</select></label>
         <label>Fail to start <select value={o.failToStart} onChange={(e) => set({ failToStart: Number(e.target.value) })}>{[0, 1, 2].map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
-        <label>Fuel <select value={o.fuelH} onChange={(e) => set({ fuelH: Number(e.target.value) })}>{[24, 36, 60, 96].map((h) => <option key={h} value={h}>{h} h at one set’s rating</option>)}</select></label>
+        <label>Fuel <select value={o.fuelH} onChange={(e) => set({ fuelH: Number(e.target.value) })}>{[24, 36, 60, 96].map((h) => <option key={h} value={h}>{h} h of one set at full load</option>)}</select></label>
         <label className="hp-check"><input type="checkbox" checked={o.refuel} onChange={(e) => set({ refuel: e.target.checked })} /> Tanker every 24 h</label>
         <label className="hp-check"><input type="checkbox" checked={o.secondFeeder} onChange={(e) => set({ secondFeeder: e.target.checked })} /> Second feeder from another substation</label>
       </footer>
