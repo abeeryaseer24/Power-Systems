@@ -192,7 +192,12 @@ button { font: inherit; color: inherit; }
 .nav-menu a { display: flex; flex-direction: column; gap: 1px; padding: 9px 10px; border-radius: 8px; border: 0 !important; color: var(--porcelain) !important; text-decoration: none; }
 .nav-menu a:hover, .nav-menu a.active { background: rgba(134, 197, 218, 0.08); }
 .nav-menu b { font-size: 15px; }
-.nav-menu span { font-size: 12px; color: var(--steel); }
+.nav-menu span { font-size: 12px; color: var(--steel); line-height: 1.35; }
+/* the bar's own links never wrap; menu entries must, or long notes run out of the box */
+.topbar .nav-menu a, .topbar .nav-menu a:hover { white-space: normal; overflow-wrap: anywhere; font-size: inherit; padding: 9px 10px; border-bottom: 0; }
+.nav-menu { width: min(320px, calc(100vw - 24px)); max-height: calc(100vh - 90px); overflow-y: auto; }
+/* the left-most menus open rightwards so they never leave the screen on narrow desktops */
+.nav-group:nth-child(-n + 2) .nav-menu { right: auto; left: 0; }
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; gap: 8px; }
   /* six menus at phone width: wrap onto two lines; a scrolling or masked row would clip the open menu */

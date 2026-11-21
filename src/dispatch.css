@@ -57,3 +57,4 @@
 .dp-find b { color: var(--porcelain); }
 .s-ppo_bc, .fc-legend .k-ppo_bc { stroke: var(--sodium); background: var(--sodium); }
 .s-mpc_value, .fc-legend .k-mpc_value { stroke: var(--trip); background: var(--trip); }
+.dp-table { max-width: 100%; }

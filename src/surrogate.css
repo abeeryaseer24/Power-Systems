@@ -50,3 +50,5 @@
   .sg-tr { min-width: 620px; }
 }
 .sg-go { justify-self: start; border: 1px solid var(--sodium) !important; color: var(--sodium); padding: 10px 16px; }
+/* grid children may shrink below their content; wide tables scroll inside their own box */
+.sg-page > *, .dp-page > *, .sg-stage > *, .dp-board > * { min-width: 0; }

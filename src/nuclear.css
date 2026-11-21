@@ -126,7 +126,7 @@
 .rr-overlay p { color: #d6d0c1; }
 
 /* instrumentation widgets */
-.det { position: relative; padding-bottom: 26px; }
+.det { position: relative; }
 .det-row { display: grid; grid-template-columns: 210px 1fr; gap: 14px; align-items: center; padding: 8px 0; opacity: 0.55; }
 .det-row.on { opacity: 1; }
 .det-name { font-size: 14px; display: flex; flex-direction: column; }
@@ -135,7 +135,7 @@
 .det-band { position: absolute; top: 0; bottom: 0; border-radius: 7px; }
 .det-band.sr { background: #4fa3d1; } .det-band.ir { background: #c9b8ff; } .det-band.pr { background: #ffb04d; }
 .det-track b { position: absolute; top: -5px; width: 2px; height: 24px; background: var(--porcelain); }
-.det-axis { position: absolute; left: 224px; right: 0; bottom: 0; height: 18px; }
+.det-axis { position: relative; margin: 2px 12px 10px 224px; height: 18px; }
 .det-axis span { position: absolute; transform: translateX(-50%); font-size: 12px; color: var(--steel); }
 .vote { display: grid; grid-template-columns: repeat(4, 1fr) 1.6fr; gap: 8px; }
 .vch, .vlogic { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 10px; border: 1px solid var(--rule); background: #0a1729; }
@@ -169,7 +169,7 @@
   .sync { grid-template-columns: 1fr; }
   .sync-dial { max-width: 220px; margin: 0 auto; }
   .det-row { grid-template-columns: 1fr; gap: 4px; }
-  .det-axis { left: 0; }
+  .det-axis { margin-left: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .pipe, .nh-pipe, .nh-wave, .blades, .pump path, .sch-bubble, .ann.flash, .nh-core { animation: none !important; }
