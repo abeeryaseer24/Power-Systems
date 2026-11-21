@@ -54,7 +54,7 @@ export function tilesOf(c) {
   for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
     const ts = s + ((n - s) * j) / ny, tn = s + ((n - s) * (j + 1)) / ny;
     const tw = w + ((e - w) * i) / nx, te = w + ((e - w) * (i + 1)) / nx;
-    out.push({ key: `${i}${j}`, bb: `${ts.toFixed(4)},${tw.toFixed(4)},${tn.toFixed(4)},${te.toFixed(4)}` });
+    out.push({ key: `${i}-${j}`, bb: `${ts.toFixed(4)},${tw.toFixed(4)},${tn.toFixed(4)},${te.toFixed(4)}` });
   }
   return out;
 }

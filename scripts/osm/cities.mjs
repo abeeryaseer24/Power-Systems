@@ -7,7 +7,7 @@ export const CITIES = [
   {
     id: 'dhaka', name: 'Dhaka', country: 'Bangladesh',
     bbox: [23.69, 90.33, 23.905, 90.475], center: [23.79, 90.405],
-    tiles: [4, 3],
+    tiles: [8, 6],
     population: 10_280_000,
     populationSource: '2022 Population and Housing Census (BBS), Dhaka North and South City Corporations',
     peakSource: 'Demand is scaled so a summer weekday evening peaks near 2,900 MW, roughly the combined peaks reported by DPDC and DESCO, the two Dhaka distribution utilities (approximate).',
