@@ -1,0 +1,12 @@
+[
+ {
+  "id": "dhaka",
+  "name": "Dhaka",
+  "country": "Bangladesh",
+  "kind": "real",
+  "population": 10280000,
+  "lines": 1,
+  "districts": 11,
+  "blurb": "Bangladesh’s capital: 470,000 mapped buildings, MRT Line 6 on 1500 V DC, and a long humid summer of air conditioners."
+ }
+]

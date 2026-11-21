@@ -222,7 +222,7 @@ export class CityEngine {
 
   constructor(public city: CityData, opts: Partial<CityOpts> = {}, mode: { deferred?: boolean } = {}) {
     const x = (this.x = makeCtx(city));
-    this.opts = { ...DEFAULT_OPTS, peakHeadway: city.metro.peakHeadway, ...opts };
+    this.opts = { ...DEFAULT_OPTS, peakHeadway: city.metro.peakHeadway, evShare: city.demand.evShare ?? DEFAULT_OPTS.evShare, ...opts };
     this.ratings = designRatings(x);
     for (const s of x.c.subs) this.graph.add(s.id, s.name);
     for (const d of x.c.districts) this.graph.add(`d:${d.id}`, d.name, [d.sub]);

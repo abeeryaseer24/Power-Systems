@@ -64,7 +64,7 @@
 .cy-trip:hover { background: var(--trip); color: var(--night); }
 .cy-insp-act button:focus-visible, .cy-trip:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 
-.cy-tools { position: absolute; right: 22px; bottom: 232px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.cy-tools { position: absolute; right: 22px; bottom: 262px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .cy-metro .cy-tools { bottom: 372px; }
 .cy-tools > * { background: rgba(8, 16, 28, 0.66); backdrop-filter: blur(10px); }
 .cy-tools .pv-seg { border: 1px solid var(--rule-strong); }

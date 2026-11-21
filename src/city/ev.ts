@@ -28,10 +28,17 @@ export const chargeKW = (soc: number, maxKW: number) => (soc < 0.3 ? maxKW : soc
 
 export function buildHubs(c: CityData): Hub[] {
   const R = rng(9090);
-  // one hub per ~90,000 people, more in districts with offices and shops; at least one per area
+  // about one hub per 1,200 electric cars today, placed by population and commercial floor space
+  const evs = c.population * (c.demand.cars ?? CARS_PER_PERSON) * (c.demand.evShare ?? 0.08);
+  const N = Math.max(3, Math.min(160, Math.round(evs / 1200)));
+  const comTot = c.districts.reduce((a, d) => a + d.comM2, 0) || 1;
+  const w = c.districts.map((d) => 0.5 * (d.pop / c.population) + 0.5 * (d.comM2 / comTot));
   const hubs: Hub[] = [];
+  let carry = 0;
   c.districts.forEach((d, i) => {
-    const n = Math.max(1, Math.round(d.pop / 90000 + d.comM2 / 1.5e6));
+    carry += w[i] * N;
+    const n = Math.floor(carry);
+    carry -= n;
     for (let k = 0; k < n; k++) {
       const a = R() * Math.PI * 2, r = 300 + R() * 900;
       hubs.push({ x: d.cx + Math.cos(a) * r, z: d.cz + Math.sin(a) * r, district: i, name: `${d.name} hub ${k + 1}`, stalls: 8 + Math.floor(R() * 3) * 4, limitKW: 0, batKWh: 0 });
@@ -57,7 +64,7 @@ type Car = { soc: number; cap: number; maxKW: number; target: number };
 export function runEv(c: CityData, hubs: Hub[], o: EvOpts, districtUp: (m: number, d: number) => boolean): EvRun {
   const R = rng(777);
   const D = c.districts.length, H = hubs.length;
-  const evs = c.population * CARS_PER_PERSON * o.evShare;
+  const evs = c.population * (c.demand.cars ?? CARS_PER_PERSON) * o.evShare;
   const dailyKWh = evs * KM * KWH_KM;
   const popShare = c.districts.map((d) => d.pop / c.population);
   const comTot = c.districts.reduce((a, d) => a + d.comM2, 0) || 1;

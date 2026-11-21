@@ -422,6 +422,7 @@ function build(c) {
       `${Math.round((100 * raw.filter((b) => b.imputed).length) / raw.length)} % of buildings have no storey count in OpenStreetMap; theirs is estimated from tagged neighbours.`,
       `Service areas are split by nearest grid substation, not from real feeder maps. Only ${subs.length} grid substations inside the city are mapped in OpenStreetMap (the real network has many more), so each area is large.`,
       ...(c.metro ? ['Traction substation positions on the metro are modelled; they are not mapped in OpenStreetMap.'] : []),
+      `Cars: about ${Math.round((c.demand.cars ?? 0.18) * 1000)} per 1,000 people, ${Math.round((c.demand.evShare ?? 0.08) * 1000) / 10} % of them electric today (approximate).`,
       ...(c.extraNotes ?? []),
       c.peakSource,
     ],

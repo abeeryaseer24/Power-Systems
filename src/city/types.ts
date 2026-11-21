@@ -44,6 +44,8 @@ export type DemandParams = {
   heatShare?: number; // share of homes heated electrically (cold cities)
   peakSeason?: 'summer' | 'winter'; // which season the target peak belongs to
   rooftopMW?: number; // installed rooftop solar, MW peak
+  cars?: number; // private cars per person
+  evShare?: number; // share of those that are electric today
 };
 
 export type MetroParams = {

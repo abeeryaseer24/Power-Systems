@@ -62,7 +62,7 @@ function calibrate(c: CityData) {
     const l = cityLoad(c, bh, inp);
     // loads the other models add at the evening peak: water pumping, EV charging (8 % of cars) and the metro
     const water = (c.population * 0.15 * 0.35 * 1.6) / 24 / 1000;
-    const ev = (c.population * 0.18 * 0.08 * 38 * 0.17 * 0.146) / 1000;
+    const ev = (c.population * (c.demand.cars ?? 0.18) * (c.demand.evShare ?? 0.08) * 38 * 0.17 * 0.146) / 1000;
     const metro = c.lines.length * 12;
     const scaled = l.res + l.com, rest = l.ind + l.inst + l.light - solarOut(c, bh, inp) + water + ev + metro;
     c.demand.scale *= Math.max(0.05, (T / (1 + LOSS_FRACTION) - rest) / scaled);
