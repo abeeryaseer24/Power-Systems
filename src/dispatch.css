@@ -1,0 +1,52 @@
+/* RL dispatch page (dp- prefix); reuses fc- and sg- table styles */
+.dp-days { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); border: 1px solid var(--rule-strong); }
+.dp-days button { all: unset; cursor: pointer; padding: 8px 6px; display: grid; gap: 1px; text-align: center; border-right: 1px solid var(--rule); }
+.dp-days button:last-child { border-right: 0; }
+.dp-days b { font-family: var(--display); font-size: 20px; line-height: 1; }
+.dp-days span { font-size: 11px; color: var(--steel); }
+.dp-days button.on { background: var(--porcelain); color: var(--night); }
+.dp-days button.on span { color: var(--night); }
+.dp-days button:focus-visible, .dp-who button:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.dp-dayline { color: var(--steel); margin: -12px 0 0; font-size: 14.5px; line-height: 1.5; max-width: 900px; }
+.dp-board { display: grid; gap: 14px; }
+.dp-who { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--rule-strong); border-left: 1px solid var(--rule-strong); }
+.dp-who button { all: unset; cursor: pointer; padding: 10px 14px; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); display: grid; gap: 2px; }
+.dp-who span { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--steel); }
+.dp-who b { font-family: var(--display); font-weight: 800; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.dp-who small { color: var(--dim); font-size: 12px; }
+.dp-who button.on { box-shadow: inset 0 -3px 0 var(--sodium); background: rgba(255, 176, 77, 0.06); }
+.dp-who button.on b { color: var(--sodium); }
+.dp-chart { margin: 0; }
+.dp-chart svg { width: 100%; height: 300px; display: block; background: rgba(6, 14, 26, 0.5); border: 1px solid var(--rule-strong); }
+.dp-soc svg { height: 110px; }
+.dp-grid { stroke: var(--rule); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dp-zero { stroke: var(--steel); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dp-demand { fill: none; stroke: var(--porcelain); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dp-under { fill: none; stroke: var(--porcelain); stroke-width: 1.2; stroke-dasharray: 3 4; opacity: 0.7; vector-effect: non-scaling-stroke; }
+.dp-curt { fill: rgba(134, 197, 218, 0.18); stroke: rgba(134, 197, 218, 0.6); stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.fc-legend .k-curt { height: 10px; vertical-align: -1px; background: rgba(134, 197, 218, 0.25); outline: 1px dashed rgba(134, 197, 218, 0.7); }
+.fc-legend .k-under { background: repeating-linear-gradient(90deg, var(--porcelain) 0 3px, transparent 3px 7px); }
+.dp-axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); padding: 4px 2px 0; font-variant-numeric: tabular-nums; }
+.dp-cap { font-size: 13px; color: var(--steel); margin: 0 0 6px; }
+.dp-socl { fill: none; stroke-width: 1.4; opacity: 0.45; vector-effect: non-scaling-stroke; }
+.dp-socl.on { stroke-width: 2.6; opacity: 1; }
+.s-rule, .fc-legend .k-rule { stroke: var(--steel); background: var(--steel); }
+.s-ppo, .fc-legend .k-ppo { stroke: var(--sodium); background: var(--sodium); }
+.s-mpc, .fc-legend .k-mpc { stroke: var(--glaze); background: var(--glaze); }
+.s-perfect, .fc-legend .k-perfect { stroke: var(--arc); background: var(--arc); }
+.dp-table .sg-tr { grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)); }
+.dp-ours { color: var(--sodium); font-weight: 700; }
+.dp-learn { margin: 10px 0 0; max-width: 640px; }
+.dp-learn svg { width: 100%; height: 150px; display: block; border-bottom: 1px solid var(--rule-strong); }
+.dp-lc { fill: none; stroke: var(--sodium); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dp-ref { stroke: var(--glaze); stroke-dasharray: 6 4; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.dp-ref.p { stroke: var(--arc); }
+@media (max-width: 900px) {
+  .dp-days { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .dp-days button:nth-child(6) { border-right: 0; }
+  .dp-days button:nth-child(-n + 6) { border-bottom: 1px solid var(--rule); }
+  .dp-who { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dp-who small { display: none; }
+  .dp-chart svg { height: 220px; }
+  .dp-table { overflow-x: auto; }
+}
