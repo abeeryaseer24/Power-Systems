@@ -174,6 +174,8 @@ export class TractionSim {
     this.lines.forEach((ln, li) => {
       for (const d of [0, 1] as const) {
         if (this.t - ln.lastDep[d] < hw) continue;
+        // the two directions are timetabled half a headway apart
+        if (d === 1 && ln.lastDep[1] < -1e8 && this.t - ln.lastDep[0] < hw / 2) continue;
         const dir = d === 0 ? 1 : -1;
         const blocked = this.trains.some((tr) => tr.line === li && tr.dir === dir && tr.p < TRAIN.length + 250);
         if (blocked) continue;
@@ -272,7 +274,8 @@ export class TractionSim {
         tr.next++;
         tr.phase = 'dwell';
         const inter = ln.names[tr.dir > 0 ? 0 : 1][tr.next - 1] === this.interchange;
-        tr.dwell = 25 + 25 * lf + (inter ? 12 : 0);
+        // dwell varies with how many people get on and off: this keeps trains from running in lockstep
+        tr.dwell = 25 + 25 * lf + (inter ? 12 : 0) + (this.rand() - 0.5) * 18;
         // passengers change at each stop
         tr.pax = Math.round(clamp(tr.pax + (this.rand() - 0.5) * 0.25 * this.cap * Math.max(lf, 0.1), 0, this.cap));
       } else if (tr.p > target) {

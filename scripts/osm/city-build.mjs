@@ -18,7 +18,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const CACHE = path.join(ROOT, 'scripts/osm/.cache');
 const OUT = path.join(ROOT, 'public/data/cities');
 fs.mkdirSync(OUT, { recursive: true });
-const read = (k) => JSON.parse(fs.readFileSync(path.join(CACHE, `${k}.json`), 'utf8'));
+// DRY=1 builds from whatever is cached so far (missing building tiles are skipped) to test the pipeline
+const DRY = !!process.env.DRY;
+const read = (k) => {
+  const f = path.join(CACHE, `${k}.json`);
+  if (DRY && !fs.existsSync(f) && k.includes('-bld-')) return { elements: [] };
+  return JSON.parse(fs.readFileSync(f, 'utf8'));
+};
 
 const MAX_BUILDINGS = 140_000;
 
@@ -322,9 +328,13 @@ function build(c) {
       // floor area of the buildings inside the hospital grounds
       let floor = 0;
       for (const b of raw) if (b.x > mnx && b.x < mxx && b.z > mnz && b.z < mxz && inPoly(b.x, b.z, pts)) floor += b.floor;
+      const nm = el.tags['name:en'] ?? el.tags.name;
+      // a config override names the city's main hospital and its sourced bed count
+      if (c.hospital && nm.toLowerCase().includes(c.hospital.name.toLowerCase())) { best = { el, pts, beds: c.hospital.beds, floor, tagged: true, override: true, cx: (mnx + mxx) / 2, cz: (mnz + mxz) / 2 }; break; }
       const tagged = parseInt(el.tags.beds, 10);
-      const beds = Number.isFinite(tagged) && tagged > 20 ? tagged : Math.round(floor / 110);
+      const beds = Number.isFinite(tagged) && tagged > 20 ? tagged : Math.round(floor / 160);
       if (beds < 80) continue;
+      if (best?.override) continue;
       if (!best || beds > best.beds) best = { el, pts, beds, floor, tagged: Number.isFinite(tagged) && tagged > 20, cx: (mnx + mxx) / 2, cz: (mnz + mxz) / 2 };
     }
     if (best) {
@@ -334,9 +344,11 @@ function build(c) {
       hospital = {
         name, beds: Math.min(4000, best.beds), peakMW: +((Math.min(4000, best.beds) * kwBed) / 1000).toFixed(1),
         district: subs[nearestSub(best.cx, best.cz)].id, x: Math.round(best.cx), z: Math.round(best.cz),
-        source: best.tagged
+        source: best.override
+          ? `${name}: ${best.beds} beds (${c.hospital.source}); location from OpenStreetMap; peak load estimated at ${kwBed} kW per bed.`
+          : best.tagged
           ? `${name}: ${best.beds} beds as tagged in OpenStreetMap; peak load estimated at ${kwBed} kW per bed.`
-          : `${name}: the largest hospital mapped in OpenStreetMap here. About ${Math.round(best.beds)} beds estimated from ${Math.round(best.floor / 1000)}k m² of floor space (110 m² per bed); peak load estimated at ${kwBed} kW per bed.`,
+          : `${name}: the largest hospital mapped in OpenStreetMap here. About ${Math.round(best.beds)} beds estimated from ${Math.round(best.floor / 1000)}k m² of floor space (160 m² per bed); peak load estimated at ${kwBed} kW per bed.`,
       };
       console.log(`  hospital: ${name}, ${hospital.beds} beds, ${hospital.peakMW} MW`);
     }

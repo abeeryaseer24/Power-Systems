@@ -13,6 +13,7 @@ export const CITIES = [
     peakSource: 'Demand is scaled so a summer weekday evening peaks near 2,900 MW, roughly the combined peaks reported by DPDC and DESCO, the two Dhaka distribution utilities (approximate).',
     blurb: 'Bangladesh’s capital: 470,000 mapped buildings, MRT Line 6 on 1500 V DC, and a long humid summer of air conditioners.',
     ground: '#76785a',
+    hospital: { name: 'Dhaka Medical College Hospital', beds: 2600, source: 'official capacity, approximate; it routinely treats far more patients than beds' },
     climate: {
       summer: { tmax: 34.5, tmin: 26, dec: 18, label: 'Pre-monsoon summer (April–May)' },
       monsoon: { tmax: 32, tmin: 26.5, dec: 18, label: 'Monsoon (July–August)' },
