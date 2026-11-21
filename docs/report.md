@@ -11,9 +11,9 @@ Source code: https://github.com/abeeryaseer24/Power-Systems
 
 ## Abstract
 
-This report describes Blackstart, a power system simulator that runs in a web browser. The software contains a fictional test system for operator training, reduced models of 17 transmission networks derived from OpenStreetMap data, reconstructions of 24 historical blackouts, and a point-kinetics reactor model applied to seven nuclear plants. The network models solve an AC power flow with generator reactive limits and switched shunt compensation, and a per-island frequency model with governor droop, secondary control, under-frequency load shedding and line and generator protection. A multilayer perceptron trained on simulated disturbances estimates the probability of collapse within 60 s, and two modules display live data from the British and United States power systems. Six power stations are modelled in three dimensions, where they can be subjected to disturbances on a representation of their grid, built up from an empty site, flooded, and examined in cutaway; two accidents are replayed from the control room, and the dispersion of the Chernobyl and Fukushima releases is estimated with a puff model.
+This report describes Blackstart, a power system simulator that runs in a web browser. The software contains a fictional test system for operator training, reduced models of 17 transmission networks derived from OpenStreetMap data, reconstructions of 24 historical blackouts, and a point-kinetics reactor model applied to seven nuclear plants. The network models solve an AC power flow with generator reactive limits and switched shunt compensation, and a per-island frequency model with governor droop, secondary control, under-frequency load shedding and line and generator protection. A multilayer perceptron trained on simulated disturbances estimates the probability of collapse within 60 s, and two modules display live data from the British and United States power systems. Six power stations are modelled in three dimensions, where they can be subjected to disturbances on a representation of their grid, built up from an empty site, flooded, and examined in cutaway; two accidents are replayed from the control room, and the dispersion of the Chernobyl and Fukushima releases is estimated with a puff model. Finally, a set of city models follows the services a grid supplies (demand by sector, metro traction on a solved DC network, the mobile network, water supply, vehicle charging, a hospital's essential electrical system and a data centre) through a single day and through a whole-city blackout, on a fictional prototype city and on real cities built from OpenStreetMap.
 
-The models are of reduced order and are intended for teaching. Line parameters are typical values for each voltage class, generator dynamics are aggregated per island, and the blackout reconstructions combine simulated physics with event sequences taken from the investigation reports. No reconstruction has been validated against recorded measurements. Section 14 discusses these limitations.
+The models are of reduced order and are intended for teaching. Line parameters are typical values for each voltage class, generator dynamics are aggregated per island, and the blackout reconstructions combine simulated physics with event sequences taken from the investigation reports. No reconstruction has been validated against recorded measurements. Section 15 discusses these limitations.
 
 ## 1. Introduction
 
@@ -93,7 +93,7 @@ Each region is connected to the remainder of its synchronous system through an e
 
 ### 3.5 Corrections for individual regions
 
-Several reduced models did not solve as first built. Table 2 lists the problem found in each case and the correction applied. Each correction has a physical basis, but taken together they amount to calibration, which Section 13 discusses.
+Several reduced models did not solve as first built. Table 2 lists the problem found in each case and the correction applied. Each correction has a physical basis, but taken together they amount to calibration, which Section 15 discusses.
 
 Table 2. Region-specific corrections.
 
@@ -282,17 +282,66 @@ The model reproduces the broad pattern of each event, including the north-west b
 
 A positional soundscape is synthesised in the browser without recorded material: transformer hum at twice the supply frequency with its harmonics near each transformer, the noise of falling water inside each operating tower, turbine hall noise in proportion to output, discharge from the relief valves during a trip, the spillway, wind that increases with height, and footsteps when walking. Breaker operations, load shedding and station blackout have their own sounds, and the control rooms have the hum of their lighting, one tone per new alarm and the explosion at Chernobyl.
 
-## 12. Verification
+## 12. City Infrastructure Models
 
-The test suite contains 90 automated tests. The AC power flow is checked against a closed-form solution for a two-bus system; it is shown to fail to converge beyond the nose of the PV curve; the decoupled and Newton-Raphson solutions are compared on the Halvern network with losses, line charging and PV buses; and a generator held at its reactive limit is shown to allow its terminal voltage to fall. Further tests cover the DC load flow and island detection, the weather and demand profiles, the Halvern scenarios, black start from a hydro unit, the connection of Rooppur to the Bangladesh network, each contingency modifier, the network simulator, and the reactor model (steady state at rated power, decay heat after shutdown, the reactor period after a reactivity step, and completion of every plant scenario). Each historical reconstruction is required to produce a loss of supply in observation mode. For the plant models, tests confirm that the grid representation holds frequency without disturbance, rides through the loss of a 660 MW unit on the Bangladesh grid without load shedding and returns to nominal frequency, sheds load when both Rooppur units are lost, and scales the shedding thresholds for a 60 Hz grid; that the dispersion model keeps its highest category near the source and its Fukushima deposition on land; and that the control-room sequences place the relief valve indication, the shutdown signal and the excursion in the reported order. The tests run on every change submitted to the repository.
+The city models apply the methods of the earlier sections to the systems that a city's grid supplies. Each system is a separate model on its own page, and all of them share one clock, one set of outages and one dependency graph, so that the effect of a single failure can be followed from the substation to the tap, the telephone and the hospital ward.
+
+### 12.1 Cities and data
+
+The models run on a common city description: districts with population, commercial floor area, industrial and institutional load and street length; the substations that feed them; metro lines with their stations and traction substations; and the buildings, streets, water and land use drawn in three dimensions. Meridia, a fictional city of 2.66 million, is generated in code and is labelled throughout as a prototype; every model is developed there first. Sixteen real cities are built from OpenStreetMap by a separate procedure (Appendix C). Buildings are reduced to oriented boxes with the same footprint area; for the largest cities only bounding boxes are downloaded. Storey counts, which are absent for most buildings in the source data (94 % in Dhaka), are imputed from the mean of tagged buildings within 300 m. Population is taken from the latest official count and distributed over residential floor area; 12 % of residential floor area is assumed to be in commercial use. Districts are formed as the service area of the nearest mapped 132 kV or 230 kV substation, which is a geometric approximation and not a representation of feeder networks; in Dhaka only 11 such substations are mapped, so each area is large.
+
+### 12.2 Demand
+
+Demand is built from the bottom up for each district and minute. Residential load per person is the sum of a base term, an activity term following an hourly profile, a lighting term after dark, cooling in proportion to the temperature above 25.5 °C, the share of households with air conditioning and occupancy, and, in cold cities, electric heating below 15 °C. Commercial load follows office and shop occupancy with chiller load above 23 °C. Industrial load follows a three-shift profile and institutional load combines a flat hospital component with a campus profile. Street lighting switches on when the sun is 1° below the horizon and dims to 70 % after midnight. Temperature follows an asymmetric diurnal curve for each season and city, and solar elevation follows the city's latitude and the season's declination. Rooftop solar, where present, is subtracted to give the demand on the grid; it is disconnected in any district that loses supply, as anti-islanding protection requires. For real cities the residential and commercial terms are scaled so that a design day reproduces a published peak (Table 6); where no city figure exists the peak is estimated from annual consumption at a stated load factor or scaled from a wider-area record by population, and two cities are left uncalibrated. Special days modify the activity profiles: the half-time and full-time television pickups of a football final, the holiday closure and departure of Eid, the iftar and sehri peaks of a Ramadan evening, the circuit lighting of a street Grand Prix and the loss of solar output during a partial eclipse.
+
+Table 6. Basis of the peak demand used for each real city.
+
+| Basis | Cities |
+|---|---|
+| Published city or utility record | Delhi 8,748 MW (SLDC, 2026); Karachi 3,563 MW (K-Electric, 2025); Tashkent 1,811 MW (2025); Rome 2,200 MW (Areti); Dhaka 2,900 MW (DPDC and DESCO, approximate) |
+| Wider-area record scaled by population | New York (Con Edison, 13,322 MW); Houston (CenterPoint, about 21 GW); Moscow (Moscow and region, 21,126 MW, winter); Adelaide (South Australia, 3,140 MW) |
+| Annual consumption at an assumed load factor | Istanbul, Madrid, São Paulo, Sapporo (winter), Colombo |
+| Not calibrated | London, Caracas |
+
+### 12.3 Metro traction
+
+Each metro line is simulated train by train. Trains are dispatched from both terminals at the timetabled headway, the two directions half a headway apart, and run between stations under a braking curve and a moving-block separation, with tractive effort limited to 310 kN and 3.4 MW at the wheel, Davis running resistance, and a mass that rises with the number of passengers. Dwell times increase with loading and vary randomly by about 9 s, which prevents the trains from falling into step. The direct-current network of each line is solved at every time step as a chain of nodes: traction substations are modelled as a no-load voltage behind a source resistance with diodes that conduct only outward, the catenary and rail return as a resistance per kilometre, and trains as constant-power loads when motoring and constant-power sources when braking. Regeneration is clipped at the EN 50163 limit of 1800 V on a 1500 V system and traction power is reduced to zero between 1200 V and 1000 V; these limits scale with the nominal voltage for 625 V, 630 V, 750 V and 825 V systems. Optional reversible substations return surplus braking energy to the grid. In Meridia at a three-minute peak headway the two lines draw 31 MW at peak, the lowest pantograph voltage is about 1480 V, and regeneration recovers about a quarter of traction energy with diode-only substations. Removing one traction substation raises the load on its neighbours and lowers the minimum voltage to about 1200 V.
+
+### 12.4 Mobile network
+
+Cell sites are placed from population density, at one site per 1,500 people and not more than about 1.1 km apart; their positions are modelled, not taken from operator data. Each site draws 1.6 kW plus up to 2.4 kW with traffic, which follows the daily pattern of mobile data with its evening peak. Batteries are sized in hours at average load and given a capacity between 60 % and 120 % of nameplate to represent ageing, and a selectable share of sites has a diesel generator that starts in 30 s with 24 h of fuel. Each site's traffic passes through an exchange in its district, which has 4 h of battery and a generator with 48 h of fuel; a site with power but without its exchange carries no traffic. With a six-hour substation outage at 18:00 in Meridia, the battery-only sites in the affected area are dark within about three hours, because the outage coincides with the traffic peak.
+
+### 12.5 Water supply
+
+Each district has a pumping station that lifts treated water into an elevated tank, which supplies the district by gravity. Consumption is 150 litres per person per day with morning and evening peaks, and pumping, treatment and boosting take 0.35 kWh per cubic metre. Without supply (or a standby generator) the tank drains at the demand rate; below a quarter of its capacity upper floors lose pressure, and at empty supply stops. With six hours of storage, a district without supply from 06:00 has low pressure by 10:00 and no water by about 14:00.
+
+### 12.6 Electric vehicle charging
+
+The vehicle fleet is taken as 180 cars per 1,000 people, each driving 38 km a day at 0.17 kWh/km. Charging energy is divided between home (55 %), workplace (15 %) and public fast-charging hubs (30 %). Home charging begins when drivers return, or is shifted to between 01:00 and 05:00 by smart charging. Hubs are simulated car by car, with Poisson arrivals, charging curves that taper from 250 kW or 150 kW above 30 % state of charge, queues, site transformers rated at 60 % of stall nameplate and optional batteries that supply the excess. At 8 % of cars electric, Meridia's vehicles take 247 MWh a day with an evening peak of 36 MW.
+
+### 12.7 Hospital
+
+A hospital's essential electrical system is represented in the arrangement required by NFPA 99 and NFPA 110: life-safety (4 % of load), critical (22 %) and equipment (30 %) branches, each behind an automatic transfer switch, and a non-essential board (44 %) supplied from the generators only when capacity allows. The first three minutes are simulated second by second (UPS transfer within a cycle, generators at speed in 8 s, life-safety and critical transfer at 10 s, the equipment branch at 25 s and chiller restart at 120 s) and the following 72 hours minute by minute, with diesel consumption of 0.025 L/kWh of rated capacity plus 0.22 L/kWh delivered. For real cities the largest mapped hospital is used, with its bed count from the source data or a stated estimate.
+
+### 12.8 Data centre and city blackout
+
+The data centre model gives IT load from a flat AI-training component and a traffic-following cloud component, a power usage effectiveness that rises with outdoor temperature (1.12 plus 0.012 per °C above 15 °C for air cooling), evaporative water use, and the first five minutes of a supply failure, in which the server inlet temperature rises at about 1 °C per minute once neither chillers nor stored chilled water are available. The city blackout model removes supply from every district at once and follows each system for 73 hours: traffic signals (a quarter with 2 h batteries), the metro (trains stopped where they stand, service resuming 30 minutes after the last traction substation is restored), the mobile network, water, the hospital (including whether its district still has water) and the charging hubs. Districts are restored one at a time at a selectable interval, the hospital's district first.
+
+### 12.9 Rendering and interaction
+
+Each city is drawn with up to 140,000 instanced buildings whose lit windows are computed from the demand model, street lighting per district from a district raster, the metro viaduct and trains, and layers for cell sites, charging hubs and water towers. A full day is recomputed in a Web Worker whenever an input or outage changes. Guided walkthroughs move the clock and camera and run what-if cases step by step, and selected assets can be opened as detailed models with labelled parts that follow the live state.
+
+## 13. Verification
+
+The test suite contains 104 automated tests. The AC power flow is checked against a closed-form solution for a two-bus system; it is shown to fail to converge beyond the nose of the PV curve; the decoupled and Newton-Raphson solutions are compared on the Halvern network with losses, line charging and PV buses; and a generator held at its reactive limit is shown to allow its terminal voltage to fall. Further tests cover the DC load flow and island detection, the weather and demand profiles, the Halvern scenarios, black start from a hydro unit, the connection of Rooppur to the Bangladesh network, each contingency modifier, the network simulator, and the reactor model (steady state at rated power, decay heat after shutdown, the reactor period after a reactivity step, and completion of every plant scenario). Each historical reconstruction is required to produce a loss of supply in observation mode. For the plant models, tests confirm that the grid representation holds frequency without disturbance, rides through the loss of a 660 MW unit on the Bangladesh grid without load shedding and returns to nominal frequency, sheds load when both Rooppur units are lost, and scales the shedding thresholds for a 60 Hz grid; that the dispersion model keeps its highest category near the source and its Fukushima deposition on land; and that the control-room sequences place the relief valve indication, the shutdown signal and the excursion in the reported order. For the city models, tests confirm that a summer weekday in Meridia peaks in the evening within a plausible range; that an hour of peak metro service keeps pantograph voltages between 900 V and the regeneration limit and recovers between 12 % and 50 % of traction energy; that a train covers a 1.2 km interstation in 70 to 140 s; that removing a traction substation raises the load on its neighbours; that trains do not jam over a whole day; that a substation outage drains cell-site batteries and then reduces coverage; that smart charging moves electric vehicle load into the night and an outage empties a district's water tank; that the blackout model fails traffic signals first, the mobile network within hours and water later, and restores all of them; that the hospital transfers its essential branches within 10 s and sheds the equipment branch when two generators fail; that a partial eclipse reduces solar output; and that the special days produce the expected changes. The tests run on every change submitted to the repository.
 
 These are consistency and regression tests. They confirm that the software implements the models described; they do not show that the models represent the real systems.
 
-## 13. Results Summary
+## 14. Results Summary
 
-The network models solve for all 17 regions after the corrections in Table 2, and all 24 reconstructions produce a loss of supply when run in observation mode (Table 4). Grid-forming batteries rated at 8 % of demand raised the frequency nadir and reduced load shedding in each of the three regions tested (Table 3). The risk predictor achieved an area under the ROC curve of 0.80 on held-out simulated runs, with low precision. The live data modules operate against the public services described in Section 10. The plant models respond to disturbances on their grids in the manner described in Section 11.2, and the dispersion model reproduces the principal deposition patterns of both releases (Section 11.6).
+The network models solve for all 17 regions after the corrections in Table 2, and all 24 reconstructions produce a loss of supply when run in observation mode (Table 4). Grid-forming batteries rated at 8 % of demand raised the frequency nadir and reduced load shedding in each of the three regions tested (Table 3). The risk predictor achieved an area under the ROC curve of 0.80 on held-out simulated runs, with low precision. The live data modules operate against the public services described in Section 10. The plant models respond to disturbances on their grids in the manner described in Section 11.2, and the dispersion model reproduces the principal deposition patterns of both releases (Section 11.6). The city models produce the behaviour described in Section 12 for Meridia; in a test build of Dhaka from partial map data (452,000 buildings), the calibrated demand reproduces the target peak within 1 % and Mass Rapid Transit Line 6 is reconstructed at 18.9 km with 16 stations against the operating 20.1 km and 16 stations.
 
-## 14. Limitations
+## 15. Limitations
 
 1. Line impedances and ratings are typical values for each voltage class. Conductor types, bundling, transformer impedances and protection settings for the real networks are not known, and generator capacities are taken from mapped data or defaults.
 
@@ -312,13 +361,19 @@ The network models solve for all 17 regions after the corrections in Table 2, an
 
 9. The dispersion maps rest on reconstructed winds, a relative release history and a calibration to the published maps (Section 11.6). They show where deposition occurred, approximately; they do not give doses.
 
-## 15. Conclusions
+10. The city models are illustrative. Meridia is fictional. For real cities, building heights are mostly imputed, districts are geometric service areas around the few substations that are mapped, cell sites, charging hubs, pumping stations and traction substations are placed by rule, and the demand coefficients are assumptions calibrated to a single published peak, or to an estimate where no peak is published (Table 6).
+
+11. The traction model treats each line as a single DC circuit, ignores rail-to-earth leakage and the fourth rail of London's system, uses one nominal voltage per city, and does not represent 25 kV AC traction, so Delhi's metro is not modelled.
+
+12. The telecommunications, water, vehicle charging, hospital and data centre models use typical parameters from published sources and have not been compared with operator data.
+
+## 16. Conclusions
 
 The project shows that a large part of an undergraduate power system syllabus can be implemented as interacting models on real network topology, in software that runs in a browser. The combination of AC power flow, frequency response and protection on these networks reproduces the general course of the 24 blackouts studied. The corrections in Table 2 each followed from diagnosing a specific failure: excessive charging on 765 kV lines, a missing double circuit, half of a plant counted on the wrong system, and a merit order that overloaded a corridor.
 
-The models are of teaching grade. They are reduced-order reconstructions of each network and are not suitable for planning or operational studies. The blackout replays are best described as reconstructions that combine event sequences from the investigation reports with simulated physics. The plant models connect the same ideas to the buildings in which they occur: the effect of a trip on frequency, the dependence of a station on off-site and emergency supplies, and the elevation of safety equipment relative to a flood.
+The models are of teaching grade. They are reduced-order reconstructions of each network and are not suitable for planning or operational studies. The blackout replays are best described as reconstructions that combine event sequences from the investigation reports with simulated physics. The plant models connect the same ideas to the buildings in which they occur: the effect of a trip on frequency, the dependence of a station on off-site and emergency supplies, and the elevation of safety equipment relative to a flood. The city models extend them to the services a grid supports, and show in particular how differently a single outage unfolds in each system according to the backup it was given.
 
-## 16. Recommendations for Further Work
+## 17. Recommendations for Further Work
 
 1. Validate one event quantitatively by comparing the Great Britain 9 August 2019 reconstruction with the frequency record in the official report [12], which shows a nadir of 48.8 Hz, and adjusting inertia and response until the profiles agree.
 2. Indicate in the interface whether each consequence in a replay is simulated or scripted.
@@ -327,6 +382,8 @@ The models are of teaching grade. They are reduced-order reconstructions of each
 5. Retrain the predictor on all 17 regions with more runs, report precision-recall curves, and compare it with simple threshold rules on frequency and its rate of change.
 6. Drive the control-room replays from the reactor model of Section 7, so that an intervention by the user changes the outcome.
 7. Replace the puff model with a published dispersion code and meteorological reanalysis data for the two releases.
+8. Calibrate the city demand models against hourly load data where utilities publish it, and replace rule-placed cell sites and substations with operator data where it is available (for example, cell-site databases).
+9. Train a day-ahead load forecaster on published demand and weather data, benchmarked against the system operator's own forecast, and use it to drive the city demand model.
 
 ## References
 
@@ -407,8 +464,10 @@ Table A1. Organisation of the source code.
 | src/plants3d | Plant models, procedural textures, reactor interiors, grid disturbances, construction, flooding, sound |
 | src/controlroom | Control-room replays and their time series |
 | src/fallout | Dispersion and deposition model |
+| src/city | City models: demand, metro traction, mobile network, water, vehicle charging, hospital, data centre, blackout cascade, guided walkthroughs, three-dimensional city and close-ups, day simulation in a Web Worker |
+| src/frontier | Launch site, orbital and Mars microgrid models |
 | src/pages, src/components | User interface |
-| scripts/osm | Region definitions and the OpenStreetMap build procedure |
+| scripts/osm | Region and city definitions and the OpenStreetMap build procedures |
 | api | Serverless function for United States data |
 | public/data | Built network models, trained predictor and world outline |
 | public/props | Six public-domain props for the plant models |
@@ -446,10 +505,12 @@ Bus counts include junctions where lines meet away from a substation. Mapped gen
 ```
 npm install
 npm run dev                                    local server at http://localhost:5173
-npm test                                       run the 90 tests
+npm test                                       run the 104 tests
 node scripts/osm/build.mjs <region ids>        rebuild regions (downloads cached in scripts/osm/.cache)
 LAYERS=cached node scripts/osm/build.mjs <id>  rebuild using cached map layers only
 TRAIN=1 RUNS=400 npx vitest run src/ai/train.test.ts    retrain the risk predictor
 ```
 
 The public Overpass servers are frequently busy, and the build procedure rotates between three of them. Downloading a national region can take up to an hour; rebuilding from the cache takes seconds. The United States data module requires an EIA access key set as an environment variable on the hosting service.
+
+The city models are built in two stages. `node scripts/osm/city-fetch.mjs <ids>` downloads the metro routes, substations, water, land use, roads and buildings for each city in `scripts/osm/cities.mjs`, the buildings in tiles; `node scripts/osm/city-build.mjs <ids>` writes `public/data/cities/<id>.json` (districts, metro, areas, hospital, sources) and a binary file of buildings, streets and the district raster. With `DRY=1` the build runs on whatever tiles have been downloaded.
