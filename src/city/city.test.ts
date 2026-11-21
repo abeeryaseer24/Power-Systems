@@ -139,3 +139,26 @@ describe('hospital', () => {
     expect(refuel.dryAt).toBeLessThan(0);
   });
 });
+
+describe('ev and water', () => {
+  it('EV load is plausible, smart charging moves it to the night, an outage dries the taps', async () => {
+    const { CityEngine } = await import('./engine');
+    const e = new CityEngine(M);
+    const evAt = (h: number) => { const q = e.ev.mins[Math.floor(h * 60)]; return q.home + q.work + q.hub; };
+    const peakEv = Math.max(...e.ev.mins.map((q) => q.home + q.work + q.hub));
+    const water = Math.max(...e.water.mins.map((q) => q.mw));
+    if (FULL) console.log({ evs: Math.round(e.ev.evs), dailyMWh: e.ev.dailyMWh, peakEv, at20: evAt(20), at3: evAt(3), hubs: e.hubs.length, water, dayPeak: Math.max(...e.baseline.mins.map((m) => m.total)) });
+    expect(peakEv).toBeGreaterThan(5);
+    expect(peakEv).toBeLessThan(200);
+    expect(water).toBeGreaterThan(1);
+    expect(water).toBeLessThan(40);
+    e.setOpts({ smartCharging: true });
+    expect(evAt(3)).toBeGreaterThan(evAt(20) * 0.5);
+    e.trip('eastfield', true, [6, 20]);
+    const d = e.city.districts.findIndex((q) => q.sub === 'eastfield');
+    const p = (h: number) => e.water.pressure[d * 1440 + Math.floor(h * 60)];
+    if (FULL) console.log({ p7: p(7), p10: p(10), p14: p(14), p21: p(21) });
+    expect(p(5.9)).toBe(0);
+    expect(Math.max(p(14), p(16), p(19))).toBeGreaterThan(0);
+  });
+});

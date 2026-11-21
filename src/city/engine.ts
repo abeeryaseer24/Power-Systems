@@ -9,9 +9,14 @@ import type { CityData } from './types';
 import { cityLoad, districtLoad, LOSS_FRACTION, sunElevation, temperature, type DayInputs, type DistrictLoad } from './demand';
 import { TractionSim, headway, type TractionOpts } from './metro';
 import { buildNetwork, runTelecom, type Network, type TelecomOpts, type TelecomRun } from './telecom';
+import { buildHubs, runEv, type EvOpts, type EvRun, type Hub as EvHub } from './ev';
+import { buildStations, runWater, type Station, type WaterOpts, type WaterRun } from './water';
 
-export type CityOpts = DayInputs & Omit<TractionOpts, 'inp'> & TelecomOpts;
-export const DEFAULT_OPTS: CityOpts = { season: 'summer', day: 'weekday', heat: 0, peakHeadway: 180, regen: true, reversible: false, batteryH: 3, gensetShare: 0.15 };
+export type CityOpts = DayInputs & Omit<TractionOpts, 'inp'> & TelecomOpts & EvOpts & WaterOpts;
+export const DEFAULT_OPTS: CityOpts = { season: 'summer', day: 'weekday', heat: 0, peakHeadway: 180, regen: true, reversible: false, batteryH: 3, gensetShare: 0.15, evShare: 0.08, smartCharging: false, hubBattery: false, tankHours: 6, pumpGenShare: 0.3 };
+
+/** Loads from the other models that the day run adds to the demand stack. */
+type Extra = { evD: Float32Array; water: Float32Array };
 
 /** One graph node: an asset, what it needs, and an optional backup supply. */
 export type Asset = { id: string; label: string; needs: string[]; backup?: { kwh: number; kw: number }; up: boolean; onBackup: boolean; left: number };
@@ -51,7 +56,7 @@ export class Coupling {
 }
 
 export type Minute = {
-  res: number; com: number; ind: number; inst: number; light: number; metro: number; loss: number;
+  res: number; com: number; ind: number; inst: number; light: number; ev: number; water: number; metro: number; loss: number;
   total: number; unserved: number; trains: number; regen: number; burnt: number; returned: number; minV: number; T: number;
   tss: number[]; // per traction substation, MW, flattened across lines
   subs: number[]; // per grid substation, MW
@@ -81,7 +86,7 @@ export function activeAt(trips: Trips, h: number) {
 }
 
 /** Runs a whole day headless and records it minute by minute. */
-function runDay(x: Ctx, opts: CityOpts, trips: Trips, ratings: number[]) {
+function runDay(x: Ctx, opts: CityOpts, trips: Trips, ratings: number[], ex: Extra) {
   const sim = new TractionSim(x.c, { ...opts, inp: opts });
   let act = activeAt(trips, 0), actKey = [...act].join();
   applyTrips(x, sim, act);
@@ -116,29 +121,35 @@ function runDay(x: Ctx, opts: CityOpts, trips: Trips, ratings: number[]) {
     const n = Math.max(1, acc.n);
     const metro = acc.metro / n / 1e6;
     const tss = Array.from(acc.tss, (x) => x / n / 1e6);
-    mins.push(minuteAt(x, h + 0.5 / 60, opts, act, metro, tss, ratings, {
+    mins.push(minuteAt(x, h + 0.5 / 60, opts, act, metro, tss, ratings, ex, m, {
       trains: Math.round(acc.trains / n), regen: acc.regen / n / 1e6, burnt: acc.burnt / n / 1e6, returned: acc.returned / n / 1e6, minV: acc.minV,
     }));
   }
   return { mins, cps };
 }
 
-function minuteAt(x: Ctx, h: number, opts: CityOpts, trips: Set<string>, metroMW: number, tss: number[], ratings: number[], extra: Pick<Minute, 'trains' | 'regen' | 'burnt' | 'returned' | 'minV'>): Minute {
+function minuteAt(x: Ctx, h: number, opts: CityOpts, trips: Set<string>, metroMW: number, tss: number[], ratings: number[], ex: Extra, m: number, extra: Pick<Minute, 'trains' | 'regen' | 'burnt' | 'returned' | 'minV'>): Minute {
   const subs = new Array(x.c.subs.length).fill(0);
   const out = { res: 0, com: 0, ind: 0, inst: 0, light: 0 };
   let unserved = 0;
-  for (const d of x.c.districts) {
+  let ev = 0;
+  const D = x.c.districts.length;
+  x.c.districts.forEach((d, di) => {
     const l = districtLoad(x.c, d, h, opts);
     const sum = l.res + l.com + l.ind + l.inst + l.light;
-    if (trips.has(d.sub)) { unserved += sum; continue; }
+    if (trips.has(d.sub)) { unserved += sum; return; }
+    const e = ex.evD[di * 1440 + m] ?? 0;
     out.res += l.res; out.com += l.com; out.ind += l.ind; out.inst += l.inst; out.light += l.light;
-    subs[x.subIndex.get(d.sub)!] += sum;
-  }
+    ev += e;
+    subs[x.subIndex.get(d.sub)!] += sum + e + (ex.water[m] * d.pop) / (x.c.population || 1);
+  });
+  void D;
   x.tssList.forEach((t, i) => { subs[x.subIndex.get(t.sub)!] += tss[i]; });
-  const base = out.res + out.com + out.ind + out.inst + out.light + metroMW;
+  const water = ex.water[m] ?? 0;
+  const base = out.res + out.com + out.ind + out.inst + out.light + ev + water + metroMW;
   const loss = base * LOSS_FRACTION;
   void ratings;
-  return { ...out, metro: metroMW, loss, total: base + loss, unserved, T: temperature(x.c, h, opts), tss, subs, ...extra };
+  return { ...out, ev, water, metro: metroMW, loss, total: base + loss, unserved, T: temperature(x.c, h, opts), tss, subs, ...extra };
 }
 
 function applyTrips(x: Ctx, sim: TractionSim, trips: Set<string>) {
@@ -192,7 +203,13 @@ export class CityEngine {
   sim!: TractionSim;
   private _net?: Network;
   telecom!: TelecomRun;
+  ev!: EvRun;
+  water!: WaterRun;
+  private _hubs?: EvHub[];
+  private _st?: Station[];
   get net() { return (this._net ??= buildNetwork(this.city)); }
+  get hubs() { return (this._hubs ??= buildHubs(this.city)); }
+  get stations() { return (this._st ??= buildStations(this.city)); }
   private acc = 0;
 
   constructor(public city: CityData, opts: Partial<CityOpts> = {}) {
@@ -208,10 +225,19 @@ export class CityEngine {
   /** Re-run the day after a change to the inputs or the trips, then return to hour h. */
   recompute(h = this.hour) {
     const x = this.x;
-    const base = runDay(x, this.opts, new Map(), this.ratings);
+    // EV charging and water pumping first: they add load to the day run
+    const evBase = runEv(this.city, this.hubs, this.opts, () => true);
+    const wBase = runWater(this.city, this.stations, this.opts, () => true);
+    const exBase: Extra = { evD: evBase.districtMW, water: Float32Array.from(wBase.mins, (q) => q.mw) };
+    const down = this.downByMinute();
+    const upFn = (m: number, d: number) => !down[m].has(this.city.districts[d].sub);
+    this.ev = this.trips.size ? runEv(this.city, this.hubs, this.opts, upFn) : evBase;
+    this.water = this.trips.size ? runWater(this.city, this.stations, this.opts, upFn) : wBase;
+    const exSc: Extra = this.trips.size ? { evD: this.ev.districtMW, water: Float32Array.from(this.water.mins, (q) => q.mw) } : exBase;
+    const base = runDay(x, this.opts, new Map(), this.ratings, exBase);
     this.baseline = { mins: base.mins, events: findEvents(x, base.mins, this.opts, new Map(), this.ratings) };
     if (this.trips.size) {
-      const sc = runDay(x, this.opts, this.trips, this.ratings);
+      const sc = runDay(x, this.opts, this.trips, this.ratings, exSc);
       this.scenario = { mins: sc.mins, events: findEvents(x, sc.mins, this.opts, this.trips, this.ratings) };
       this.cps = sc.cps;
     } else {
@@ -223,10 +249,15 @@ export class CityEngine {
   }
 
   /** The mobile network against the same outages, minute by minute. */
-  runTelecom() {
-    const c = this.city, trips = this.trips;
+  private downByMinute() {
     const down: Set<string>[] = [];
-    for (let m = 0; m < 1440; m++) down.push(trips.size ? activeAt(trips, (m + 0.5) / 60) : new Set());
+    for (let m = 0; m < 1440; m++) down.push(this.trips.size ? activeAt(this.trips, (m + 0.5) / 60) : new Set());
+    return down;
+  }
+
+  runTelecom() {
+    const c = this.city;
+    const down = this.downByMinute();
     this.telecom = runTelecom(c, this.net, this.opts, (m, d) => !down[m].has(c.districts[d].sub));
   }
 
@@ -300,7 +331,11 @@ export class CityEngine {
     const metro = this.sim.gridPower() / 1e6;
     let unserved = 0;
     for (const q of districts) if (!q.up) unserved += sumLoad(q.l);
-    const served = c.res + c.com + c.ind + c.inst + c.light - unserved + metro;
+    const mi = Math.min(1439, Math.floor(h * 60));
+    let evNow = 0;
+    districts.forEach((q, di) => { if (q.up) evNow += this.ev.districtMW[di * 1440 + mi]; });
+    const waterNow = this.water.mins[mi].mw;
+    const served = c.res + c.com + c.ind + c.inst + c.light - unserved + metro + evNow + waterNow;
     return { h, T: temperature(x.c, h, this.opts), sunEl: sunElevation(x.c, h, this.opts), districts, subs, metro, total: served * (1 + LOSS_FRACTION), unserved, hw: headway(h, { ...this.opts, inp: this.opts }, x.c.metro) };
   }
 

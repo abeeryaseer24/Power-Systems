@@ -6,16 +6,17 @@ import type { CityData } from '../city/types';
 import { SECTORS, SECTOR_INFO, type Sector } from '../city/demand';
 import { TRAIN } from '../city/metro';
 import { ST_LABEL, traffic } from '../city/telecom';
+import { PRESSURE } from '../city/water';
 import { clock, num } from '../lib/format';
 import '../city.css';
 
 // One viewer, two models on two pages:
 //   /city        City Day: where 2.7 million people's demand comes from, hour by hour
 //   /city/metro  Metro traction: trains, substations and the 1500 V DC network
-type Mode = 'day' | 'metro' | 'telecom';
+type Mode = 'day' | 'metro' | 'telecom' | 'ev' | 'water';
 
-const SPEEDS: Record<Mode, number[]> = { day: [60, 300, 900, 1800], metro: [1, 10, 30, 120], telecom: [60, 300, 900, 1800] };
-const TITLES: Record<Mode, string> = { day: 'City Day', metro: 'Metro traction', telecom: 'Mobile network' };
+const SPEEDS: Record<Mode, number[]> = { day: [60, 300, 900, 1800], metro: [1, 10, 30, 120], telecom: [60, 300, 900, 1800], ev: [60, 300, 900, 1800], water: [60, 300, 900, 1800] };
+const TITLES: Record<Mode, string> = { day: 'City Day', metro: 'Metro traction', telecom: 'Mobile network', ev: 'EV charging', water: 'Water supply' };
 type TripFn = (id: string, on: boolean, win?: [number, number]) => void;
 const speedLabel = (s: number) => (s >= 60 ? `${s / 60} min/s` : `${s}×`);
 const HI: Partial<Record<Sector, number>> = { res: 0, com: 1, ind: 2, inst: 3, metro: 4, light: 5 };
@@ -70,6 +71,8 @@ export default function CityTwin({ mode }: { mode: Mode }) {
         scene!.state = sceneState(e);
       };
       if (mode === 'telecom') scene.setTelecom(e.net);
+      if (mode === 'ev') scene.setEv(e.hubs);
+      if (mode === 'water') scene.setWater(e.stations);
       scene.state = sceneState(e);
       lastEv.current = e.hour;
       setReady(true);
@@ -181,13 +184,15 @@ export default function CityTwin({ mode }: { mode: Mode }) {
           <Link to={`/city/${cityId}`} className={mode === 'day' ? 'on' : ''}>City Day</Link>
           {(!city || city.lines.length > 0) && <Link to={`/city/${cityId}/metro`} className={mode === 'metro' ? 'on' : ''}>Metro traction</Link>}
           <Link to={`/city/${cityId}/telecom`} className={mode === 'telecom' ? 'on' : ''}>Mobile network</Link>
+          <Link to={`/city/${cityId}/ev`} className={mode === 'ev' ? 'on' : ''}>EV charging</Link>
+          <Link to={`/city/${cityId}/water`} className={mode === 'water' ? 'on' : ''}>Water</Link>
           {cityId === 'meridia' && <Link to={`/city/${cityId}/hospital`}>Hospital</Link>}
         </nav>
       </header>
 
       {ready && e && now && minute && opts && (
         <>
-          <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win), 'Simulating the outage')} />
+          <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win), 'Simulating the outage')} onOpts={(o) => rerun((en) => en.setOpts(o))} />
           <Inspector sel={sel} e={e} now={now} mode={mode} onClose={() => setSel(null)} onFocus={(p) => { const v = scn.current?.posOf(p); if (v) scn.current!.focus(v, p.type === 'district' ? 2600 : 700); }}
             onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win), on ? 'Taking it out of service' : 'Back in service')} trips={trips} />
 
@@ -214,10 +219,10 @@ export default function CityTwin({ mode }: { mode: Mode }) {
               </div>
               <button className={`cy-hide ${graphs ? '' : 'off'}`} onClick={() => setGraphs(!graphs)} aria-pressed={!graphs} title="Show or hide the graphs (G)">{graphs ? 'Hide graphs' : 'Show graphs'}</button>
               <span className="cy-sum">
-                {mode === 'telecom' ? <TelSum e={e} h={now.h} /> : mode === 'day' ? <>Demand <b>{num(now.total)}</b> MW{now.unserved > 1 && <em> · {num(now.unserved)} MW unserved</em>}</> : <>Traction <b>{num(now.metro, 1)}</b> MW · <b>{e.sim.trains.length}</b> trains · headway <b>{Number.isFinite(now.hw) ? `${num(now.hw / 60, 1)} min` : 'no service'}</b></>}
+                {mode === 'ev' ? <EvSum e={e} h={now.h} /> : mode === 'water' ? <WaterSum e={e} h={now.h} /> : mode === 'telecom' ? <TelSum e={e} h={now.h} /> : mode === 'day' ? <>Demand <b>{num(now.total)}</b> MW{now.unserved > 1 && <em> · {num(now.unserved)} MW unserved</em>}</> : <>Traction <b>{num(now.metro, 1)}</b> MW · <b>{e.sim.trains.length}</b> trains · headway <b>{Number.isFinite(now.hw) ? `${num(now.hw / 60, 1)} min` : 'no service'}</b></>}
               </span>
             </div>
-            {!graphs ? null : mode === 'telecom' ? <TelecomChart e={e} hour={now.h} seek={seek} /> : mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} /> : <TractionChart e={e} hour={now.h} seek={seek} />}
+            {!graphs ? null : mode === 'ev' ? <EvChart e={e} hour={now.h} seek={seek} /> : mode === 'water' ? <WaterChart e={e} hour={now.h} seek={seek} /> : mode === 'telecom' ? <TelecomChart e={e} hour={now.h} seek={seek} /> : mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} /> : <TractionChart e={e} hour={now.h} seek={seek} />}
           </section>
         </>
       )}
@@ -234,17 +239,36 @@ function sceneState(e: CityEngine) {
     subs: n.subs.map((s) => ({ load: s.mw / s.rating, up: s.up })),
     sim: e.sim,
     telecom: { state: e.telecom.state, soc: e.telecom.soc, hub: e.telecom.hubState, minute: Math.min(1439, Math.floor(n.h * 60)) },
+    ev: { mw: e.ev.hubMW, minute: Math.min(1439, Math.floor(n.h * 60)) },
+    water: { level: e.water.level, pressure: e.water.pressure, minute: Math.min(1439, Math.floor(n.h * 60)) },
   };
 }
 
 // ------------------------------------------------------------------ captions
 
-function Captions({ mode, e, now, minute, feed, onTrip }: { mode: Mode; e: CityEngine; now: ReturnType<CityEngine['now']>; minute: Minute; feed: CityEvent[]; onTrip: TripFn }) {
+function Captions({ mode, e, now, minute, feed, onTrip, onOpts }: { mode: Mode; e: CityEngine; now: ReturnType<CityEngine['now']>; minute: Minute; feed: CityEvent[]; onTrip: TripFn; onOpts: (o: Partial<CityOpts>) => void }) {
   const peak = Math.max(...e.scenario.mins.map((m) => m.total));
   const h = now.h;
   let line: string;
   let action: React.ReactNode = null;
-  if (mode === 'telecom') {
+  const mi = Math.min(1439, Math.floor(h * 60));
+  if (mode === 'ev') {
+    const q = e.ev.mins[mi];
+    line = `${num(q.charging)} cars on fast chargers${q.queue ? `, ${num(q.queue)} waiting` : ''}. Home charging ${num(q.home, 1)} MW, offices ${num(q.work, 1)} MW, hubs ${num(q.hub, 1)} MW. ${e.opts.smartCharging ? 'Smart charging holds home charging back until after midnight.' : 'Most home charging starts when people get home, on top of the evening peak.'}`;
+    action = e.opts.evShare < 0.3
+      ? <button className="cy-try" onClick={() => onOpts({ evShare: 0.3 })}>Try it: 30 % of cars electric</button>
+      : !e.opts.smartCharging ? <button className="cy-try" onClick={() => onOpts({ smartCharging: true })}>Try it: switch on smart charging</button> : null;
+  } else if (mode === 'water') {
+    const q = e.water.mins[mi];
+    line = q.low + q.dry === 0
+      ? `Every area has full pressure. Pumps draw ${num(q.mw, 1)} MW, filling the elevated tanks between the morning and evening peaks.`
+      : `${Math.round(q.low * 100)} % of people have low pressure (upper floors dry) and ${Math.round(q.dry * 100)} % have no water at all. Pumps draw ${num(q.mw, 1)} MW.`;
+    if (!e.trips.size) {
+      const big = [...e.city.districts].sort((a, b) => b.pop - a.pop)[0];
+      const sub = e.city.subs.find((q2) => q2.id === big.sub)!;
+      action = <button className="cy-try" onClick={() => onTrip(sub.id, true, [6, 20])}>Try it: {sub.name.replace(/ \d.*$/, '')} out from 06:00 to 20:00</button>;
+    }
+  } else if (mode === 'telecom') {
     const t = e.telecom.mins[Math.min(1439, Math.floor(h * 60))];
     const n = e.net.sites.length;
     line = t.battery + t.down + t.genset + t.isolated === 0
@@ -475,11 +499,24 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
   if (!sel) {
     kicker = `${C.name} now`;
     const tm = e.telecom.mins[Math.min(1439, Math.floor(now.h * 60))];
-    title = mode === 'telecom' ? `${Math.round(tm.served * 100)} % with signal` : mode === 'day' ? `${num(now.total)} MW` : `${num(now.metro, 1)} MW`;
+    const evq = e.ev.mins[Math.min(1439, Math.floor(now.h * 60))], wq = e.water.mins[Math.min(1439, Math.floor(now.h * 60))];
+    title = mode === 'ev' ? `${num(evq.home + evq.work + evq.hub, 1)} MW` : mode === 'water' ? `${Math.round(wq.full * 100)} % full pressure` : mode === 'telecom' ? `${Math.round(tm.served * 100)} % with signal` : mode === 'day' ? `${num(now.total)} MW` : `${num(now.metro, 1)} MW`;
     const peak = Math.max(...e.scenario.mins.map((m) => m.total));
     body = (
       <>
-        <Rows rows={mode === 'telecom' ? [
+        <Rows rows={mode === 'ev' ? [
+          ['Electric cars', `${num(e.ev.evs)} (${Math.round(e.opts.evShare * 100)} % of the fleet)`],
+          ['Energy per day', `${num(e.ev.dailyMWh)} MWh`],
+          ['Fast-charging hubs', `${e.hubs.length} (positions modelled)`],
+          ['Smart home charging', e.opts.smartCharging ? 'on' : 'off'],
+          ['Hub batteries', e.opts.hubBattery ? 'fitted' : 'none'],
+        ] : mode === 'water' ? [
+          ['Pumping now', `${num(wq.mw, 1)} MW`],
+          ['Water per person', '150 litres a day'],
+          ['Tank storage', `${e.opts.tankHours} h of average demand`],
+          ['Stations with a generator', `${Math.round(e.opts.pumpGenShare * 100)} %`],
+          ['People without water', `${Math.round(wq.dry * 100)} %`],
+        ] : mode === 'telecom' ? [
           ['Cell sites', `${num(e.net.sites.length)} (positions modelled)`],
           ['Exchanges', `${e.net.hubs.length}, one per service area`],
           ['Network load', `${num(tm.mw, 1)} MW`],
@@ -498,7 +535,7 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
           ['Regenerative braking', e.opts.regen ? 'on' : 'off'],
           ['Substation type', e.opts.reversible ? 'reversible (inverter)' : 'diode rectifier'],
         ]} />
-        <p className="cy-hint">Click a {mode === 'telecom' ? 'cell site, exchange or substation' : mode === 'day' ? 'district, substation or train' : 'train, substation or station'} in the city to inspect it.</p>
+        <p className="cy-hint">Click a {mode === 'ev' ? 'charging hub' : mode === 'water' ? 'water tower or district' : mode === 'telecom' ? 'cell site, exchange or substation' : mode === 'day' ? 'district, substation or train' : 'train, substation or station'} in the city to inspect it.</p>
         <details className="cy-notes">
           <summary>{C.kind === 'prototype' ? 'This is a prototype city' : 'Where the data comes from'}</summary>
           <ul>{C.notes.map((n) => <li key={n}>{n}</li>)}</ul>
@@ -545,6 +582,32 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
         <Rows rows={[['Output', t.on ? `${num(Math.max(0, t.p) / 1e6, 2)} MW` : 'out of service'], ['Current', t.on ? `${num(Math.max(0, t.i))} A` : '—'], ['Busbar voltage', t.on ? `${num(t.v)} V` : '—'], ['Rating', `${dc.tssRating} MW${t.modelled ? ' (position modelled)' : ''}`], ['Fed from', C.subs.find((g) => g.id === t.sub)!.name]]} />
         <button className="cy-trip" onClick={() => onTrip(id, !trips.includes(id))}>{trips.includes(id) ? 'Return to service' : 'Take out of service'}</button>
         <p className="cy-hint">A diode rectifier only conducts while the line voltage is below its {dc.E} V no-load voltage, so substations share each train’s load by distance.</p>
+      </>
+    );
+  } else if (sel.type === 'evhub') {
+    const m = Math.min(1439, Math.floor(now.h * 60));
+    const hb = e.hubs[sel.idx];
+    const mw = e.ev.hubMW[sel.idx * 1440 + m];
+    kicker = 'Fast-charging hub';
+    title = `${num(mw * 1000)} kW`;
+    body = (
+      <>
+        <Rows rows={[['Stalls', `${hb.stalls} × 250 kW`], ['Cars charging', `${e.ev.hubCars[sel.idx * 1440 + m]}`], ['Waiting', `${e.ev.hubQueue[sel.idx * 1440 + m]}`], ['Site transformer', `${num(hb.limitKW)} kW`], ['Site battery', hb.batKWh ? `${e.ev.hubSoc[sel.idx * 1440 + m]} % of ${num(hb.batKWh)} kWh` : 'none'], ['Area', C.districts[hb.district].name]]} />
+        <p className="cy-hint">The transformer is sized for 60 % of the stalls’ nameplate. When too many cars want full power at once, every car is slowed to share it; a site battery fills the gap instead.</p>
+      </>
+    );
+  } else if (sel.type === 'pump') {
+    const m = Math.min(1439, Math.floor(now.h * 60));
+    const stn = e.stations[sel.idx];
+    const lv = e.water.level[sel.idx * 1440 + m], pr = e.water.pressure[sel.idx * 1440 + m];
+    let dryAt = -1;
+    for (let k = m; k < 1440; k++) if (e.water.pressure[sel.idx * 1440 + k] === 2) { dryAt = k; break; }
+    kicker = 'Water tower and pumping station';
+    title = `${Math.round(lv * 100)} % full`;
+    body = (
+      <>
+        <Rows rows={[['Pressure', PRESSURE[pr]], ['Serves', `${num(C.districts[stn.district].pop)} people`], ['Pumps', stn.genset ? 'on mains, standby generator' : 'mains only'], ['Area', C.districts[stn.district].name]]} />
+        {pr < 2 && dryAt > 0 && <p className="cy-hint warn">At this rate the tank is empty at about {clock(dryAt / 60)}.</p>}
       </>
     );
   } else if (sel.type === 'site' || sel.type === 'hub') {
@@ -628,8 +691,8 @@ function Bars({ parts }: { parts: [Sector, number][] }) {
 // ------------------------------------------------------------------ inputs
 
 function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city: CityData; mode: Mode; opts: CityOpts; trips: string[]; onOpts: (o: Partial<CityOpts>) => void; onTrip: TripFn; onClose: () => void }) {
-  const [from, setFrom] = useState(mode === 'telecom' ? 18 : 0);
-  const [dur, setDur] = useState(mode === 'telecom' ? 6 : 24);
+  const [from, setFrom] = useState(mode === 'telecom' ? 18 : mode === 'water' ? 6 : 0);
+  const [dur, setDur] = useState(mode === 'telecom' ? 6 : mode === 'water' ? 12 : 24);
   return (
     <aside className="cy-inputs" aria-label="Model inputs">
       <header><h2>Model inputs</h2><button onClick={onClose} aria-label="Close">×</button></header>
@@ -659,6 +722,34 @@ function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city:
           <fieldset>
             <legend>Substations</legend>
             <div className="pv-seg"><button className={!opts.reversible ? 'on' : ''} onClick={() => onOpts({ reversible: false })}>Diode only</button><button className={opts.reversible ? 'on' : ''} onClick={() => onOpts({ reversible: true })}>Reversible</button></div>
+          </fieldset>
+        </>
+      )}
+      {mode === 'ev' && (
+        <>
+          <fieldset>
+            <legend>Share of cars that are electric</legend>
+            <div className="pv-seg">{[0.02, 0.08, 0.15, 0.3, 0.6].map((v) => <button key={v} className={opts.evShare === v ? 'on' : ''} onClick={() => onOpts({ evShare: v })}>{Math.round(v * 100)} %</button>)}</div>
+          </fieldset>
+          <fieldset>
+            <legend>Smart home charging (wait until after midnight)</legend>
+            <div className="pv-seg"><button className={opts.smartCharging ? 'on' : ''} onClick={() => onOpts({ smartCharging: true })}>On</button><button className={!opts.smartCharging ? 'on' : ''} onClick={() => onOpts({ smartCharging: false })}>Off</button></div>
+          </fieldset>
+          <fieldset>
+            <legend>Batteries at fast-charging hubs</legend>
+            <div className="pv-seg"><button className={opts.hubBattery ? 'on' : ''} onClick={() => onOpts({ hubBattery: true })}>Fitted</button><button className={!opts.hubBattery ? 'on' : ''} onClick={() => onOpts({ hubBattery: false })}>None</button></div>
+          </fieldset>
+        </>
+      )}
+      {mode === 'water' && (
+        <>
+          <fieldset>
+            <legend>Elevated tank storage (hours of average demand)</legend>
+            <div className="pv-seg">{[2, 4, 6, 12].map((v) => <button key={v} className={opts.tankHours === v ? 'on' : ''} onClick={() => onOpts({ tankHours: v })}>{v} h</button>)}</div>
+          </fieldset>
+          <fieldset>
+            <legend>Pumping stations with a standby generator</legend>
+            <div className="pv-seg">{[0, 0.3, 0.6, 1].map((v) => <button key={v} className={opts.pumpGenShare === v ? 'on' : ''} onClick={() => onOpts({ pumpGenShare: v })}>{Math.round(v * 100)} %</button>)}</div>
           </fieldset>
         </>
       )}
@@ -745,4 +836,75 @@ function TelecomChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h
       </div>
     </div>
   );
+}
+
+function EvSum({ e, h }: { e: CityEngine; h: number }) {
+  const q = e.ev.mins[Math.min(1439, Math.floor(h * 60))];
+  return <>EV charging <b>{num(q.home + q.work + q.hub, 1)}</b> MW · <b>{num(q.charging)}</b> on fast chargers · <b>{num(q.queue)}</b> waiting</>;
+}
+function WaterSum({ e, h }: { e: CityEngine; h: number }) {
+  const q = e.water.mins[Math.min(1439, Math.floor(h * 60))];
+  return <>Full pressure for <b>{Math.round(q.full * 100)} %</b> · low <b>{Math.round(q.low * 100)} %</b> · dry <b>{Math.round(q.dry * 100)} %</b></>;
+}
+
+function Stack({ e, hour, seek, series, max, unit, legend }: { e: CityEngine; hour: number; seek: (h: number) => void; series: { key: string; label: string; colour: string; v: (m: number) => number }[]; max: number; unit: string; legend: React.ReactNode }) {
+  const tl = useTimeline(seek);
+  const paths = useMemo(() => {
+    const acc = new Float64Array(361);
+    return series.map((sr) => {
+      const top: string[] = [], bot: string[] = [];
+      for (let k = 0; k <= 360; k++) {
+        const m = Math.min(1439, k * 4), x = (k / 360) * CW;
+        const y0 = CH - (acc[k] / max) * CH;
+        acc[k] += sr.v(m);
+        top.push(`${x.toFixed(1)},${(CH - (acc[k] / max) * CH).toFixed(1)}`);
+        bot.unshift(`${x.toFixed(1)},${y0.toFixed(1)}`);
+      }
+      return { key: sr.key, colour: sr.colour, d: `M${top.join(' L')} L${bot.join(' L')} Z` };
+    });
+  }, [series, max]);
+  return (
+    <div className="cy-chart">
+      <ul className="cy-legend">{legend}</ul>
+      <div className="cy-plot">
+        <svg ref={tl.ref} viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" onPointerDown={tl.onPointerDown} onPointerMove={tl.onPointerMove} onPointerUp={tl.onPointerUp} role="slider" aria-label="Time of day" aria-valuemin={0} aria-valuemax={24} aria-valuenow={hour}>
+          <Axis />
+          {paths.map((p) => <path key={p.key} d={p.d} fill={p.colour} opacity={0.85} />)}
+          <line x1={(hour / 24) * CW} x2={(hour / 24) * CW} y1={0} y2={CH} className="cy-head" />
+        </svg>
+        <Markers events={e.scenario.events} seek={seek} />
+        <span className="cy-ymax">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function EvChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: number) => void }) {
+  const mins = e.ev.mins;
+  const series = useMemo(() => [
+    { key: 'home', label: 'Home', colour: '#ffb04d', v: (m: number) => mins[m].home },
+    { key: 'work', label: 'Work', colour: '#86c5da', v: (m: number) => mins[m].work },
+    { key: 'hub', label: 'Fast hubs', colour: '#7fd1a8', v: (m: number) => mins[m].hub },
+  ], [mins]);
+  const max = Math.max(1, ...mins.map((q) => q.home + q.work + q.hub)) * 1.1;
+  const q = mins[Math.min(1439, Math.floor(hour * 60))];
+  return <Stack e={e} hour={hour} seek={seek} series={series} max={max} unit={`${num(max)} MW`} legend={<>
+    {series.map((sr) => <li key={sr.key}><span><i style={{ background: sr.colour }} />{sr.label}<b>{num(sr.v(Math.min(1439, Math.floor(hour * 60))), 1)}</b></span></li>)}
+    <li><span><i style={{ background: 'transparent', border: '1px solid #ece6d8' }} />Cars waiting<b>{num(q.queue)}</b></span></li>
+    <li className="cy-day"><span>Today<b>{num(e.ev.dailyMWh)} MWh</b></span><small>{num(e.ev.evs)} electric cars</small></li>
+  </>} />;
+}
+
+function WaterChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: number) => void }) {
+  const mins = e.water.mins;
+  const series = useMemo(() => [
+    { key: 'full', label: 'Full pressure', colour: '#5fa8d3', v: (m: number) => mins[m].full * 100 },
+    { key: 'low', label: 'Low pressure', colour: '#ffb04d', v: (m: number) => mins[m].low * 100 },
+    { key: 'dry', label: 'No water', colour: '#ff5b4f', v: (m: number) => mins[m].dry * 100 },
+  ], [mins]);
+  const q = mins[Math.min(1439, Math.floor(hour * 60))];
+  return <Stack e={e} hour={hour} seek={seek} series={series} max={100} unit="100 % of people" legend={<>
+    {series.map((sr) => <li key={sr.key}><span><i style={{ background: sr.colour }} />{sr.label}<b>{Math.round(sr.v(Math.min(1439, Math.floor(hour * 60))))} %</b></span></li>)}
+    <li className="cy-day"><span>Pumping<b>{num(q.mw, 1)} MW</b></span><small>150 L per person per day</small></li>
+  </>} />;
 }

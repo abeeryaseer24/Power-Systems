@@ -90,6 +90,8 @@ export default function App() {
           <Route path="/city/:id" element={<CityTwinRoute mode="day" />} />
           <Route path="/city/:id/metro" element={<CityTwinRoute mode="metro" />} />
           <Route path="/city/:id/telecom" element={<CityTwinRoute mode="telecom" />} />
+          <Route path="/city/:id/ev" element={<CityTwinRoute mode="ev" />} />
+          <Route path="/city/:id/water" element={<CityTwinRoute mode="water" />} />
           <Route path="/city/:id/hospital" element={<Hospital />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
@@ -102,7 +104,7 @@ export default function App() {
 }
 
 // remount the viewer whenever the city or the model changes
-function CityTwinRoute({ mode }: { mode: 'day' | 'metro' | 'telecom' }) {
+function CityTwinRoute({ mode }: { mode: 'day' | 'metro' | 'telecom' | 'ev' | 'water' }) {
   const { id = 'meridia' } = useParams();
   return <CityTwin key={`${id}-${mode}`} mode={mode} />;
 }

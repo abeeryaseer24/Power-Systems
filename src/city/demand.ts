@@ -8,14 +8,16 @@ export type { Season };
 export type DayType = 'weekday' | 'weekend';
 export type DayInputs = { season: Season; day: DayType; heat: number /* °C offset */ };
 
-export const SECTORS = ['res', 'com', 'ind', 'inst', 'light', 'metro', 'loss'] as const;
+export const SECTORS = ['res', 'com', 'ind', 'inst', 'light', 'ev', 'water', 'metro', 'loss'] as const;
 export type Sector = (typeof SECTORS)[number];
 export const SECTOR_INFO: Record<Sector, { label: string; colour: string; note: string }> = {
   res: { label: 'Homes', colour: '#ffb04d', note: 'Lights, fans, fridges, cooking, TVs and air conditioning in every home in the city.' },
   com: { label: 'Offices & shops', colour: '#86c5da', note: 'Commercial floor space: lighting, lifts, IT, and chillers that follow office and shop hours.' },
   ind: { label: 'Industry', colour: '#c9b8ff', note: 'Factories, workshops, cold stores and port cranes: three shifts, a dip at night.' },
-  inst: { label: 'Hospitals & campus', colour: '#7fd1a8', note: 'Hospitals run flat around the clock; universities follow the teaching day.' },
+  inst: { label: 'Hospitals & campus', colour: '#e98fb0', note: 'Hospitals run flat around the clock; universities follow the teaching day.' },
   light: { label: 'Street lighting', colour: '#e8d27a', note: 'Switches on when the sun drops 1° below the horizon, dims to 70 % after midnight.' },
+  ev: { label: 'EV charging', colour: '#7fd1a8', note: 'Home wallboxes in the evening (or after midnight with smart charging), office chargers by day, and 250 kW hubs simulated car by car.' },
+  water: { label: 'Water pumping', colour: '#5fa8d3', note: 'Pumping stations lifting treated water into each area’s elevated tank: about 0.35 kWh per cubic metre.' },
   metro: { label: 'Metro traction', colour: '#ff8a5c', note: 'The metro, from the traction substations’ meters. Simulated train by train.' },
   loss: { label: 'Network losses', colour: '#5d6d84', note: 'Heat in cables and transformers between the 132 kV intake and the meters, about 6 %.' },
 };

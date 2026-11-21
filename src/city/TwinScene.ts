@@ -12,6 +12,8 @@ import { glow, rng } from '../plants3d/textures';
 import { along, districtAt, polyLength, type CityData, type Kind, type Season } from './types';
 import { TRAIN, type TractionSim } from './metro';
 import type { Network } from './telecom';
+import type { Hub as EvHub } from './ev';
+import type { Station } from './water';
 
 const KIND_INDEX: Record<Kind, number> = { res: 0, com: 1, ind: 2, inst: 3 };
 export const MAXD = 64;
@@ -21,7 +23,7 @@ export const MAXD = 64;
 // trains move as the traction simulation moves them, and the flow particles
 // travel along the catenary at a speed set by the solved DC currents.
 
-export type Pick = { type: 'site'; idx: number } | { type: 'hub'; idx: number } | { type: 'train'; id: number } | { type: 'tss'; line: number; idx: number } | { type: 'sub'; id: string } | { type: 'district'; id: string } | { type: 'station'; line: number; idx: number };
+export type Pick = { type: 'evhub'; idx: number } | { type: 'pump'; idx: number } | { type: 'site'; idx: number } | { type: 'hub'; idx: number } | { type: 'train'; id: number } | { type: 'tss'; line: number; idx: number } | { type: 'sub'; id: string } | { type: 'district'; id: string } | { type: 'station'; line: number; idx: number };
 
 export type SceneState = {
   hour: number;
@@ -30,6 +32,8 @@ export type SceneState = {
   subs: { load: number; up: boolean }[]; // load as a fraction of rating
   sim: TractionSim;
   telecom?: { state: Uint8Array; soc: Uint8Array; hub: Uint8Array; minute: number };
+  ev?: { mw: Float32Array; minute: number };
+  water?: { level: Float32Array; pressure: Uint8Array; minute: number };
 };
 
 const DECK = 13; // viaduct deck height, m
@@ -57,6 +61,7 @@ export class TwinScene {
   };
   private gUniforms = {
     uStreet: { value: new Array(MAXD + 1).fill(0) as number[] },
+    uTint: { value: Array.from({ length: MAXD }, () => new THREE.Vector4()) },
     uNight: { value: 0 },
     uHi: { value: -1 },
   };
@@ -81,6 +86,8 @@ export class TwinScene {
   state?: SceneState;
   selected: Pick | null = null;
   private ring: THREE.Mesh;
+  private evl?: { hubs: EvHub[]; canopies: THREE.InstancedMesh; glow: THREE.Sprite[] };
+  private wat?: { st: Station[]; towers: THREE.Group[]; tanks: THREE.Mesh[] };
   private tel?: { net: Network; hex: THREE.InstancedMesh; masts: THREE.InstancedMesh; lights: THREE.Points; hubs: THREE.InstancedMesh };
 
   constructor(private host: HTMLElement, public city: CityData, opts: { view?: 'city' | 'metro' } = {}) {
@@ -253,7 +260,13 @@ export class TwinScene {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;').replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed,1.0)).xyz;');
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
-          varying vec3 vW; uniform sampler2D uMask; uniform sampler2D uCells; uniform float uStreet[${MAXD + 1}]; uniform float uNight; uniform float uHi;`)
+          varying vec3 vW; uniform sampler2D uMask; uniform sampler2D uCells; uniform float uStreet[${MAXD + 1}]; uniform vec4 uTint[${MAXD}]; uniform float uNight; uniform float uHi;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          {
+            vec2 q0 = vec2((vW.x - ${X0.toFixed(1)}) / ${W.toFixed(1)}, (vW.z - ${Z0.toFixed(1)}) / ${D.toFixed(1)});
+            int d0 = int(texture2D(uCells, q0).r * 255.0 + 0.5);
+            for (int i = 0; i < ${MAXD}; i++) { if (i == d0) diffuseColor.rgb = mix(diffuseColor.rgb, uTint[i].rgb, uTint[i].a); }
+          }`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           vec2 q = vec2((vW.x - ${X0.toFixed(1)}) / ${W.toFixed(1)}, (vW.z - ${Z0.toFixed(1)}) / ${D.toFixed(1)});
           float st = texture2D(uMask, vec2(q.x, 1.0 - q.y)).r;
@@ -568,6 +581,57 @@ export class TwinScene {
     this.tel = { net, hex, masts, lights, hubs };
   }
 
+  /** Public fast-charging hubs: a canopy over the stalls and a glow that follows the site's power. */
+  setEv(hubs: EvHub[] | null) {
+    if (this.evl) { this.evl.canopies.visible = !!hubs; this.evl.glow.forEach((g) => { g.visible = !!hubs; }); }
+    if (!hubs || this.evl) return;
+    const g = mergeGeometries([new THREE.BoxGeometry(1, 0.7, 12).translate(0, 5.6, 0), new THREE.BoxGeometry(0.4, 5.6, 0.4).translate(-0.45, 2.8, -5), new THREE.BoxGeometry(0.4, 5.6, 0.4).translate(0.45, 2.8, 5)]);
+    const canopies = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ color: '#e6e8e4', roughness: 0.4, metalness: 0.3, emissive: '#7fd1a8', emissiveIntensity: 0.2 }), hubs.length);
+    const glows: THREE.Sprite[] = [];
+    const m4 = new THREE.Matrix4();
+    hubs.forEach((h, i) => {
+      m4.makeScale(h.stalls * 4.5, 1, 1).setPosition(h.x, 0, h.z);
+      canopies.setMatrixAt(i, m4);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: '#7fd1a8', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      sp.position.set(h.x, 22, h.z);
+      sp.scale.setScalar(90);
+      this.scene.add(sp);
+      glows.push(sp);
+    });
+    canopies.castShadow = true;
+    this.scene.add(canopies);
+    this.evl = { hubs, canopies, glow: glows };
+  }
+
+  /** Elevated water tanks, one per area; the ground is tinted by water pressure. */
+  setWater(st: Station[] | null) {
+    if (this.wat) this.wat.towers.forEach((t) => { t.visible = !!st; });
+    if (!st) { this.gUniforms.uTint.value.forEach((v) => v.set(0, 0, 0, 0)); return; }
+    if (this.wat) return;
+    const legM = new THREE.MeshStandardMaterial({ color: '#9b9488', roughness: 0.9 });
+    const towers: THREE.Group[] = [], tanks: THREE.Mesh[] = [];
+    for (const s0 of st) {
+      const g = new THREE.Group();
+      for (const [dx, dz] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1, 30, 6), legM);
+        leg.position.set(dx, 15, dz);
+        g.add(leg);
+      }
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 30, 8), legM);
+      shaft.position.y = 15;
+      g.add(shaft);
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(13, 9, 14, 20), new THREE.MeshStandardMaterial({ color: '#cfd6d8', roughness: 0.5, metalness: 0.2, emissive: '#5fa8d3', emissiveIntensity: 0.2 }));
+      tank.position.y = 37;
+      g.add(tank);
+      g.position.set(s0.x, 0, s0.z);
+      g.traverse((o) => { o.castShadow = true; });
+      this.scene.add(g);
+      towers.push(g);
+      tanks.push(tank);
+    }
+    this.wat = { st, towers, tanks };
+  }
+
   setHighlight(k: number) {
     this.bUniforms.uHi.value = k;
     this.gUniforms.uHi.value = k;
@@ -709,6 +773,34 @@ export class TwinScene {
       if (hex.instanceColor) hex.instanceColor.needsUpdate = true;
       (this.tel.lights.material as THREE.PointsMaterial).opacity = 0.25 + 0.75 * this.night;
     }
+    // charging hubs glow with their power
+    if (this.evl && st.ev && this.evl.canopies.visible) {
+      this.evl.hubs.forEach((h, i) => {
+        const mw = st.ev!.mw[i * 1440 + st.ev!.minute];
+        const f = Math.min(1.4, mw / (h.limitKW / 1000));
+        const sp = this.evl!.glow[i];
+        (sp.material as THREE.SpriteMaterial).opacity = mw > 0.001 ? 0.25 + 0.6 * f : 0.05;
+        (sp.material as THREE.SpriteMaterial).color.set(f > 0.98 ? '#ffb04d' : '#7fd1a8');
+        sp.scale.setScalar(60 + 120 * f);
+      });
+    }
+    // water: tanks show their level, the ground shows pressure
+    if (this.wat && st.water && this.wat.towers[0]?.visible) {
+      const { level, pressure, minute } = st.water;
+      this.wat.tanks.forEach((t, d) => {
+        const lv = level[d * 1440 + minute];
+        const mat = t.material as THREE.MeshStandardMaterial;
+        mat.emissive.set(lv > 0.25 ? '#5fa8d3' : lv > 0.02 ? '#ffb04d' : '#ff5b4f');
+        mat.emissiveIntensity = 0.15 + 0.5 * this.night + 0.3 * (lv < 0.25 ? 1 : 0);
+      });
+      this.gUniforms.uTint.value.forEach((v, d) => {
+        if (d >= this.city.districts.length) return;
+        const p = pressure[d * 1440 + minute];
+        if (p === 0) v.set(0.25, 0.55, 0.75, 0.12);
+        else if (p === 1) v.set(1, 0.6, 0.2, 0.45);
+        else v.set(0.95, 0.2, 0.15, 0.55);
+      });
+    }
     // selection ring
     const sp = this.selPos();
     this.ring.visible = !!sp;
@@ -722,6 +814,8 @@ export class TwinScene {
   private selPos(): THREE.Vector3 | null {
     const s = this.selected;
     if (!s) return null;
+    if (s.type === 'evhub') { const q = this.evl?.hubs[s.idx]; return q ? new THREE.Vector3(q.x, 2, q.z) : null; }
+    if (s.type === 'pump') { const q = this.wat?.st[s.idx]; return q ? new THREE.Vector3(q.x, 2, q.z) : null; }
     if (s.type === 'site') { const q = this.tel?.net.sites[s.idx]; return q ? new THREE.Vector3(q.x, 2, q.z) : null; }
     if (s.type === 'hub') { const q = this.tel?.net.hubs[s.idx]; return q ? new THREE.Vector3(q.x, 2, q.z) : null; }
     if (s.type === 'train') return this.trainHeads.get(s.id) ?? null;
@@ -757,6 +851,8 @@ export class TwinScene {
     this.tssPos.forEach((arr, line) => arr.forEach((p, idx) => test(p, { type: 'tss', line, idx })));
     this.stationPos.forEach((arr, line) => arr.forEach((p, idx) => test(p, { type: 'station', line, idx }, 18)));
     this.city.subs.forEach((s) => test(new THREE.Vector3(s.x, 30, s.z), { type: 'sub', id: s.id }));
+    if (this.evl?.canopies.visible) this.evl.hubs.forEach((h, idx) => test(new THREE.Vector3(h.x, 8, h.z), { type: 'evhub', idx }));
+    if (this.wat?.towers[0]?.visible) this.wat.st.forEach((q, idx) => test(new THREE.Vector3(q.x, 37, q.z), { type: 'pump', idx }));
     if (this.tel?.hex.visible) {
       this.tel.net.hubs.forEach((h, idx) => test(new THREE.Vector3(h.x, 10, h.z), { type: 'hub', idx }));
       this.tel.net.sites.forEach((q, idx) => test(new THREE.Vector3(q.x, 30, q.z), { type: 'site', idx }, 16));
