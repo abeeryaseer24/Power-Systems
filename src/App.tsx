@@ -40,6 +40,7 @@ const Launch = lazy(() => import('./pages/Launch'));
 const Orbit = lazy(() => import('./pages/Orbit'));
 const Mars = lazy(() => import('./pages/Mars'));
 const Forecast = lazy(() => import('./pages/Forecast'));
+const Surrogate = lazy(() => import('./pages/Surrogate'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/reactor-startup" element={<ReactorStartup />} />
           <Route path="/predictor" element={<Predictor />} />
           <Route path="/forecast" element={<Forecast />} />
+          <Route path="/surrogate" element={<Surrogate />} />
           <Route path="/dhaka-tonight" element={<DhakaTonight />} />
           <Route path="/protection" element={<Protection />} />
           <Route path="/market" element={<Market />} />

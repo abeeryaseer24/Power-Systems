@@ -709,6 +709,62 @@ export class RegionSim {
   }
 
   /** Solve AC load flow in every live island. */
+  /** The AC power-flow problem of one island: buses (local order = m), closed branches, and their indices. */
+  islandProblem(m: number[]) {
+    const local = new Map<number, number>();
+    m.forEach((b, i) => local.set(b, i));
+    const acb: ACBus[] = m.map((bi) => {
+      const b = this.buses[bi];
+      const Pl = b.served / 100;
+      return { type: 'pq', P: -Pl, Q: -Pl * 0.33, Vset: 1, Qmin: 0, Qmax: 0, Bsh: Pl * 0.26 + (this.shunt[bi] ?? 0) + this.reactor[bi] };
+    });
+    // generation and their reactive capability
+    let Ekk = 0;
+    const syncAt: [number, number][] = [];
+    for (const g of this.gens) {
+      if (!g.online || !local.has(g.def.bus)) continue;
+      const li = local.get(g.def.bus)!;
+      acb[li].P += g.p / 100;
+      const k = KIND[g.def.kind];
+      if (k.sync) {
+        acb[li].type = 'pv';
+        acb[li].Vset = 1.0;
+        acb[li].Qmax += (0.55 * g.def.mw) / 100;
+        acb[li].Qmin -= (0.3 * g.def.mw) / 100;
+        Ekk += k.H * g.def.mw;
+        syncAt.push([li, k.H * g.def.mw]);
+      } else {
+        acb[li].Q += 0; // inverters at unity power factor
+      }
+    }
+    if (this.ext.online && local.has(this.ext.bus)) {
+      const li = local.get(this.ext.bus)!;
+      acb[li].P += this.ext.p / 100;
+      if (!this.ext.hvdc) {
+        acb[li].type = 'pv';
+        acb[li].Vset = 1.0;
+        acb[li].Qmax += this.ext.MW / 200;
+        acb[li].Qmin -= this.ext.MW / 300;
+        Ekk += this.ext.H * this.ext.MW;
+        syncAt.push([li, this.ext.H * this.ext.MW]);
+      }
+    }
+    if (!syncAt.length) return null;
+    // share the island's imbalance among machines by inertia so the slack only carries losses
+    const mis = acb.reduce((a, b) => a + b.P, 0);
+    for (const [li, w] of syncAt) acb[li].P -= (mis * w) / Ekk;
+    const slack = syncAt.reduce((best, s) => (s[1] > best[1] ? s : best), syncAt[0])[0];
+    acb[slack].type = 'slack';
+    const acbr: ACBranch[] = [];
+    const brIdx: number[] = [];
+    this.branches.forEach((br, i) => {
+      if (!br.closed || !local.has(br.def.a) || !local.has(br.def.b)) return;
+      acbr.push({ from: local.get(br.def.a)!, to: local.get(br.def.b)!, r: br.def.r, x: Math.max(6e-4, br.def.x), b: br.def.bc, closed: true });
+      brIdx.push(i);
+    });
+    return { acb, acbr, brIdx, local };
+  }
+
   solveNetwork(initial: boolean) {
     if (this.topoDirty) this.rebuild();
     const n = this.buses.length;
@@ -720,57 +776,9 @@ export class RegionSim {
         }
         return;
       }
-      const local = new Map<number, number>();
-      m.forEach((b, i) => local.set(b, i));
-      const acb: ACBus[] = m.map((bi) => {
-        const b = this.buses[bi];
-        const Pl = b.served / 100;
-        return { type: 'pq', P: -Pl, Q: -Pl * 0.33, Vset: 1, Qmin: 0, Qmax: 0, Bsh: Pl * 0.26 + (this.shunt[bi] ?? 0) + this.reactor[bi] };
-      });
-      // generation and their reactive capability
-      let Ekk = 0;
-      const syncAt: [number, number][] = [];
-      for (const g of this.gens) {
-        if (!g.online || !local.has(g.def.bus)) continue;
-        const li = local.get(g.def.bus)!;
-        acb[li].P += g.p / 100;
-        const k = KIND[g.def.kind];
-        if (k.sync) {
-          acb[li].type = 'pv';
-          acb[li].Vset = 1.0;
-          acb[li].Qmax += (0.55 * g.def.mw) / 100;
-          acb[li].Qmin -= (0.3 * g.def.mw) / 100;
-          Ekk += k.H * g.def.mw;
-          syncAt.push([li, k.H * g.def.mw]);
-        } else {
-          acb[li].Q += 0; // inverters at unity power factor
-        }
-      }
-      if (this.ext.online && local.has(this.ext.bus)) {
-        const li = local.get(this.ext.bus)!;
-        acb[li].P += this.ext.p / 100;
-        if (!this.ext.hvdc) {
-          acb[li].type = 'pv';
-          acb[li].Vset = 1.0;
-          acb[li].Qmax += this.ext.MW / 200;
-          acb[li].Qmin -= this.ext.MW / 300;
-          Ekk += this.ext.H * this.ext.MW;
-          syncAt.push([li, this.ext.H * this.ext.MW]);
-        }
-      }
-      if (!syncAt.length) return;
-      // share the island's imbalance among machines by inertia so the slack only carries losses
-      const mis = acb.reduce((a, b) => a + b.P, 0);
-      for (const [li, w] of syncAt) acb[li].P -= (mis * w) / Ekk;
-      const slack = syncAt.reduce((best, s) => (s[1] > best[1] ? s : best), syncAt[0])[0];
-      acb[slack].type = 'slack';
-      const acbr: ACBranch[] = [];
-      const brIdx: number[] = [];
-      this.branches.forEach((br, i) => {
-        if (!br.closed || !local.has(br.def.a) || !local.has(br.def.b)) return;
-        acbr.push({ from: local.get(br.def.a)!, to: local.get(br.def.b)!, r: br.def.r, x: Math.max(6e-4, br.def.x), b: br.def.bc, closed: true });
-        brIdx.push(i);
-      });
+      const prob = this.islandProblem(m);
+      if (!prob) return;
+      const { acb, acbr, brIdx } = prob;
       let res = fdlf(acb, acbr, {
         V0: initial ? undefined : m.map((b) => this.buses[b].V || 1),
         theta0: initial ? undefined : m.map((b) => this.buses[b].theta),

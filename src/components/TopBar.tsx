@@ -22,6 +22,7 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
       { to: '/documentary', label: 'Documentaries', note: 'The last minutes, told as a story' },
       { to: '/academy', label: 'Case files', note: 'Why each one happened' },
       { to: '/forecast', label: 'Demand forecast', note: 'Tomorrow’s GB demand, forecast by machine learning' },
+      { to: '/surrogate', label: 'Learned load flow', note: 'N-1 screening by a neural network, checked live' },
       { to: '/predictor', label: 'Predictor', note: 'Would an AI have seen it coming?' },
       { to: '/trailer', label: 'Trailer', note: 'A new cut of the disasters, every time' },
     ],
