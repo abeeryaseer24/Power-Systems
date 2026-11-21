@@ -218,3 +218,17 @@ describe('frontier', () => {
     expect(nuke.shedH).toBeLessThan(solar.shedH);
   });
 });
+
+describe('rooftop solar', () => {
+  it('lowers midday net demand, and an eclipse takes it away', async () => {
+    const { CityEngine } = await import('./engine');
+    const e = new CityEngine(M);
+    const noon = e.baseline.mins[12 * 60 + 30];
+    expect(noon.solar).toBeGreaterThan(100);
+    expect(noon.total).toBeLessThan(noon.res + noon.com + noon.ind + noon.inst + noon.light + noon.ev + noon.water + noon.metro + noon.loss);
+    e.setOpts({ special: 'eclipse' });
+    const max = e.baseline.mins[10 * 60 + 30], before = e.baseline.mins[8 * 60 + 30];
+    if (FULL) console.log({ max: max.solar, before: before.solar });
+    expect(max.solar).toBeLessThan(before.solar);
+  });
+});

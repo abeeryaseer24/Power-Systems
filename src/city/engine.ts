@@ -6,7 +6,7 @@
 // water, EV, data centres) plug into the same graph.
 
 import type { CityData } from './types';
-import { cityLoad, districtLoad, LOSS_FRACTION, SPECIAL, sunElevation, temperature, type DayInputs, type DistrictLoad } from './demand';
+import { cityLoad, districtLoad, LOSS_FRACTION, SPECIAL, solarOut, sunElevation, temperature, type DayInputs, type DistrictLoad } from './demand';
 import { TractionSim, headway, type TractionOpts } from './metro';
 import { buildNetwork, runTelecom, type Network, type TelecomOpts, type TelecomRun } from './telecom';
 import { buildHubs, runEv, type EvOpts, type EvRun, type Hub as EvHub } from './ev';
@@ -57,6 +57,7 @@ export class Coupling {
 
 export type Minute = {
   res: number; com: number; ind: number; inst: number; light: number; ev: number; water: number; metro: number; loss: number;
+  solar: number; // rooftop solar generation, MW (subtracted from the demand the grid sees)
   total: number; unserved: number; trains: number; regen: number; burnt: number; returned: number; minV: number; T: number;
   tss: number[]; // per traction substation, MW, flattened across lines
   subs: number[]; // per grid substation, MW
@@ -147,9 +148,13 @@ function minuteAt(x: Ctx, h: number, opts: CityOpts, trips: Set<string>, metroMW
   x.tssList.forEach((t, i) => { subs[x.subIndex.get(t.sub)!] += tss[i]; });
   const water = ex.water[m] ?? 0;
   const base = out.res + out.com + out.ind + out.inst + out.light + ev + water + metroMW;
-  const loss = base * LOSS_FRACTION;
+  // inverters disconnect when their area loses mains (anti-islanding), so only areas with power count
+  let upPop = 0;
+  for (const d of x.c.districts) if (!trips.has(d.sub)) upPop += d.pop;
+  const solar = solarOut(x.c, h, opts) * (upPop / (x.c.population || 1));
+  const loss = Math.max(0, base - solar) * LOSS_FRACTION;
   void ratings;
-  return { ...out, ev, water, metro: metroMW, loss, total: base + loss, unserved, T: temperature(x.c, h, opts), tss, subs, ...extra };
+  return { ...out, ev, water, metro: metroMW, loss, solar, total: base - solar + loss, unserved, T: temperature(x.c, h, opts), tss, subs, ...extra };
 }
 
 function applyTrips(x: Ctx, sim: TractionSim, trips: Set<string>) {
@@ -336,7 +341,9 @@ export class CityEngine {
     districts.forEach((q, di) => { if (q.up) evNow += this.ev.districtMW[di * 1440 + mi]; });
     const waterNow = this.water.mins[mi].mw;
     const served = c.res + c.com + c.ind + c.inst + c.light - unserved + metro + evNow + waterNow;
-    return { h, T: temperature(x.c, h, this.opts), sunEl: sunElevation(x.c, h, this.opts), districts, subs, metro, total: served * (1 + LOSS_FRACTION), unserved, hw: headway(h, { ...this.opts, inp: this.opts }, x.c.metro) };
+    const upShare = districts.reduce((a, q) => a + (q.up ? q.d.pop : 0), 0) / (x.c.population || 1);
+    const solarNow = solarOut(x.c, h, this.opts) * upShare;
+    return { h, T: temperature(x.c, h, this.opts), sunEl: sunElevation(x.c, h, this.opts), districts, subs, metro, solar: solarNow, total: (served - solarNow) * (1 + LOSS_FRACTION), unserved, hw: headway(h, { ...this.opts, inp: this.opts }, x.c.metro) };
   }
 
   minute(h = this.hour) {

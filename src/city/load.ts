@@ -9,7 +9,7 @@
 //   cells:     nx*nz uint8
 
 import type { Building, CityData, Kind, Street } from './types';
-import { cityLoad, LOSS_FRACTION } from './demand';
+import { cityLoad, LOSS_FRACTION, solarOut } from './demand';
 
 export type CityIndexEntry = { id: string; name: string; country: string; kind: 'prototype' | 'real'; population: number; lines: number; districts: number; blurb: string };
 
@@ -56,11 +56,11 @@ function calibrate(c: CityData) {
     let best = 0, bh = 0;
     for (let m = 0; m < 1440; m += 10) {
       const l = cityLoad(c, m / 60, inp);
-      const t = l.res + l.com + l.ind + l.inst + l.light;
+      const t = l.res + l.com + l.ind + l.inst + l.light - solarOut(c, m / 60, inp);
       if (t > best) { best = t; bh = m / 60; }
     }
     const l = cityLoad(c, bh, inp);
-    const scaled = l.res + l.com, rest = l.ind + l.inst + l.light;
+    const scaled = l.res + l.com, rest = l.ind + l.inst + l.light - solarOut(c, bh, inp);
     c.demand.scale *= Math.max(0.05, (T / (1 + LOSS_FRACTION) - rest) / scaled);
   }
 }

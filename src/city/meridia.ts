@@ -196,9 +196,9 @@ export function buildMeridia(): CityData {
   cached = {
     id: 'meridia', name: 'Meridia', country: 'Prototype city', kind: 'prototype', lat: 23.4, bounds,
     population: DISTRICTS.reduce((a, d) => a + d.pop, 0),
-    notes: ['Meridia is fictional. Its layout, people and loads are invented, calibrated to published figures for hot, dense Asian cities.', 'It is the test bench: every model is built here first, then applied to real cities.'],
+    notes: ['Meridia is fictional. Its layout, people and loads are invented, calibrated to published figures for hot, dense Asian cities.', 'It is the test bench: every model is built here first, then applied to real cities.', 'It has 350 MW of rooftop solar, an illustrative figure.'],
     climate: MERIDIA_CLIMATE,
-    demand: { acShare: 0.42, resBase: 0.07, resAct: 0.165, scale: 1 },
+    demand: { acShare: 0.42, resBase: 0.07, resAct: 0.165, scale: 1, rooftopMW: 350 },
     metro: { voltage: 1500, E: 1650, capacity: 1950, vmax: 22.2, peakHeadway: 180, tssRating: 5, interchange: 'Civic Centre' },
     districts: DISTRICTS.map((d) => {
       const [x0, z0, x1, z1] = d.rect;

@@ -275,8 +275,8 @@ export const CITIES = [
       monsoon: { tmax: 22, tmin: 12, dec: -5, label: 'Autumn (April)' },
       winter: { tmax: 15.5, tmin: 8, dec: 21, label: 'Winter (July)' },
     },
-    demand: { acShare: 0.85, resBase: 0.1, resAct: 0.18, scale: 1, targetPeak: 2450, heatShare: 0.25 },
+    demand: { acShare: 0.85, resBase: 0.1, resAct: 0.18, scale: 1, targetPeak: 2450, heatShare: 0.25, rooftopMW: 1700 },
     metro: null,
-    extraNotes: ['Adelaide has trams and suburban trains but no metro.', 'Rooftop solar is not modelled yet; it pushes the real midday demand far below this curve.'],
+    extraNotes: ['Adelaide has trams and suburban trains but no metro.', 'Rooftop solar: about 1,700 MW, an approximate share of the roughly 2 GW installed across South Australia. On sunny spring days it can push the grid’s midday demand close to zero.'],
   },
 ];

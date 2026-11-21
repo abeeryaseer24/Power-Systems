@@ -43,6 +43,7 @@ export type DemandParams = {
   targetPeak?: number; // if set, scale is fitted so a design day peaks at this, MW
   heatShare?: number; // share of homes heated electrically (cold cities)
   peakSeason?: 'summer' | 'winter'; // which season the target peak belongs to
+  rooftopMW?: number; // installed rooftop solar, MW peak
 };
 
 export type MetroParams = {

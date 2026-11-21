@@ -6,7 +6,7 @@ import type { CityData, District, Season } from './types';
 
 export type { Season };
 export type DayType = 'weekday' | 'weekend';
-export type Special = 'none' | 'final' | 'eid' | 'ramadan' | 'gp';
+export type Special = 'none' | 'final' | 'eid' | 'ramadan' | 'gp' | 'eclipse';
 export type DayInputs = { season: Season; day: DayType; heat: number /* °C offset */; special?: Special };
 
 /** Special days: what changes, and when. Illustrative shapes, not measured curves. */
@@ -29,6 +29,14 @@ export const SPECIAL: Record<Special, { label: string; note: string; marks: { t:
     marks: [
       { t: 18.3, title: 'Iftar', body: 'Sunset: the fast breaks across the city within minutes. Kitchens, lights and fans all come on together.' },
       { t: 3.6, title: 'Sehri', body: 'Before dawn, families wake to eat before the fast: a small night peak.' },
+    ],
+  },
+  eclipse: {
+    label: 'Solar eclipse', note: 'A deep partial eclipse: the Moon covers nine-tenths of the Sun at 10:30. Rooftop solar output falls and recovers over two and a half hours, and the grid has to cover the gap with plants that ramp up and down on cue, as Europe did in March 2015.',
+    marks: [
+      { t: 9.25, title: 'First contact', body: 'The Moon starts to cross the Sun. Rooftop solar output begins to fall, minute by minute.' },
+      { t: 10.5, title: 'Maximum eclipse', body: 'Nine-tenths of the Sun is covered. Solar output is down to a fraction of normal and the air cools a degree or two. Gas and hydro plants have ramped up to cover the gap.' },
+      { t: 11.75, title: 'Last contact', body: 'The Sun is back. Solar output surges back faster than it fell, and the plants that filled in have to ramp down just as fast.' },
     ],
   },
   gp: {
@@ -71,12 +79,15 @@ function hourly(tbl: number[], h: number) {
 }
 
 /** Air temperature, °C. Minimum just before dawn, maximum mid-afternoon. */
+export const eclipseFactor = (h: number) => 1 - 0.9 * Math.max(0, 1 - Math.abs(h - 10.5) / 1.25) ** 1.3;
+
 export function temperature(c: CityData, h: number, inp: DayInputs) {
   const s = c.climate[inp.season];
+  const ecl = inp.special === 'eclipse' ? (1 - eclipseFactor(h)) * 2 : 0;
   const x = ((h - 5.5 + 24) % 24) / 24; // 0 at 05:30
   // asymmetric day: fast warm-up to 15:00, slow cooling through the night
   const w = x < 0.396 ? Math.sin((x / 0.396) * Math.PI / 2) : Math.cos(((x - 0.396) / 0.604) * Math.PI / 2) ** 1.4;
-  return s.tmin + inp.heat + (s.tmax - s.tmin) * w;
+  return s.tmin + inp.heat + (s.tmax - s.tmin) * w - ecl;
 }
 
 /** Solar elevation in degrees for the city latitude and the season's declination. */
@@ -163,6 +174,18 @@ export function districtLoad(c: CityData, d: District, h: number, inp: DayInputs
 }
 
 export const LOSS_FRACTION = 0.062;
+
+/** Rooftop solar output, MW: sun height, season's cloud, inverter and dust losses, and any eclipse. */
+export function solarOut(c: CityData, h: number, inp: DayInputs) {
+  const cap = c.demand.rooftopMW ?? 0;
+  if (!cap) return 0;
+  const el = sunElevation(c, h, inp);
+  if (el <= 0) return 0;
+  const label = c.climate[inp.season].label.toLowerCase();
+  const cloud = /monsoon|rain/.test(label) ? 0.55 : inp.season === 'winter' ? 0.75 : inp.season === 'summer' ? 0.9 : 0.8;
+  const sun = Math.sin((el * Math.PI) / 180) ** 1.15;
+  return cap * sun * cloud * 0.82 * (inp.special === 'eclipse' ? eclipseFactor(h) : 1);
+}
 
 /** Sum of the closed-form sectors over all districts (metro comes from the traction sim). */
 export function cityLoad(c: CityData, h: number, inp: DayInputs) {

@@ -371,6 +371,8 @@ function DemandChart({ e, hour, hi, setHi, seek }: { e: CityEngine; hour: number
     });
   }, [mins, max]);
   const baseLine = useMemo(() => base.filter((_, i) => i % 6 === 0).map((m, k) => `${((k * 6) / 1440) * CW},${CH - (m.total / max) * CH}`).join(' '), [base, max]);
+  const hasSolar = mins.some((q) => q.solar > 0.5);
+  const netLine = useMemo(() => mins.filter((_, i) => i % 3 === 0).map((q, k) => `${((k * 3) / 1440) * CW},${CH - (q.total / max) * CH}`).join(' '), [mins, max]);
   const m = mins[Math.min(1439, Math.floor(hour * 60))];
   return (
     <div className="cy-chart">
@@ -382,12 +384,14 @@ function DemandChart({ e, hour, hi, setHi, seek }: { e: CityEngine; hour: number
             </button>
           </li>
         ))}
+        {hasSolar && <li><span title="Rooftop solar output; the dashed line is the demand the grid has to meet after it."><i style={{ background: 'transparent', border: '1.5px dashed #ffe08a' }} />Rooftop solar<b>−{num(m.solar, m.solar < 10 ? 1 : 0)}</b></span></li>}
       </ul>
       <div className="cy-plot">
         <svg ref={tl.ref} viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" onPointerDown={tl.onPointerDown} onPointerMove={tl.onPointerMove} onPointerUp={tl.onPointerUp} role="slider" aria-label="Time of day" aria-valuemin={0} aria-valuemax={24} aria-valuenow={hour}>
           <Axis />
           {paths.map((p) => <path key={p.s} d={p.d} fill={SECTOR_INFO[p.s].colour} opacity={hi && hi !== p.s ? 0.18 : 0.85} />)}
           {e.trips.size > 0 && <polyline points={baseLine} className="cy-base" />}
+          {hasSolar && <polyline points={netLine} className="cy-net" />}
           <line x1={(hour / 24) * CW} x2={(hour / 24) * CW} y1={0} y2={CH} className="cy-head" />
         </svg>
         <Markers events={e.scenario.events} seek={seek} />
