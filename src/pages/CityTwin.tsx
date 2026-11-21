@@ -181,6 +181,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
           <Link to={`/city/${cityId}`} className={mode === 'day' ? 'on' : ''}>City Day</Link>
           {(!city || city.lines.length > 0) && <Link to={`/city/${cityId}/metro`} className={mode === 'metro' ? 'on' : ''}>Metro traction</Link>}
           <Link to={`/city/${cityId}/telecom`} className={mode === 'telecom' ? 'on' : ''}>Mobile network</Link>
+          {cityId === 'meridia' && <Link to={`/city/${cityId}/hospital`}>Hospital</Link>}
         </nav>
       </header>
 

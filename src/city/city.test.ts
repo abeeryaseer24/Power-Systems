@@ -122,3 +122,20 @@ describe('telecom', () => {
     expect(at(23).served).toBeLessThan(at(17.9).served);
   });
 });
+
+describe('hospital', () => {
+  it('Type 10 transfer, shedding with a failed set, and running dry', async () => {
+    const { firstMinutes, threeDays, HOSPITALS, DEFAULT_HOSPITAL } = await import('./hospital');
+    const def = HOSPITALS.meridia;
+    const f = firstMinutes(def, DEFAULT_HOSPITAL);
+    expect(f.secs[5].on.life).toBe(false);
+    expect(f.secs[10].on.life && f.secs[10].on.critical).toBe(true);
+    expect(f.secs[5].on.critical).toBe(true); // UPS bridges the gap
+    const twoDown = firstMinutes(def, { ...DEFAULT_HOSPITAL, failToStart: 2 });
+    expect(twoDown.secs[60].on.equipment).toBe(false);
+    const long = threeDays(def, { ...DEFAULT_HOSPITAL, duration: 72, fuelH: 24 });
+    expect(long.dryAt).toBeGreaterThan(0);
+    const refuel = threeDays(def, { ...DEFAULT_HOSPITAL, duration: 72, fuelH: 60, refuel: true });
+    expect(refuel.dryAt).toBeLessThan(0);
+  });
+});
