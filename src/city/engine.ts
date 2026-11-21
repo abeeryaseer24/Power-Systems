@@ -8,9 +8,10 @@
 import type { CityData } from './types';
 import { cityLoad, districtLoad, LOSS_FRACTION, sunElevation, temperature, type DayInputs, type DistrictLoad } from './demand';
 import { TractionSim, headway, type TractionOpts } from './metro';
+import { buildNetwork, runTelecom, type Network, type TelecomOpts, type TelecomRun } from './telecom';
 
-export type CityOpts = DayInputs & Omit<TractionOpts, 'inp'>;
-export const DEFAULT_OPTS: CityOpts = { season: 'summer', day: 'weekday', heat: 0, peakHeadway: 180, regen: true, reversible: false };
+export type CityOpts = DayInputs & Omit<TractionOpts, 'inp'> & TelecomOpts;
+export const DEFAULT_OPTS: CityOpts = { season: 'summer', day: 'weekday', heat: 0, peakHeadway: 180, regen: true, reversible: false, batteryH: 3, gensetShare: 0.15 };
 
 /** One graph node: an asset, what it needs, and an optional backup supply. */
 export type Asset = { id: string; label: string; needs: string[]; backup?: { kwh: number; kw: number }; up: boolean; onBackup: boolean; left: number };
@@ -70,10 +71,20 @@ function makeCtx(c: CityData): Ctx {
 
 type Checkpoint = { t: number; state: string };
 
+/** Outage windows: id -> [from, to) in hours; to may run past 24 into the next morning. */
+export type Trips = Map<string, [number, number]>;
+export const WHOLE_DAY: [number, number] = [0, 24];
+export function activeAt(trips: Trips, h: number) {
+  const out = new Set<string>();
+  for (const [id, [a, b]] of trips) if ((h >= a && h < b) || h + 24 < b) out.add(id);
+  return out;
+}
+
 /** Runs a whole day headless and records it minute by minute. */
-function runDay(x: Ctx, opts: CityOpts, trips: Set<string>, ratings: number[]) {
+function runDay(x: Ctx, opts: CityOpts, trips: Trips, ratings: number[]) {
   const sim = new TractionSim(x.c, { ...opts, inp: opts });
-  applyTrips(x, sim, trips);
+  let act = activeAt(trips, 0), actKey = [...act].join();
+  applyTrips(x, sim, act);
   const mins: Minute[] = [];
   const cps: Checkpoint[] = [];
   const acc = { metro: 0, regen: 0, burnt: 0, returned: 0, minV: sim.dc.E, tss: new Float64Array(x.tssList.length), n: 0, trains: 0 };
@@ -81,6 +92,8 @@ function runDay(x: Ctx, opts: CityOpts, trips: Set<string>, ratings: number[]) {
   for (let m = 0; m < 1440; m++) {
     if (m % 15 === 0) cps.push({ t: sim.t, state: save(sim) });
     const h = m / 60;
+    act = activeAt(trips, h + 0.5 / 60);
+    if ([...act].join() !== actKey) { actKey = [...act].join(); applyTrips(x, sim, act); }
     const active = x.c.lines.length > 0 && (h >= (x.c.metro.service?.[0] ?? 5.5) - 0.1 || sim.trains.length > 0);
     acc.metro = acc.regen = acc.burnt = acc.returned = acc.n = acc.trains = 0;
     acc.minV = sim.dc.E;
@@ -103,7 +116,7 @@ function runDay(x: Ctx, opts: CityOpts, trips: Set<string>, ratings: number[]) {
     const n = Math.max(1, acc.n);
     const metro = acc.metro / n / 1e6;
     const tss = Array.from(acc.tss, (x) => x / n / 1e6);
-    mins.push(minuteAt(x, h + 0.5 / 60, opts, trips, metro, tss, ratings, {
+    mins.push(minuteAt(x, h + 0.5 / 60, opts, act, metro, tss, ratings, {
       trains: Math.round(acc.trains / n), regen: acc.regen / n / 1e6, burnt: acc.burnt / n / 1e6, returned: acc.returned / n / 1e6, minV: acc.minV,
     }));
   }
@@ -169,7 +182,7 @@ export type DayRun = { mins: Minute[]; events: CityEvent[] };
 
 export class CityEngine {
   opts: CityOpts;
-  trips = new Set<string>();
+  trips: Trips = new Map();
   graph = new Coupling();
   ratings: number[];
   x: Ctx;
@@ -177,6 +190,9 @@ export class CityEngine {
   scenario!: DayRun; // same as baseline when nothing is tripped
   private cps: Checkpoint[] = [];
   sim!: TractionSim;
+  private _net?: Network;
+  telecom!: TelecomRun;
+  get net() { return (this._net ??= buildNetwork(this.city)); }
   private acc = 0;
 
   constructor(public city: CityData, opts: Partial<CityOpts> = {}) {
@@ -192,8 +208,8 @@ export class CityEngine {
   /** Re-run the day after a change to the inputs or the trips, then return to hour h. */
   recompute(h = this.hour) {
     const x = this.x;
-    const base = runDay(x, this.opts, new Set(), this.ratings);
-    this.baseline = { mins: base.mins, events: findEvents(x, base.mins, this.opts, new Set(), this.ratings) };
+    const base = runDay(x, this.opts, new Map(), this.ratings);
+    this.baseline = { mins: base.mins, events: findEvents(x, base.mins, this.opts, new Map(), this.ratings) };
     if (this.trips.size) {
       const sc = runDay(x, this.opts, this.trips, this.ratings);
       this.scenario = { mins: sc.mins, events: findEvents(x, sc.mins, this.opts, this.trips, this.ratings) };
@@ -202,9 +218,16 @@ export class CityEngine {
       this.scenario = this.baseline;
       this.cps = base.cps;
     }
-    this.graph.tripped = new Set(this.trips);
-    this.graph.resolve();
+    this.runTelecom();
     this.seek(h);
+  }
+
+  /** The mobile network against the same outages, minute by minute. */
+  runTelecom() {
+    const c = this.city, trips = this.trips;
+    const down: Set<string>[] = [];
+    for (let m = 0; m < 1440; m++) down.push(trips.size ? activeAt(trips, (m + 0.5) / 60) : new Set());
+    this.telecom = runTelecom(c, this.net, this.opts, (m, d) => !down[m].has(c.districts[d].sub));
   }
 
   setOpts(o: Partial<CityOpts>) {
@@ -212,8 +235,8 @@ export class CityEngine {
     this.recompute();
   }
 
-  trip(id: string, on: boolean) {
-    if (on) this.trips.add(id);
+  trip(id: string, on: boolean, win: [number, number] = WHOLE_DAY) {
+    if (on) this.trips.set(id, win);
     else this.trips.delete(id);
     this.recompute();
   }
@@ -229,7 +252,7 @@ export class CityEngine {
     for (const c of this.cps) if (c.t <= t) cp = c;
     this.sim = new TractionSim(this.city, { ...this.opts, inp: this.opts });
     load(this.sim, cp.state);
-    applyTrips(this.x, this.sim, this.trips);
+    this.syncTrips(true);
     while (this.sim.t < t - 0.5) this.sim.step(Math.min(1, t - this.sim.t));
     this.acc = 0;
   }
@@ -246,6 +269,19 @@ export class CityEngine {
       while (this.acc >= 1 && guard++ < 4000) { this.sim.step(1); this.acc -= 1; }
     }
     if (this.sim.t >= 86400 - 1) this.seek(0);
+    this.syncTrips();
+  }
+
+  private tripKey = '';
+  /** Apply the outages that are active at the current instant to the trains and the graph. */
+  private syncTrips(force = false) {
+    const act = activeAt(this.trips, this.hour);
+    const key = [...act].join();
+    if (!force && key === this.tripKey) return;
+    this.tripKey = key;
+    applyTrips(this.x, this.sim, act);
+    this.graph.tripped = act;
+    this.graph.resolve();
   }
 
   /** Loads and states at the current instant, for the scene and the inspector. */
@@ -278,7 +314,7 @@ export const sumLoad = (l: DistrictLoad) => l.res + l.com + l.ind + l.inst + l.l
 const fmtH = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 
 /** Scan a recorded day for the moments worth a marker on the time bar. */
-export function findEvents(x: Ctx, mins: Minute[], opts: CityOpts, trips: Set<string>, ratings: number[]): CityEvent[] {
+export function findEvents(x: Ctx, mins: Minute[], opts: CityOpts, trips: Trips, ratings: number[]): CityEvent[] {
   const ev: CityEvent[] = [];
   const at = (m: number) => m / 60;
   // street lighting follows the sun
@@ -320,7 +356,14 @@ export function findEvents(x: Ctx, mins: Minute[], opts: CityOpts, trips: Set<st
       ev.push({ t: at(m), kind: 'warn', title: `Undervoltage: ${Math.round(q.minV)} V`, body: 'A train’s pantograph voltage has sagged towards the 1000 V limit. Its traction power is being cut back, so it accelerates more slowly.' });
     }
   });
-  if (trips.size) ev.push({ t: 0, kind: 'trip', title: `${trips.size} asset${trips.size > 1 ? 's' : ''} out of service`, body: [...trips].map((id) => tripLabel(x.c, id)).join(', ') + ' — out for the whole day in this run.' });
+  for (const [id, [a, b]] of trips) {
+    const name = tripLabel(x.c, id);
+    if (a <= 0 && b >= 24) ev.push({ t: 0, kind: 'trip', title: `${name} out all day`, body: `${name} is out of service for the whole day in this run.` });
+    else {
+      ev.push({ t: a, kind: 'trip', title: `${name} trips`, body: `${name} goes out of service. Everything it feeds loses mains power now; anything with a battery or a generator starts its own countdown.` });
+      if (b < 24) ev.push({ t: b, kind: 'info', title: `${name} restored`, body: `${name} is back. Loads reconnect, and batteries start recharging.` });
+    }
+  }
   return ev.sort((a, b) => a.t - b.t).map((e) => ({ ...e, title: e.title }));
 }
 

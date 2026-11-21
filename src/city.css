@@ -193,3 +193,8 @@
 .cy-nographs .cy-inputs, .cy-nographs.cy-metro .cy-inputs { bottom: 122px; max-height: calc(100% - 150px); }
 .cy-nographs .cy-note { display: none; }
 @media (max-width: 900px) { .cy-nographs .cy-insp { bottom: 90px; } .cy-nographs .cy-tools { bottom: auto; } }
+.cy-try { all: unset; cursor: pointer; pointer-events: auto; padding: 8px 12px; font-family: var(--display); font-weight: 700; font-size: 15px; background: var(--sodium); color: var(--night); }
+.cy-try:hover { background: var(--porcelain); }
+.cy-try:focus-visible { outline: 2px solid var(--porcelain); outline-offset: 2px; }
+.cy-win { display: flex; gap: 10px; margin-bottom: 6px; font-size: 13px; color: var(--steel); }
+.cy-win select { width: auto; margin-left: 4px; }

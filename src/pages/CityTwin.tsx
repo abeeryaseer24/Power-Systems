@@ -5,15 +5,18 @@ import type { Pick, TwinScene } from '../city/TwinScene';
 import type { CityData } from '../city/types';
 import { SECTORS, SECTOR_INFO, type Sector } from '../city/demand';
 import { TRAIN } from '../city/metro';
+import { ST_LABEL, traffic } from '../city/telecom';
 import { clock, num } from '../lib/format';
 import '../city.css';
 
 // One viewer, two models on two pages:
 //   /city        City Day: where 2.7 million people's demand comes from, hour by hour
 //   /city/metro  Metro traction: trains, substations and the 1500 V DC network
-type Mode = 'day' | 'metro';
+type Mode = 'day' | 'metro' | 'telecom';
 
-const SPEEDS: Record<Mode, number[]> = { day: [60, 300, 900, 1800], metro: [1, 10, 30, 120] };
+const SPEEDS: Record<Mode, number[]> = { day: [60, 300, 900, 1800], metro: [1, 10, 30, 120], telecom: [60, 300, 900, 1800] };
+const TITLES: Record<Mode, string> = { day: 'City Day', metro: 'Metro traction', telecom: 'Mobile network' };
+type TripFn = (id: string, on: boolean, win?: [number, number]) => void;
 const speedLabel = (s: number) => (s >= 60 ? `${s / 60} min/s` : `${s}×`);
 const HI: Partial<Record<Sector, number>> = { res: 0, com: 1, ind: 2, inst: 3, metro: 4, light: 5 };
 
@@ -66,6 +69,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
         if (p.playing) e.advance(dt * p.speed);
         scene!.state = sceneState(e);
       };
+      if (mode === 'telecom') scene.setTelecom(e.net);
       scene.state = sceneState(e);
       lastEv.current = e.hour;
       setReady(true);
@@ -126,7 +130,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
     setTimeout(() => {
       fn(e);
       setOpts({ ...e.opts });
-      setTrips([...e.trips]);
+      setTrips([...e.trips.keys()]);
       lastEv.current = e.hour;
       setBusy('');
     }, 40);
@@ -172,18 +176,19 @@ export default function CityTwin({ mode }: { mode: Mode }) {
       <header className="cy-title">
         <Link to="/cities" className="pv-back">Cities</Link>
         <p className="cy-kicker">{city ? <>{city.name} · <span className={`cy-badge cy-badge-${city.kind}`}>{city.kind === 'prototype' ? 'Prototype city' : 'Real city · OpenStreetMap'}</span></> : ' '}</p>
-        <h1>{mode === 'day' ? 'City Day' : 'Metro traction'}</h1>
+        <h1>{TITLES[mode]}</h1>
         <nav className="cy-switch" aria-label="Models">
           <Link to={`/city/${cityId}`} className={mode === 'day' ? 'on' : ''}>City Day</Link>
           {(!city || city.lines.length > 0) && <Link to={`/city/${cityId}/metro`} className={mode === 'metro' ? 'on' : ''}>Metro traction</Link>}
+          <Link to={`/city/${cityId}/telecom`} className={mode === 'telecom' ? 'on' : ''}>Mobile network</Link>
         </nav>
       </header>
 
       {ready && e && now && minute && opts && (
         <>
-          <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} />
+          <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win), 'Simulating the outage')} />
           <Inspector sel={sel} e={e} now={now} mode={mode} onClose={() => setSel(null)} onFocus={(p) => { const v = scn.current?.posOf(p); if (v) scn.current!.focus(v, p.type === 'district' ? 2600 : 700); }}
-            onTrip={(id, on) => rerun((en) => en.trip(id, on), on ? 'Taking it out of service' : 'Back in service')} trips={trips} />
+            onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win), on ? 'Taking it out of service' : 'Back in service')} trips={trips} />
 
           <div className="cy-tools">
             <div className="pv-seg" role="group" aria-label="Camera">
@@ -194,7 +199,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
             {mode === 'metro' && <button className={`pv-cut ${flow ? 'on' : ''}`} onClick={() => setFlow(!flow)} aria-pressed={flow}>Current flow</button>}
             <button className={`pv-cut ${panel === 'inputs' ? 'on' : ''}`} onClick={() => setPanel(panel === 'inputs' ? null : 'inputs')} aria-expanded={panel === 'inputs'}>Model inputs</button>
           </div>
-          {panel === 'inputs' && <Inputs city={e.city} mode={mode} opts={opts} trips={trips} onOpts={(o) => rerun((en) => en.setOpts(o))} onTrip={(id, on) => rerun((en) => en.trip(id, on))} onClose={() => setPanel(null)} />}
+          {panel === 'inputs' && <Inputs city={e.city} mode={mode} opts={opts} trips={trips} onOpts={(o) => rerun((en) => en.setOpts(o))} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win))} onClose={() => setPanel(null)} />}
 
           {mode === 'metro' && graphs && <LineSchematic e={e} line={line} setLine={setLine} sel={sel} setSel={setSel} />}
 
@@ -208,10 +213,10 @@ export default function CityTwin({ mode }: { mode: Mode }) {
               </div>
               <button className={`cy-hide ${graphs ? '' : 'off'}`} onClick={() => setGraphs(!graphs)} aria-pressed={!graphs} title="Show or hide the graphs (G)">{graphs ? 'Hide graphs' : 'Show graphs'}</button>
               <span className="cy-sum">
-                {mode === 'day' ? <>Demand <b>{num(now.total)}</b> MW{now.unserved > 1 && <em> · {num(now.unserved)} MW unserved</em>}</> : <>Traction <b>{num(now.metro, 1)}</b> MW · <b>{e.sim.trains.length}</b> trains · headway <b>{Number.isFinite(now.hw) ? `${num(now.hw / 60, 1)} min` : 'no service'}</b></>}
+                {mode === 'telecom' ? <TelSum e={e} h={now.h} /> : mode === 'day' ? <>Demand <b>{num(now.total)}</b> MW{now.unserved > 1 && <em> · {num(now.unserved)} MW unserved</em>}</> : <>Traction <b>{num(now.metro, 1)}</b> MW · <b>{e.sim.trains.length}</b> trains · headway <b>{Number.isFinite(now.hw) ? `${num(now.hw / 60, 1)} min` : 'no service'}</b></>}
               </span>
             </div>
-            {!graphs ? null : mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} /> : <TractionChart e={e} hour={now.h} seek={seek} />}
+            {!graphs ? null : mode === 'telecom' ? <TelecomChart e={e} hour={now.h} seek={seek} /> : mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} /> : <TractionChart e={e} hour={now.h} seek={seek} />}
           </section>
         </>
       )}
@@ -227,16 +232,29 @@ function sceneState(e: CityEngine) {
     districts: n.districts.map((x) => ({ lit: x.l.lit, up: x.up, street: x.l.light > 0.001 ? 1 : 0 })),
     subs: n.subs.map((s) => ({ load: s.mw / s.rating, up: s.up })),
     sim: e.sim,
+    telecom: { state: e.telecom.state, soc: e.telecom.soc, hub: e.telecom.hubState, minute: Math.min(1439, Math.floor(n.h * 60)) },
   };
 }
 
 // ------------------------------------------------------------------ captions
 
-function Captions({ mode, e, now, minute, feed }: { mode: Mode; e: CityEngine; now: ReturnType<CityEngine['now']>; minute: Minute; feed: CityEvent[] }) {
+function Captions({ mode, e, now, minute, feed, onTrip }: { mode: Mode; e: CityEngine; now: ReturnType<CityEngine['now']>; minute: Minute; feed: CityEvent[]; onTrip: TripFn }) {
   const peak = Math.max(...e.scenario.mins.map((m) => m.total));
   const h = now.h;
   let line: string;
-  if (mode === 'day') {
+  let action: React.ReactNode = null;
+  if (mode === 'telecom') {
+    const t = e.telecom.mins[Math.min(1439, Math.floor(h * 60))];
+    const n = e.net.sites.length;
+    line = t.battery + t.down + t.genset + t.isolated === 0
+      ? `All ${num(n)} cell sites are on mains power. Traffic is at ${Math.round(100 * (t.mw > 0 ? (t.mw * 1000 / n - 1.6) / 2.4 : 0))} % of the evening busy hour.`
+      : `${num(t.battery)} sites on battery, ${num(t.genset)} on generators, ${num(t.down)} dark${t.isolated ? `, ${num(t.isolated)} powered but cut off from their exchange` : ''}. ${Math.round(t.served * 100)} % of people still have a signal.`;
+    if (!e.trips.size) {
+      const big = [...e.city.districts].sort((a, b) => b.pop - a.pop)[0];
+      const sub = e.city.subs.find((q) => q.id === big.sub)!;
+      action = <button className="cy-try" onClick={() => onTrip(sub.id, true, [18, 24])}>Try it: {sub.name.replace(/ \d.*$/, '')} trips at 18:00 for 6 hours</button>;
+    }
+  } else if (mode === 'day') {
     const parts = [...SECTORS].filter((s) => s !== 'loss').map((s) => [s, minute[s as keyof Minute] as number] as const).sort((a, b) => b[1] - a[1]);
     const lead = SECTOR_INFO[parts[0][0]].label.toLowerCase();
     const phase = h < 5 ? 'Night. Bedroom air conditioners hold the base load up.' : h < 9 ? 'Morning ramp. Homes wake, then offices and shops open.' : h < 16 ? 'Working day. Chillers in offices follow the afternoon heat.' : h < 18.5 ? 'Late afternoon. Offices wind down while homes fill up.' : h < 22.5 ? 'Evening peak. Everyone is home, lights and AC on together.' : 'Late evening. Demand falls as the city goes to bed.';
@@ -252,6 +270,7 @@ function Captions({ mode, e, now, minute, feed }: { mode: Mode; e: CityEngine; n
   return (
     <aside className="cy-captions" aria-live="polite">
       <p className="cy-live"><span>{clock(h)}</span>{line}</p>
+      {action}
       {feed.map((ev, i) => (
         <article key={`${ev.t}-${ev.title}-${i}`} className={`cy-ev cy-ev-${ev.kind}`}>
           <h3><span>{clock(ev.t)}</span>{ev.title}</h3>
@@ -448,17 +467,24 @@ function LineSchematic({ e, line, setLine, sel, setSel }: { e: CityEngine; line:
 
 // ------------------------------------------------------------------ inspector
 
-function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel: Pick | null; e: CityEngine; now: ReturnType<CityEngine['now']>; mode: Mode; onClose: () => void; onFocus: (p: Pick) => void; onTrip: (id: string, on: boolean) => void; trips: string[] }) {
+function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel: Pick | null; e: CityEngine; now: ReturnType<CityEngine['now']>; mode: Mode; onClose: () => void; onFocus: (p: Pick) => void; onTrip: TripFn; trips: string[] }) {
   let body: React.ReactNode;
   let title = '', kicker = '';
   const C = e.city, dc = e.sim.dc;
   if (!sel) {
     kicker = `${C.name} now`;
-    title = mode === 'day' ? `${num(now.total)} MW` : `${num(now.metro, 1)} MW`;
+    const tm = e.telecom.mins[Math.min(1439, Math.floor(now.h * 60))];
+    title = mode === 'telecom' ? `${Math.round(tm.served * 100)} % with signal` : mode === 'day' ? `${num(now.total)} MW` : `${num(now.metro, 1)} MW`;
     const peak = Math.max(...e.scenario.mins.map((m) => m.total));
     body = (
       <>
-        <Rows rows={mode === 'day' ? [
+        <Rows rows={mode === 'telecom' ? [
+          ['Cell sites', `${num(e.net.sites.length)} (positions modelled)`],
+          ['Exchanges', `${e.net.hubs.length}, one per service area`],
+          ['Network load', `${num(tm.mw, 1)} MW`],
+          ['Battery backup', `${e.opts.batteryH} h at average load, as fitted`],
+          ['Sites with a generator', `${Math.round(e.opts.gensetShare * 100)} %`],
+        ] : mode === 'day' ? [
           ['Air temperature', `${now.T.toFixed(1)} °C`],
           ['Sun', now.sunEl > 0 ? `${now.sunEl.toFixed(0)}° up` : `${(-now.sunEl).toFixed(0)}° below horizon`],
           ['Today’s peak', `${num(peak)} MW`],
@@ -471,7 +497,7 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
           ['Regenerative braking', e.opts.regen ? 'on' : 'off'],
           ['Substation type', e.opts.reversible ? 'reversible (inverter)' : 'diode rectifier'],
         ]} />
-        <p className="cy-hint">Click a {mode === 'day' ? 'district, substation or train' : 'train, substation or station'} in the city to inspect it.</p>
+        <p className="cy-hint">Click a {mode === 'telecom' ? 'cell site, exchange or substation' : mode === 'day' ? 'district, substation or train' : 'train, substation or station'} in the city to inspect it.</p>
         <details className="cy-notes">
           <summary>{C.kind === 'prototype' ? 'This is a prototype city' : 'Where the data comes from'}</summary>
           <ul>{C.notes.map((n) => <li key={n}>{n}</li>)}</ul>
@@ -520,6 +546,35 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips }: { sel
         <p className="cy-hint">A diode rectifier only conducts while the line voltage is below its {dc.E} V no-load voltage, so substations share each train’s load by distance.</p>
       </>
     );
+  } else if (sel.type === 'site' || sel.type === 'hub') {
+    const m = Math.min(1439, Math.floor(now.h * 60));
+    if (sel.type === 'site') {
+      const q = e.net.sites[sel.idx];
+      const stt = e.telecom.state[sel.idx * 1440 + m], soc = e.telecom.soc[sel.idx * 1440 + m];
+      // when does this site go dark today, if it does
+      let darkAt = -1;
+      for (let k = m; k < 1440; k++) if (e.telecom.state[sel.idx * 1440 + k] === 4) { darkAt = k; break; }
+      kicker = `Cell site · ${C.districts[q.district].name}`;
+      title = ST_LABEL[stt];
+      body = (
+        <>
+          <Rows rows={[['Power draw', `${num(1.6 + 2.4 * traffic(now.h), 1)} kW`], ['Battery', `${soc} % of ${num(q.batKWh, 1)} kWh`], ['Generator', q.genset ? 'yes, 24 h of fuel' : 'none'], ['People served', `about ${num(Math.round(q.pop / 100) * 100)}`], ['Backhaul to', e.net.hubs[q.hub].name], ['Mains from', C.subs.find((g) => g.id === C.districts[q.district].sub)!.name]]} />
+          {stt === 1 && darkAt > 0 && <p className="cy-hint warn">At this traffic level the battery runs flat at about {clock(darkAt / 60)}.</p>}
+          <p className="cy-hint">Batteries age: this one holds {Math.round((q.batKWh / (e.opts.batteryH * 3)) * 100)} % of its nameplate capacity.</p>
+        </>
+      );
+    } else {
+      const hb = e.net.hubs[sel.idx];
+      const stt = e.telecom.hubState[sel.idx * 1440 + m];
+      kicker = 'Exchange (backhaul hub)';
+      title = hb.name.replace(' exchange', '');
+      body = (
+        <>
+          <Rows rows={[['State', ST_LABEL[stt]], ['Load', `${hb.kw} kW`], ['Backup', `4 h battery, generator with ${hb.fuelH} h of fuel`], ['Sites behind it', num(e.net.sites.filter((q) => q.hub === sel.idx).length)]]} />
+          <p className="cy-hint">If an exchange goes down, every site behind it loses its fibre link. Their radios stay lit, but carry no calls.</p>
+        </>
+      );
+    }
   } else if (sel.type === 'train') {
     const t = e.sim.trains.find((x) => x.id === sel.id);
     kicker = t ? `${C.lines[t.line].name} · train ${t.id}` : 'Train';
@@ -571,7 +626,9 @@ function Bars({ parts }: { parts: [Sector, number][] }) {
 
 // ------------------------------------------------------------------ inputs
 
-function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city: CityData; mode: Mode; opts: CityOpts; trips: string[]; onOpts: (o: Partial<CityOpts>) => void; onTrip: (id: string, on: boolean) => void; onClose: () => void }) {
+function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city: CityData; mode: Mode; opts: CityOpts; trips: string[]; onOpts: (o: Partial<CityOpts>) => void; onTrip: TripFn; onClose: () => void }) {
+  const [from, setFrom] = useState(mode === 'telecom' ? 18 : 0);
+  const [dur, setDur] = useState(mode === 'telecom' ? 6 : 24);
   return (
     <aside className="cy-inputs" aria-label="Model inputs">
       <header><h2>Model inputs</h2><button onClick={onClose} aria-label="Close">×</button></header>
@@ -604,9 +661,25 @@ function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city:
           </fieldset>
         </>
       )}
+      {mode === 'telecom' && (
+        <>
+          <fieldset>
+            <legend>Site batteries (hours at average load)</legend>
+            <div className="pv-seg">{[1, 2, 3, 4, 8].map((v) => <button key={v} className={opts.batteryH === v ? 'on' : ''} onClick={() => onOpts({ batteryH: v })}>{v} h</button>)}</div>
+          </fieldset>
+          <fieldset>
+            <legend>Sites with a diesel generator</legend>
+            <div className="pv-seg">{[0, 0.15, 0.4, 1].map((v) => <button key={v} className={opts.gensetShare === v ? 'on' : ''} onClick={() => onOpts({ gensetShare: v })}>{Math.round(v * 100)} %</button>)}</div>
+          </fieldset>
+        </>
+      )}
       <fieldset>
         <legend>Out of service</legend>
-        <select value="" onChange={(ev) => ev.target.value && onTrip(ev.target.value, true)}>
+        <div className="cy-win">
+          <label>From <select value={from} onChange={(ev) => setFrom(Number(ev.target.value))}>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}</select></label>
+          <label>for <select value={dur} onChange={(ev) => setDur(Number(ev.target.value))}>{[1, 2, 4, 6, 8, 12, 24].map((d) => <option key={d} value={d}>{d === 24 ? 'the whole day' : `${d} h`}</option>)}</select></label>
+        </div>
+        <select value="" onChange={(ev) => ev.target.value && onTrip(ev.target.value, true, dur >= 24 ? [0, 24] : [from, from + dur])}>
           <option value="">Take something out…</option>
           {mode === 'metro'
             ? C.lines.flatMap((l, li) => l.tss.map((t, ti) => <option key={`${li}${ti}`} value={`tss:${li}:${ti}`} disabled={trips.includes(`tss:${li}:${ti}`)}>{l.name}: {t.name}</option>))
@@ -621,4 +694,54 @@ function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city:
 function labelOf(C: CityData, id: string) {
   if (id.startsWith('tss:')) { const [, l, i] = id.split(':').map(Number); return C.lines[l].tss[i].name; }
   return C.subs.find((s) => s.id === id)?.name ?? id;
+}
+
+function TelSum({ e, h }: { e: CityEngine; h: number }) {
+  const t = e.telecom.mins[Math.min(1439, Math.floor(h * 60))];
+  return <>Signal for <b>{Math.round(t.served * 100)} %</b> of people · <b>{num(t.battery)}</b> on battery · <b>{num(t.down)}</b> dark</>;
+}
+
+function TelecomChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: number) => void }) {
+  const tl = useTimeline(seek);
+  const mins = e.telecom.mins, n = e.net.sites.length;
+  const paths = useMemo(() => {
+    const keys = ['battery', 'genset', 'isolated', 'down'] as const;
+    const acc = new Float64Array(1441);
+    const out = keys.map((k) => {
+      const top: string[] = [], bot: string[] = [];
+      for (let i = 0; i <= 1440; i += 4) {
+        const m = mins[Math.min(1439, i)];
+        const x = (i / 1440) * CW, y0 = CH - (acc[i] / n) * CH;
+        acc[i] += m[k];
+        for (let j = 1; j < 4 && i + j <= 1440; j++) acc[i + j] = acc[i];
+        top.push(`${x.toFixed(1)},${(CH - (acc[i] / n) * CH).toFixed(1)}`);
+        bot.unshift(`${x.toFixed(1)},${y0.toFixed(1)}`);
+      }
+      return { k, d: `M${top.join(' L')} L${bot.join(' L')} Z` };
+    });
+    const served = mins.filter((_, i) => i % 4 === 0).map((m, k) => `${((k * 4) / 1440) * CW},${CH - m.served * CH}`).join(' ');
+    return { out, served };
+  }, [mins, n]);
+  const COL = { battery: '#ffb04d', genset: '#c9b8ff', isolated: '#8b9ab0', down: '#ff5b4f' };
+  const LAB = { battery: 'On battery', genset: 'On generator', isolated: 'Cut off from exchange', down: 'Dark' };
+  const m = mins[Math.min(1439, Math.floor(hour * 60))];
+  return (
+    <div className="cy-chart">
+      <ul className="cy-legend">
+        <li><span><i style={{ background: '#ece6d8' }} />People with signal<b>{Math.round(m.served * 100)} %</b></span></li>
+        {(['battery', 'genset', 'isolated', 'down'] as const).map((k) => <li key={k}><span><i style={{ background: COL[k] }} />{LAB[k]}<b>{num(m[k])}</b></span></li>)}
+        <li className="cy-day"><span>Sites<b>{num(n)}</b></span><small>share of sites, stacked; line: people served</small></li>
+      </ul>
+      <div className="cy-plot">
+        <svg ref={tl.ref} viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" onPointerDown={tl.onPointerDown} onPointerMove={tl.onPointerMove} onPointerUp={tl.onPointerUp} role="slider" aria-label="Time of day" aria-valuemin={0} aria-valuemax={24} aria-valuenow={hour}>
+          <Axis />
+          {paths.out.map((p) => <path key={p.k} d={p.d} fill={COL[p.k]} opacity={0.8} />)}
+          <polyline points={paths.served} fill="none" stroke="#ece6d8" strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
+          <line x1={(hour / 24) * CW} x2={(hour / 24) * CW} y1={0} y2={CH} className="cy-head" />
+        </svg>
+        <Markers events={e.scenario.events} seek={seek} />
+        <span className="cy-ymax">100 %</span>
+      </div>
+    </div>
+  );
 }

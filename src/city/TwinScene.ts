@@ -11,6 +11,7 @@ import { gsap } from 'gsap';
 import { glow, rng } from '../plants3d/textures';
 import { along, districtAt, polyLength, type CityData, type Kind, type Season } from './types';
 import { TRAIN, type TractionSim } from './metro';
+import type { Network } from './telecom';
 
 const KIND_INDEX: Record<Kind, number> = { res: 0, com: 1, ind: 2, inst: 3 };
 export const MAXD = 64;
@@ -20,7 +21,7 @@ export const MAXD = 64;
 // trains move as the traction simulation moves them, and the flow particles
 // travel along the catenary at a speed set by the solved DC currents.
 
-export type Pick = { type: 'train'; id: number } | { type: 'tss'; line: number; idx: number } | { type: 'sub'; id: string } | { type: 'district'; id: string } | { type: 'station'; line: number; idx: number };
+export type Pick = { type: 'site'; idx: number } | { type: 'hub'; idx: number } | { type: 'train'; id: number } | { type: 'tss'; line: number; idx: number } | { type: 'sub'; id: string } | { type: 'district'; id: string } | { type: 'station'; line: number; idx: number };
 
 export type SceneState = {
   hour: number;
@@ -28,6 +29,7 @@ export type SceneState = {
   districts: { lit: [number, number, number, number]; up: boolean; street: number }[];
   subs: { load: number; up: boolean }[]; // load as a fraction of rating
   sim: TractionSim;
+  telecom?: { state: Uint8Array; soc: Uint8Array; hub: Uint8Array; minute: number };
 };
 
 const DECK = 13; // viaduct deck height, m
@@ -79,6 +81,7 @@ export class TwinScene {
   state?: SceneState;
   selected: Pick | null = null;
   private ring: THREE.Mesh;
+  private tel?: { net: Network; hex: THREE.InstancedMesh; masts: THREE.InstancedMesh; lights: THREE.Points; hubs: THREE.InstancedMesh };
 
   constructor(private host: HTMLElement, public city: CityData, opts: { view?: 'city' | 'metro' } = {}) {
     const [bx0, bz0, bx1, bz1] = city.bounds;
@@ -528,6 +531,43 @@ export class TwinScene {
     this.flyTo(p.clone().add(dir.multiplyScalar(dist)), p.clone());
   }
 
+  /** The mobile network layer: masts, exchanges and a coverage hex per site. */
+  setTelecom(net: Network | null) {
+    if (this.tel) { this.tel.hex.visible = this.tel.masts.visible = this.tel.lights.visible = this.tel.hubs.visible = !!net; }
+    if (!net || this.tel) return;
+    const n = net.sites.length;
+    const hexG = new THREE.CircleGeometry(1, 6);
+    hexG.rotateX(-Math.PI / 2);
+    hexG.rotateY(Math.PI / 6);
+    const hex = new THREE.InstancedMesh(hexG, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }), n);
+    const mastG = new THREE.CylinderGeometry(0.5, 0.9, 32, 5);
+    mastG.translate(0, 16, 0);
+    const head = new THREE.BoxGeometry(3.2, 2.4, 3.2);
+    head.translate(0, 30, 0);
+    const masts = new THREE.InstancedMesh(mergeGeometries([mastG, head]), new THREE.MeshStandardMaterial({ color: '#9aa2a6', roughness: 0.5, metalness: 0.6 }), n);
+    const m4 = new THREE.Matrix4(), c = new THREE.Color();
+    const lp: number[] = [];
+    net.sites.forEach((st, i) => {
+      // tall buildings: the mast sits on a roof; elsewhere on the ground
+      m4.makeScale(st.r, 1, st.r).setPosition(st.x, 1.4, st.z);
+      hex.setMatrixAt(i, m4);
+      hex.setColorAt(i, c.set('#86c5da'));
+      m4.makeTranslation(st.x, 0, st.z);
+      masts.setMatrixAt(i, m4);
+      lp.push(st.x, 33, st.z);
+    });
+    hex.frustumCulled = masts.frustumCulled = false;
+    hex.renderOrder = 2;
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+    const lights = new THREE.Points(lg, new THREE.PointsMaterial({ map: glow(), color: new THREE.Color(3, 0.2, 0.12), size: 22, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    const hubs = new THREE.InstancedMesh(new THREE.BoxGeometry(46, 16, 30).translate(0, 8, 0), new THREE.MeshStandardMaterial({ color: '#c8c2b4', roughness: 0.8 }), net.hubs.length);
+    net.hubs.forEach((hb, i) => { m4.makeTranslation(hb.x, 0, hb.z); hubs.setMatrixAt(i, m4); });
+    hubs.castShadow = masts.castShadow = true;
+    this.scene.add(hex, masts, lights, hubs);
+    this.tel = { net, hex, masts, lights, hubs };
+  }
+
   setHighlight(k: number) {
     this.bUniforms.uHi.value = k;
     this.gUniforms.uHi.value = k;
@@ -652,6 +692,23 @@ export class TwinScene {
         P.needsUpdate = true; C.needsUpdate = true;
       }
     }
+    // mobile network: colour every coverage hex by its site's state this minute
+    if (this.tel && st.telecom && this.tel.hex.visible) {
+      const { state, soc, minute } = st.telecom;
+      const hex = this.tel.hex, c = new THREE.Color();
+      const n = this.tel.net.sites.length;
+      for (let i = 0; i < n; i++) {
+        const v = state[i * 1440 + minute];
+        if (v === 0) c.setRGB(0.03, 0.08, 0.1);
+        else if (v === 1) { const f = soc[i * 1440 + minute] / 100; c.setRGB(1, 0.45 + 0.25 * f, 0.1 + 0.2 * f).multiplyScalar(0.55 + 0.6 * f); }
+        else if (v === 2) c.setRGB(0.75, 0.62, 1);
+        else if (v === 3) c.setRGB(0.4, 0.42, 0.48);
+        else c.setRGB(0.9, 0.15, 0.12);
+        hex.setColorAt(i, c);
+      }
+      if (hex.instanceColor) hex.instanceColor.needsUpdate = true;
+      (this.tel.lights.material as THREE.PointsMaterial).opacity = 0.25 + 0.75 * this.night;
+    }
     // selection ring
     const sp = this.selPos();
     this.ring.visible = !!sp;
@@ -665,6 +722,8 @@ export class TwinScene {
   private selPos(): THREE.Vector3 | null {
     const s = this.selected;
     if (!s) return null;
+    if (s.type === 'site') { const q = this.tel?.net.sites[s.idx]; return q ? new THREE.Vector3(q.x, 2, q.z) : null; }
+    if (s.type === 'hub') { const q = this.tel?.net.hubs[s.idx]; return q ? new THREE.Vector3(q.x, 2, q.z) : null; }
     if (s.type === 'train') return this.trainHeads.get(s.id) ?? null;
     if (s.type === 'tss') return this.tssPos[s.line][s.idx];
     if (s.type === 'station') return this.stationPos[s.line][s.idx];
@@ -698,6 +757,10 @@ export class TwinScene {
     this.tssPos.forEach((arr, line) => arr.forEach((p, idx) => test(p, { type: 'tss', line, idx })));
     this.stationPos.forEach((arr, line) => arr.forEach((p, idx) => test(p, { type: 'station', line, idx }, 18)));
     this.city.subs.forEach((s) => test(new THREE.Vector3(s.x, 30, s.z), { type: 'sub', id: s.id }));
+    if (this.tel?.hex.visible) {
+      this.tel.net.hubs.forEach((h, idx) => test(new THREE.Vector3(h.x, 10, h.z), { type: 'hub', idx }));
+      this.tel.net.sites.forEach((q, idx) => test(new THREE.Vector3(q.x, 30, q.z), { type: 'site', idx }, 16));
+    }
     if (best) return best;
     // otherwise: the district under the cursor
     const ray = new THREE.Raycaster();

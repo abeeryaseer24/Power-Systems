@@ -104,3 +104,21 @@ describe('meridia data', () => {
     expect(M.cells.data.some((v) => v !== 255)).toBe(true);
   });
 });
+
+describe('telecom', () => {
+  it('a 6-hour substation outage drains batteries, then sites drop out', async () => {
+    const { CityEngine } = await import('./engine');
+    const e = new CityEngine(M);
+    const sites = e.net.sites.length;
+    e.trip('eastfield', true, [18, 24]);
+    const t = e.telecom.mins;
+    const at = (h: number) => t[Math.floor(h * 60)];
+    if (FULL) console.log({ sites, before: at(17.9), plus10: at(18.2), plus3h: at(21), plus5h: at(23) });
+    expect(sites).toBeGreaterThan(800);
+    expect(sites).toBeLessThan(5000);
+    expect(at(17.9).battery).toBe(0);
+    expect(at(18.2).battery).toBeGreaterThan(20);
+    expect(at(23).down).toBeGreaterThan(at(18.2).down);
+    expect(at(23).served).toBeLessThan(at(17.9).served);
+  });
+});
