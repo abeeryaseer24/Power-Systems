@@ -309,6 +309,39 @@ function build(c) {
     });
   }
 
+  // ---------------- the city's biggest mapped hospital (for the hospital and blackout models)
+  let hospital = null;
+  {
+    const cands = read(`city-${c.id}-landuse`).elements.filter((el) => el.tags?.amenity === 'hospital' && el.geometry && (el.tags['name:en'] || el.tags.name));
+    let best = null;
+    for (const el of cands) {
+      const pts = geo(el.geometry);
+      if (pts.length < 4) continue;
+      let mnx = Infinity, mxx = -Infinity, mnz = Infinity, mxz = -Infinity;
+      for (const [x, z] of pts) { mnx = Math.min(mnx, x); mxx = Math.max(mxx, x); mnz = Math.min(mnz, z); mxz = Math.max(mxz, z); }
+      // floor area of the buildings inside the hospital grounds
+      let floor = 0;
+      for (const b of raw) if (b.x > mnx && b.x < mxx && b.z > mnz && b.z < mxz && inPoly(b.x, b.z, pts)) floor += b.floor;
+      const tagged = parseInt(el.tags.beds, 10);
+      const beds = Number.isFinite(tagged) && tagged > 20 ? tagged : Math.round(floor / 110);
+      if (beds < 80) continue;
+      if (!best || beds > best.beds) best = { el, pts, beds, floor, tagged: Number.isFinite(tagged) && tagged > 20, cx: (mnx + mxx) / 2, cz: (mnz + mxz) / 2 };
+    }
+    if (best) {
+      const hot = c.climate.summer.tmax > 30;
+      const kwBed = hot ? 5 : 4; // peak kW per bed, cooling-heavy in hot climates
+      const name = best.el.tags['name:en'] ?? best.el.tags.name;
+      hospital = {
+        name, beds: Math.min(4000, best.beds), peakMW: +((Math.min(4000, best.beds) * kwBed) / 1000).toFixed(1),
+        district: subs[nearestSub(best.cx, best.cz)].id, x: Math.round(best.cx), z: Math.round(best.cz),
+        source: best.tagged
+          ? `${name}: ${best.beds} beds as tagged in OpenStreetMap; peak load estimated at ${kwBed} kW per bed.`
+          : `${name}: the largest hospital mapped in OpenStreetMap here. About ${Math.round(best.beds)} beds estimated from ${Math.round(best.floor / 1000)}k m² of floor space (110 m² per bed); peak load estimated at ${kwBed} kW per bed.`,
+      };
+      console.log(`  hospital: ${name}, ${hospital.beds} beds, ${hospital.peakMW} MW`);
+    }
+  }
+
   // ---------------- districts
   const districts = subs.map((q, i) => {
     const d = D[i];
@@ -384,6 +417,7 @@ function build(c) {
     demand: c.demand,
     metro: c.metro ? { voltage: c.metro.voltage, E: c.metro.E ?? Math.round(c.metro.voltage * 1.1), capacity: c.metro.capacity, vmax: c.metro.vmax, peakHeadway: c.metro.peakHeadway, tssRating: c.metro.tssRating ?? 5, service: c.metro.service, peaks: c.metro.peaks, offpeak: c.metro.offpeak, interchange: c.metro.interchange } : { voltage: 1500, E: 1650, capacity: 1000, vmax: 20, peakHeadway: 300, tssRating: 5 },
     districts,
+    hospital,
     subs: subs.map(({ short, ...q }) => q),
     lines,
     areas,

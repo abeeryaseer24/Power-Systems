@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BRANCHES, DEFAULT_HOSPITAL, HOSPITALS, firstMinutes, hospLoad, threeDays, type Branch, type HospitalOpts } from '../city/hospital';
+import { BRANCHES, DEFAULT_HOSPITAL, HOSPITALS, firstMinutes, hospitalFor, hospLoad, threeDays, type Branch, type HospitalDef, type HospitalOpts } from '../city/hospital';
+import type { CityData } from '../city/types';
 import { clock, num } from '../lib/format';
 import '../city.css';
 
@@ -9,7 +10,9 @@ type Scale = 'secs' | 'days';
 
 export default function Hospital() {
   const { id = 'meridia' } = useParams();
-  const def = HOSPITALS[id] ?? HOSPITALS.meridia;
+  const [city, setCity] = useState<CityData | null>(null);
+  useEffect(() => { import('../city/load').then(({ loadCity }) => loadCity(id).then(setCity)); }, [id]);
+  const def: HospitalDef & { source?: string } = (city && hospitalFor(city)) ?? HOSPITALS.meridia;
   const [o, setO] = useState<HospitalOpts>(DEFAULT_HOSPITAL);
   const [scale, setScale] = useState<Scale>('secs');
   const [t, setT] = useState(0); // seconds (secs) or hours (days)
@@ -56,11 +59,12 @@ export default function Hospital() {
     <main id="main" className="hp-page">
       <header className="hp-head">
         <Link to={`/city/${id}`} className="pv-back">Back to the city</Link>
-        <p className="cy-kicker">{id === 'meridia' ? <>Meridia · <span className="cy-badge cy-badge-prototype">Prototype city</span></> : id}</p>
+        <p className="cy-kicker">{city ? <>{city.name} · <span className={`cy-badge cy-badge-${city.kind}`}>{city.kind === 'prototype' ? 'Prototype city' : 'Real city'}</span></> : ' '}</p>
         <h1>Hospital in a blackout</h1>
-        <p className="hp-sub">{def.name}: {def.beds} beds, about {num(def.peakMW, 1)} MW at peak. Its essential electrical system is laid out the way NFPA 99 and 110 require. Watch the first three minutes second by second, then the next three days.</p>
+        <p className="hp-sub">{def.name}: {def.beds} beds, about {num(def.peakMW, 1)} MW at peak. Its essential electrical system is laid out the way NFPA 99 and 110 require{city?.kind === 'real' ? ' (a typical layout, not this hospital’s actual drawings)' : ''}. Watch the first three minutes second by second, then the next three days.</p>
       </header>
 
+      {def.source && <p className="hp-src">{def.source}</p>}
       <section className="hp-diagram" aria-label="Single-line diagram">
         <SLD st={st} gens={o.gens} failed={o.failToStart} second={o.secondFeeder} />
         <div className="hp-scale pv-seg" role="group" aria-label="Timescale">

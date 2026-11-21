@@ -80,6 +80,7 @@ export type CityData = {
   /** district index per cell over bounds (255 = none), for street lighting at night */
   cells: { nx: number; nz: number; data: Uint8Array };
   ground: string; // base land colour
+  hospital?: { name: string; beds: number; peakMW: number; district: string; x: number; z: number; source: string };
   sea?: [number, number][]; // optional sea polygon
   view: { city: [number, number, number, number, number, number]; metro: [number, number, number, number, number, number] }; // camera pos + target
 };

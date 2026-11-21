@@ -16,7 +16,7 @@ import type { CityData } from './types';
 import type { CityEngine } from './engine';
 import { runTelecom } from './telecom';
 import { runWater } from './water';
-import { DEFAULT_HOSPITAL, HOSPITALS, threeDays, type HospitalOpts } from './hospital';
+import { DEFAULT_HOSPITAL, HOSPITALS, hospitalFor, threeDays, type HospitalOpts } from './hospital';
 
 export type CascadeOpts = { start: number; hours: number; stepMin: number; batteryH: number; gensetShare: number; tankHours: number; pumpGenShare: number; hospFuelH: number; refuel: boolean; signalUps: number };
 export const DEFAULT_CASCADE: CascadeOpts = { start: 12.5, hours: 10, stepMin: 25, batteryH: 3, gensetShare: 0.15, tankHours: 6, pumpGenShare: 0.3, hospFuelH: 60, refuel: false, signalUps: 0.25 };
@@ -48,7 +48,7 @@ export type Cascade = {
 export function runCascade(c: CityData, e: CityEngine, o: CascadeOpts): Cascade {
   const M = 73 * 60, h0 = o.start - 1, t0 = 60;
   const D = c.districts.length;
-  const hosp = HOSPITALS[c.id];
+  const hosp = hospitalFor(c);
   // restoration order: the hospital's area first, then by population
   const order = c.districts.map((d, i) => ({ i, k: (hosp && d.id === hosp.district ? 1e12 : 0) + d.pop })).sort((a, b) => b.k - a.k).map((x) => x.i);
   const restoredAt = new Array(D).fill(0);

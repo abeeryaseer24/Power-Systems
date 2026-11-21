@@ -210,6 +210,7 @@ export function buildMeridia(): CityData {
     buildings, streets, areas, sea,
     cells: { nx, nz, data },
     ground: '#6f7556',
+    hospital: { name: 'Meridia General Infirmary', beds: 620, peakMW: 3.1, district: 'civic', x: 300, z: -1500, source: 'Fictional, sized like a large teaching hospital in a hot city.' },
     view: { city: [4300, 3300, 8200, -200, 0, 400], metro: [900, 420, 900, -150, 0, -420] },
   };
   return cached;

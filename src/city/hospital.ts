@@ -118,3 +118,8 @@ export function threeDays(def: HospitalDef, o: HospitalOpts) {
 export const HOSPITALS: Record<string, HospitalDef> = {
   meridia: { name: 'Meridia General Infirmary', beds: 620, peakMW: 3.1, district: 'civic' },
 };
+
+/** The hospital modelled for a city: its own (from OpenStreetMap) or Meridia's for the prototype. */
+export function hospitalFor(c: { id: string; hospital?: HospitalDef & { source?: string } }): (HospitalDef & { source?: string }) | null {
+  return c.hospital ?? HOSPITALS[c.id] ?? null;
+}
