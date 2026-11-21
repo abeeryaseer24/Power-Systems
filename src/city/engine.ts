@@ -6,14 +6,14 @@
 // water, EV, data centres) plug into the same graph.
 
 import type { CityData } from './types';
-import { cityLoad, districtLoad, LOSS_FRACTION, sunElevation, temperature, type DayInputs, type DistrictLoad } from './demand';
+import { cityLoad, districtLoad, LOSS_FRACTION, SPECIAL, sunElevation, temperature, type DayInputs, type DistrictLoad } from './demand';
 import { TractionSim, headway, type TractionOpts } from './metro';
 import { buildNetwork, runTelecom, type Network, type TelecomOpts, type TelecomRun } from './telecom';
 import { buildHubs, runEv, type EvOpts, type EvRun, type Hub as EvHub } from './ev';
 import { buildStations, runWater, type Station, type WaterOpts, type WaterRun } from './water';
 
 export type CityOpts = DayInputs & Omit<TractionOpts, 'inp'> & TelecomOpts & EvOpts & WaterOpts;
-export const DEFAULT_OPTS: CityOpts = { season: 'summer', day: 'weekday', heat: 0, peakHeadway: 180, regen: true, reversible: false, batteryH: 3, gensetShare: 0.15, evShare: 0.08, smartCharging: false, hubBattery: false, tankHours: 6, pumpGenShare: 0.3 };
+export const DEFAULT_OPTS: CityOpts = { season: 'summer', day: 'weekday', heat: 0, special: 'none', peakHeadway: 180, regen: true, reversible: false, batteryH: 3, gensetShare: 0.15, evShare: 0.08, smartCharging: false, hubBattery: false, tankHours: 6, pumpGenShare: 0.3 };
 
 /** Loads from the other models that the day run adds to the demand stack. */
 type Extra = { evD: Float32Array; water: Float32Array };
@@ -363,6 +363,7 @@ export function findEvents(x: Ctx, mins: Minute[], opts: CityOpts, trips: Trips,
   const pk0 = x.c.metro.peaks?.[0] ?? [7, 10];
   if (opts.day === 'weekday' && x.c.lines.length) ev.push({ t: pk0[0], kind: 'info', title: 'Peak service', body: `Trains every ${Math.round(opts.peakHeadway / 60 * 10) / 10} minutes until ${String(pk0[1]).padStart(2, '0')}:00. More trains, more acceleration, more traction power.` });
   if (x.c.lines.length) ev.push({ t: svc1, kind: 'info', title: 'Last departures', body: 'The last trains leave the terminals; traction load fades to zero as they arrive.' });
+  for (const mk of SPECIAL[opts.special ?? 'none'].marks) ev.push({ t: mk.t, kind: 'peak', title: mk.title, body: mk.body });
   // peaks
   let pk = 0;
   mins.forEach((x, i) => { if (x.total > mins[pk].total) pk = i; });

@@ -6,7 +6,40 @@ import type { CityData, District, Season } from './types';
 
 export type { Season };
 export type DayType = 'weekday' | 'weekend';
-export type DayInputs = { season: Season; day: DayType; heat: number /* °C offset */ };
+export type Special = 'none' | 'final' | 'eid' | 'ramadan' | 'gp';
+export type DayInputs = { season: Season; day: DayType; heat: number /* °C offset */; special?: Special };
+
+/** Special days: what changes, and when. Illustrative shapes, not measured curves. */
+export const SPECIAL: Record<Special, { label: string; note: string; marks: { t: number; title: string; body: string }[] }> = {
+  none: { label: 'An ordinary day', note: '', marks: [] },
+  final: {
+    label: 'World Cup final night', note: 'Kick-off at 20:00. Most homes are watching; at half-time and full-time thousands of fans, fridges, kettles and lights switch on within a few minutes: the TV pickup grid operators plan for.',
+    marks: [
+      { t: 20, title: 'Kick-off', body: 'Streets empty, TVs on. Home demand rises a little and stays flat: nobody moves.' },
+      { t: 20.78, title: 'Half-time pickup', body: 'Within five minutes everyone gets up at once: lights, fans, fridges opened, kettles and rice cookers on. Operators hold fast reserve ready for exactly this minute.' },
+      { t: 21.85, title: 'Full-time pickup', body: 'The final whistle: a second, bigger surge, then celebrations spill outside and demand drifts down.' },
+    ],
+  },
+  eid: {
+    label: 'Eid holiday', note: 'Offices, shops and factories close, and a large share of the city travels to family villages. Demand falls by a third or more; the grid has the opposite problem to a heatwave: too little load to keep big plants stable.',
+    marks: [{ t: 8, title: 'Eid prayers', body: 'The morning is quiet: offices and factories are shut and much of the city has left for the holiday.' }],
+  },
+  ramadan: {
+    label: 'A Ramadan evening', note: 'Daytime demand dips while people fast; at iftar (sunset) every kitchen switches on together, then mosques and markets light up late; a second small peak at sehri before dawn.',
+    marks: [
+      { t: 18.3, title: 'Iftar', body: 'Sunset: the fast breaks across the city within minutes. Kitchens, lights and fans all come on together.' },
+      { t: 3.6, title: 'Sehri', body: 'Before dawn, families wake to eat before the fast: a small night peak.' },
+    ],
+  },
+  gp: {
+    label: 'Street-circuit Grand Prix night', note: 'A night race on city streets: floodlighting the circuit to broadcast standard, hospitality suites, fan zones and screens in the central district, from late afternoon until after midnight. The numbers here are illustrative.',
+    marks: [
+      { t: 17, title: 'Circuit lights up', body: 'Floodlights along the street circuit and the fan zones come on in the central district, several megawatts on top of a normal evening.' },
+      { t: 22, title: 'Race start', body: 'Broadcast lighting at full output, fan zones packed, hospitality kitchens busy.' },
+    ],
+  },
+};
+const coreOf = new WeakMap<CityData, District>();
 
 export const SECTORS = ['res', 'com', 'ind', 'inst', 'light', 'ev', 'water', 'metro', 'loss'] as const;
 export type Sector = (typeof SECTORS)[number];
@@ -81,16 +114,38 @@ export function districtLoad(c: CityData, d: District, h: number, inp: DayInputs
   // bedroom AC keeps running through hot nights, so cooling follows occupancy, not activity
   const cool = Math.max(0, T - 25.5) * 0.05 * acShare * (0.55 + 0.45 * occ) + Math.max(0, T - 24) * 0.01 * occ; // AC + fans, kW per person
   const resKw = c.demand.resBase + c.demand.resAct * act + cool + 0.04 * dark * occ;
-  const res = (k * d.pop * resKw) / 1000;
+  // special days reshape the activity curves
+  const sp = inp.special ?? 'none';
+  let resMul = 1, comMul = 1, indMul = 1, extra = 0;
+  if (sp === 'final') {
+    const pulse = (t0: number, w: number) => Math.exp(-(((h - t0) * 60) ** 2) / (2 * w * w));
+    resMul = (h >= 19.9 && h < 22.1 ? 1.03 : 1) + 0.075 * pulse(20.8, 4) + 0.1 * pulse(21.88, 5);
+  } else if (sp === 'eid') {
+    resMul = 0.62; comMul = 0.3; indMul = 0.25;
+  } else if (sp === 'ramadan') {
+    const pulse = (t0: number, w: number) => Math.exp(-(((h - t0) * 60) ** 2) / (2 * w * w));
+    resMul = (h > 9 && h < 17 ? 0.9 : 1) + 0.12 * pulse(18.35, 18) + 0.06 * pulse(3.6, 25) + (h > 20 && h < 23.5 ? 0.04 : 0);
+    comMul = h > 20 && h < 24 ? 1.25 : h > 9 && h < 16 ? 0.9 : 1;
+  } else if (sp === 'gp') {
+    let core = coreOf.get(c);
+    if (!core) { core = c.districts.reduce((a, b) => (b.comM2 > a.comM2 ? b : a)); coreOf.set(c, core); }
+    if (d === core) {
+      // 5 km of circuit floodlit to broadcast level (~1.6 MW/km), fan zones and hospitality (~25 MW)
+      const on = h >= 16.8 || h < 1.2 ? 1 : 0, race = h >= 21.8 && h < 23.8 ? 1 : 0;
+      extra = on * (8 + 25 * (h >= 18 || h < 1 ? 1 : 0.4)) + race * 4;
+      comMul = 1.12;
+    }
+  }
+  const res = (k * d.pop * resKw * resMul) / 1000;
 
   // commercial floor space: W/m² base + occupancy-driven + chillers
   const offOcc = hourly(OFFICE_OCC, h) * (we ? 0.35 : 1);
   const shopOcc = hourly(SHOP_OCC, h) * (we ? 1.1 : 1);
   const comOcc = 0.6 * offOcc + 0.4 * shopOcc;
   const wm2 = 6 + 22 * comOcc + Math.max(0, T - 23) * 1.25 * (0.25 + 0.75 * comOcc);
-  const com = (k * d.comM2 * wm2) / 1e6;
+  const com = (k * d.comM2 * wm2 * comMul) / 1e6 + extra;
 
-  const ind = d.indMW * hourly(IND_SHIFT, h) * (we ? 0.78 : 1) * (1 + Math.max(0, T - 30) * 0.008);
+  const ind = d.indMW * hourly(IND_SHIFT, h) * (we ? 0.78 : 1) * (1 + Math.max(0, T - 30) * 0.008) * indMul;
   // institutions: half hospital-like (flat, cooling), half campus-like
   const inst = d.instMW * (0.5 * (0.85 + Math.max(0, T - 24) * 0.012) + 0.5 * hourly(CAMPUS, h) * (we ? 0.6 : 1));
   const light = (d.streetKm * STREET_KW_PER_KM * dark * (h >= 0.5 && h < 5 ? 0.7 : 1)) / 1000;

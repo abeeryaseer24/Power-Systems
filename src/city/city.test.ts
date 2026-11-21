@@ -194,3 +194,14 @@ describe('data centre', () => {
     expect(Math.max(...noTes.secs.map((s) => s.inlet))).toBeGreaterThan(Math.max(...tes.secs.map((s) => s.inlet)));
   });
 });
+
+describe('special days', () => {
+  it('half-time pickup, Eid dip and a Grand Prix bump', () => {
+    const tot = (h: number, special: 'none' | 'final' | 'eid' | 'gp') => { const l = cityLoad(M, h, { ...DEFAULT_OPTS, special }); return l.res + l.com + l.ind + l.inst + l.light; };
+    const pick = tot(20.8, 'final') - tot(20.6, 'final');
+    if (FULL) console.log({ pick, eid: tot(12, 'eid') / tot(12, 'none'), gp: tot(22.5, 'gp') - tot(22.5, 'none') });
+    expect(pick).toBeGreaterThan(30);
+    expect(tot(12, 'eid')).toBeLessThan(tot(12, 'none') * 0.75);
+    expect(tot(22.5, 'gp') - tot(22.5, 'none')).toBeGreaterThan(20);
+  });
+});

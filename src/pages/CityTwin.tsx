@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { CityEngine, CityEvent, CityOpts, Minute } from '../city/engine';
 import type { Pick, TwinScene } from '../city/TwinScene';
 import type { CityData } from '../city/types';
-import { SECTORS, SECTOR_INFO, type Sector } from '../city/demand';
+import { SECTORS, SECTOR_INFO, SPECIAL, type Sector, type Special } from '../city/demand';
 import { TRAIN } from '../city/metro';
 import { ST_LABEL, traffic } from '../city/telecom';
 import { PRESSURE } from '../city/water';
@@ -286,6 +286,8 @@ function Captions({ mode, e, now, minute, feed, onTrip, onOpts }: { mode: Mode; 
     const lead = SECTOR_INFO[parts[0][0]].label.toLowerCase();
     const phase = h < 5 ? 'Night. Bedroom air conditioners hold the base load up.' : h < 9 ? 'Morning ramp. Homes wake, then offices and shops open.' : h < 16 ? 'Working day. Chillers in offices follow the afternoon heat.' : h < 18.5 ? 'Late afternoon. Offices wind down while homes fill up.' : h < 22.5 ? 'Evening peak. Everyone is home, lights and AC on together.' : 'Late evening. Demand falls as the city goes to bed.';
     line = `${phase} ${parts[0][1] > 0 ? `${cap(lead)} lead with ${num(parts[0][1])} MW.` : ''} Demand is at ${Math.round((now.total / peak) * 100)} % of today's peak.`;
+    const sp = e.opts.special ?? 'none';
+    action = sp === 'none' ? <button className="cy-try" onClick={() => onOpts({ special: 'final' })}>Try it: World Cup final night</button> : <p className="cy-live cy-special"><b>{SPECIAL[sp].label}.</b> {SPECIAL[sp].note} <button className="cy-link" onClick={() => onOpts({ special: 'none' })}>Back to an ordinary day</button></p>;
   } else {
     const trains = e.sim.trains;
     const acc = trains.filter((t) => t.phase === 'accel').length, br = trains.filter((t) => t.phase === 'brake').length;
@@ -352,7 +354,7 @@ function DemandChart({ e, hour, hi, setHi, seek }: { e: CityEngine; hour: number
   const mins = e.scenario.mins, base = e.baseline.mins;
   const max = Math.max(...base.map((m) => m.total + m.unserved)) * 1.08;
   const paths = useMemo(() => {
-    const step = 6;
+    const step = 3;
     const acc = new Float64Array(Math.ceil(1440 / step) + 1);
     return SECTORS.map((s) => {
       const top: string[] = [], bot: string[] = [];
@@ -702,6 +704,13 @@ function Inputs({ city: C, mode, opts, trips, onOpts, onTrip, onClose }: { city:
       <fieldset>
         <legend>Season</legend>
         <div className="pv-seg">{(['summer', 'monsoon', 'winter'] as const).map((s) => <button key={s} className={opts.season === s ? 'on' : ''} onClick={() => onOpts({ season: s })}>{cap(s)}</button>)}</div>
+      </fieldset>
+      <fieldset>
+        <legend>Special day</legend>
+        <select value={opts.special ?? 'none'} onChange={(ev) => onOpts({ special: ev.target.value as Special })}>
+          {(Object.keys(SPECIAL) as Special[]).map((k) => <option key={k} value={k}>{SPECIAL[k].label}</option>)}
+        </select>
+        {opts.special && opts.special !== 'none' && <p className="cy-hint">{SPECIAL[opts.special].note}</p>}
       </fieldset>
       <fieldset>
         <legend>Day</legend>
