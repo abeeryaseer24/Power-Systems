@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_ORBIT, eclipseFraction, orbitRun, type OrbitOpts } from '../frontier/space';
 import { num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 import '../frontier.css';
 

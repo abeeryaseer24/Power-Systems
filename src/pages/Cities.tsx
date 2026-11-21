@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cityIndex, type CityIndexEntry } from '../city/load';
 import { num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 
 export default function Cities() {

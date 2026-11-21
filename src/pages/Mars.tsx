@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { DEFAULT_MARS, marsRun, type MarsOpts } from '../frontier/space';
 import { num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 import '../frontier.css';
 

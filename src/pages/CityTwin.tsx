@@ -7,7 +7,9 @@ import { SECTORS, SECTOR_INFO, SPECIAL, type Sector, type Special } from '../cit
 import { TRAIN } from '../city/metro';
 import { ST_LABEL, traffic } from '../city/telecom';
 import { PRESSURE } from '../city/water';
+import { TOURS, type TourApi } from '../city/tours';
 import { clock, num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 
 // One viewer, two models on two pages:
@@ -40,6 +42,8 @@ export default function CityTwin({ mode }: { mode: Mode }) {
   const [line, setLine] = useState(0);
   const [feed, setFeed] = useState<CityEvent[]>([]);
   const [panel, setPanel] = useState<'inputs' | null>(null);
+  const [tour, setTour] = useState<number | null>(null);
+  const [tourBusy, setTourBusy] = useState(false);
   const [graphs, setGraphs] = useState(() => { try { return localStorage.getItem('blackstart.cityGraphs') !== '0'; } catch { return true; } });
   useEffect(() => { try { localStorage.setItem('blackstart.cityGraphs', graphs ? '1' : '0'); } catch { /* storage unavailable */ } }, [graphs]);
   const play = useRef({ playing, speed });
@@ -143,6 +147,26 @@ export default function CityTwin({ mode }: { mode: Mode }) {
     setBusy('');
   }, []);
 
+  // guided tour: run the step's actions whenever the step changes
+  useEffect(() => {
+    const e = eng.current, sc = scn.current;
+    if (tour === null || !e || !sc) return;
+    const steps = TOURS[mode];
+    const step = steps[tour];
+    if (!step) { setTour(null); return; }
+    setPlaying(false);
+    const api: TourApi = {
+      seek: (h) => { e.seek(h); lastEv.current = h; setTick((t) => t + 1); },
+      select: (p, fly) => { setSel(p); if (p && fly) { const v = sc.posOf(p); if (v) sc.focus(v, p.type === 'district' ? 2600 : 650); } },
+      view: (v) => sc.view(v),
+      highlight: (x) => setHi(x),
+      flow: (on) => setFlow(on),
+      rerun: (fn, msg) => rerun(fn, msg),
+    };
+    setTourBusy(true);
+    Promise.resolve(step.go(e, api)).finally(() => setTourBusy(false));
+  }, [tour, mode, rerun]);
+
   const seek = (h: number) => {
     const e = eng.current;
     if (!e) return;
@@ -198,7 +222,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
 
       {ready && e && now && minute && opts && (
         <>
-          <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false), 'Simulating the outage')} onOpts={(o) => rerun((en) => en.setOpts(o, false))} />
+          {tour === null && <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false), 'Simulating the outage')} onOpts={(o) => rerun((en) => en.setOpts(o, false))} />}
           <Inspector sel={sel} e={e} now={now} mode={mode} onClose={() => setSel(null)} onFocus={(p) => { const v = scn.current?.posOf(p); if (v) scn.current!.focus(v, p.type === 'district' ? 2600 : 700); }}
             onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false), on ? 'Taking it out of service' : 'Back in service')} trips={trips} />
 
@@ -210,7 +234,20 @@ export default function CityTwin({ mode }: { mode: Mode }) {
             </div>
             {mode === 'metro' && <button className={`pv-cut ${flow ? 'on' : ''}`} onClick={() => setFlow(!flow)} aria-pressed={flow}>Current flow</button>}
             <button className={`pv-cut ${panel === 'inputs' ? 'on' : ''}`} onClick={() => setPanel(panel === 'inputs' ? null : 'inputs')} aria-expanded={panel === 'inputs'}>Model inputs</button>
+            <button className={`pv-cut ${tour !== null ? 'on' : ''}`} onClick={() => setTour(tour === null ? 0 : null)} aria-pressed={tour !== null}>Guided tour</button>
           </div>
+          {tour !== null && TOURS[mode][tour] && (
+            <section className="pv-caption cy-tour" aria-live="polite">
+              <span className="pv-step">Step {tour + 1} of {TOURS[mode].length}</span>
+              <h2>{TOURS[mode][tour].title}</h2>
+              <p>{TOURS[mode][tour].body.replaceAll('{city}', e.city.name)}</p>
+              <div className="pv-capnav">
+                {tour > 0 && <button onClick={() => setTour(tour - 1)} disabled={tourBusy}>Back</button>}
+                {tour < TOURS[mode].length - 1 ? <button className="pv-next" onClick={() => setTour(tour + 1)} disabled={tourBusy}>Next</button> : <button className="pv-next" onClick={() => setTour(null)}>Finish</button>}
+                <button onClick={() => { setTour(null); setPlaying(true); }}>Close</button>
+              </div>
+            </section>
+          )}
           {panel === 'inputs' && <Inputs city={e.city} mode={mode} opts={opts} trips={trips} onOpts={(o) => rerun((en) => en.setOpts(o, false))} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false))} onClose={() => setPanel(null)} />}
 
           {mode === 'metro' && graphs && <LineSchematic e={e} line={line} setLine={setLine} sel={sel} setSel={setSel} />}

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { BRANCHES, DEFAULT_HOSPITAL, HOSPITALS, firstMinutes, hospitalFor, hospLoad, threeDays, type Branch, type HospitalDef, type HospitalOpts } from '../city/hospital';
 import type { CityData } from '../city/types';
 import { clock, num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 
 // Model 04: one hospital through a blackout, on its single-line diagram.

@@ -4,6 +4,7 @@ import type { CityData } from '../city/types';
 import { DEFAULT_DC, dcDay, dcOutage, type DcOpts } from '../city/datacentre';
 import { cityLoad, temperature, type Season } from '../city/demand';
 import { num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 
 // Model 07: a data centre or AI campus on the city's grid.

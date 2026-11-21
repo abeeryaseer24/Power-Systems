@@ -319,3 +319,5 @@ circle.hp-dead { fill: #33445a; stroke: none; }
 .cy-link { all: unset; cursor: pointer; color: var(--sodium); text-decoration: underline; font-size: 13px; margin-left: 4px; }
 .hp-src { grid-area: diag; align-self: start; justify-self: start; margin: 0; font-size: 12.5px; color: var(--steel); position: relative; z-index: 1; max-width: 620px; }
 .cy-net { fill: none; stroke: #ffe08a; stroke-width: 1.6; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; }
+.cy-tour { top: 170px; z-index: 4; pointer-events: auto; }
+.cy-tour .pv-capnav button[disabled] { opacity: 0.4; cursor: wait; }

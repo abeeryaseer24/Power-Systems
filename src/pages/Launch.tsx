@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ascent, COMPARE, jetPowerGW, LV, propellantEnergy, siteLoad } from '../frontier/launch';
 import { num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 import '../frontier.css';
 

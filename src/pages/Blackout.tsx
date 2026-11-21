@@ -4,6 +4,7 @@ import type { CityEngine } from '../city/engine';
 import type { CityData } from '../city/types';
 import { DEFAULT_CASCADE, LANES, LANE_INFO, runCascade, type Cascade, type CascadeOpts, type Lane } from '../city/cascade';
 import { clock, num } from '../lib/format';
+import '../plants.css';
 import '../city.css';
 
 // City blackout: every system on one 73-hour clock, as swimlanes and a live dependency graph.
