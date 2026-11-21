@@ -17,6 +17,7 @@ export default function Blackout() {
   const [m, setM] = useState(40);
   const [playing, setPlaying] = useState(true);
   const [rate, setRate] = useState(60); // simulated minutes per second
+  const [pin, setPin] = useState<{ cas: Cascade; label: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -85,7 +86,8 @@ export default function Blackout() {
           </aside>
 
           <section className="bo-lanes" aria-label="Systems over 73 hours">
-            <Lanes cas={cas} mi={mi} onSeek={(v) => { setPlaying(false); setM(v); }} />
+            <Lanes cas={cas} mi={mi} pin={pin?.cas ?? null} onSeek={(v) => { setPlaying(false); setM(v); }} />
+            {pin && <p className="cy-hint">Thin bars under each system: <b>{pin.label}</b>. Change an input below to compare.</p>}
           </section>
 
           <section className="bo-feed" aria-live="polite">
@@ -107,6 +109,7 @@ export default function Blackout() {
             <label>Water tanks <select value={o.tankHours} onChange={(e) => set({ tankHours: Number(e.target.value) })}>{[2, 6, 12].map((v) => <option key={v} value={v}>{v} h</option>)}</select></label>
             <label>Hospital fuel <select value={o.hospFuelH} onChange={(e) => set({ hospFuelH: Number(e.target.value) })}>{[24, 60, 96].map((v) => <option key={v} value={v}>{v} h</option>)}</select></label>
             <label className="hp-check"><input type="checkbox" checked={o.refuel} onChange={(e) => set({ refuel: e.target.checked })} /> Fuel tankers</label>
+            <button className={`pv-cut ${pin ? 'on' : ''}`} onClick={() => setPin(pin ? null : { cas, label: `blackout at ${clock(o.start)} for ${o.hours} h, ${o.batteryH} h mast batteries, ${o.tankHours} h tanks, ${o.hospFuelH} h hospital fuel${o.refuel ? ', tankers' : ''}` })}>{pin ? 'Unpin' : 'Pin to compare'}</button>
           </footer>
         </>
       )}
@@ -116,10 +119,18 @@ export default function Blackout() {
 
 const COLS = ['#2f6d7e', '#ffb04d', '#ff5b4f'];
 
-function Lanes({ cas, mi, onSeek }: { cas: Cascade; mi: number; onSeek: (m: number) => void }) {
+function Lanes({ cas, mi, onSeek, pin }: { cas: Cascade; mi: number; onSeek: (m: number) => void; pin: Cascade | null }) {
   const W = 1000, RH = 30, H = LANES.length * RH;
   const ref = useRef<SVGSVGElement>(null);
   // run-length bands per lane, so the SVG stays small
+  const runs = (c: Cascade) => LANES.map((l) => {
+    const out: { a: number; b: number; s: number }[] = [];
+    const arr = c.lanes[l];
+    let a = 0;
+    for (let k = 1; k <= arr.length; k++) if (k === arr.length || arr[k].s !== arr[a].s) { out.push({ a, b: k, s: arr[a].s }); a = k; }
+    return out;
+  });
+  const pinBands = useMemo(() => (pin ? runs(pin) : null), [pin]); // eslint-disable-line react-hooks/exhaustive-deps
   const bands = useMemo(() => LANES.map((l) => {
     const out: { a: number; b: number; s: number }[] = [];
     const arr = cas.lanes[l];
@@ -135,7 +146,8 @@ function Lanes({ cas, mi, onSeek }: { cas: Cascade; mi: number; onSeek: (m: numb
       <ul className="bo-lab">{LANES.map((l) => <li key={l} title={LANE_INFO[l].note}>{LANE_INFO[l].label}</li>)}</ul>
       <div className="bo-plot">
         <svg ref={ref} viewBox={`0 0 ${W} ${H + 18}`} preserveAspectRatio="none" onPointerDown={(e) => { drag.current = true; (e.target as Element).setPointerCapture?.(e.pointerId); seek(e); }} onPointerMove={(e) => drag.current && seek(e)} onPointerUp={() => { drag.current = false; }}>
-          {bands.map((bs, li) => bs.map((b, i) => <rect key={`${li}-${i}`} x={x(b.a)} y={li * RH + 4} width={Math.max(0.5, x(b.b) - x(b.a))} height={RH - 8} fill={COLS[b.s]} opacity={b.s === 0 ? 0.55 : 0.9} />))}
+          {bands.map((bs, li) => bs.map((b, i) => <rect key={`${li}-${i}`} x={x(b.a)} y={li * RH + 4} width={Math.max(0.5, x(b.b) - x(b.a))} height={pinBands ? RH - 13 : RH - 8} fill={COLS[b.s]} opacity={b.s === 0 ? 0.55 : 0.9} />))}
+          {pinBands?.map((bs, li) => bs.map((b, i) => <rect key={`p${li}-${i}`} x={x(b.a)} y={li * RH + RH - 8} width={Math.max(0.5, x(b.b) - x(b.a))} height={4} fill={COLS[b.s]} opacity={0.9} />))}
           <rect x={x(cas.t0)} y={0} width={x(Math.min(...cas.restoredAt)) - x(cas.t0)} height={H} className="bo-out" />
           {Array.from({ length: 13 }, (_, k) => k * 6).map((hh) => <g key={hh} className="cy-axis"><line x1={x(hh * 60 + cas.t0)} x2={x(hh * 60 + cas.t0)} y1={0} y2={H} /><text x={x(hh * 60 + cas.t0) + 3} y={H + 13}>+{hh} h</text></g>)}
           {cas.events.map((ev, i) => <circle key={i} cx={x(ev.m)} cy={LANES.indexOf(ev.lane) * RH + RH / 2} r={3.2} className="bo-ev" />)}

@@ -43,6 +43,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
   const [feed, setFeed] = useState<CityEvent[]>([]);
   const [panel, setPanel] = useState<'inputs' | null>(null);
   const [tour, setTour] = useState<number | null>(null);
+  const [pin, setPin] = useState<Pinned | null>(null);
   const [tourBusy, setTourBusy] = useState(false);
   const [graphs, setGraphs] = useState(() => { try { return localStorage.getItem('blackstart.cityGraphs') !== '0'; } catch { return true; } });
   useEffect(() => { try { localStorage.setItem('blackstart.cityGraphs', graphs ? '1' : '0'); } catch { /* storage unavailable */ } }, [graphs]);
@@ -235,7 +236,9 @@ export default function CityTwin({ mode }: { mode: Mode }) {
             {mode === 'metro' && <button className={`pv-cut ${flow ? 'on' : ''}`} onClick={() => setFlow(!flow)} aria-pressed={flow}>Current flow</button>}
             <button className={`pv-cut ${panel === 'inputs' ? 'on' : ''}`} onClick={() => setPanel(panel === 'inputs' ? null : 'inputs')} aria-expanded={panel === 'inputs'}>Model inputs</button>
             <button className={`pv-cut ${tour !== null ? 'on' : ''}`} onClick={() => setTour(tour === null ? 0 : null)} aria-pressed={tour !== null}>Guided tour</button>
+            <button className={`pv-cut ${pin ? 'on' : ''}`} onClick={() => setPin(pin ? null : snapshot(e, mode))} aria-pressed={!!pin} title="Keep this run on the charts, then change an input to compare">{pin ? 'Unpin' : 'Pin to compare'}</button>
           </div>
+          {pin && <p className="cy-pinned">Comparing with <b>{pin.label}</b> (dashed). Change an input or take something out to see the difference.</p>}
           {tour !== null && TOURS[mode][tour] && (
             <section className="pv-caption cy-tour" aria-live="polite">
               <span className="pv-step">Step {tour + 1} of {TOURS[mode].length}</span>
@@ -265,7 +268,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
                 {mode === 'ev' ? <EvSum e={e} h={now.h} /> : mode === 'water' ? <WaterSum e={e} h={now.h} /> : mode === 'telecom' ? <TelSum e={e} h={now.h} /> : mode === 'day' ? <>Demand <b>{num(now.total)}</b> MW{now.unserved > 1 && <em> · {num(now.unserved)} MW unserved</em>}</> : <>Traction <b>{num(now.metro, 1)}</b> MW · <b>{e.sim.trains.length}</b> trains · headway <b>{Number.isFinite(now.hw) ? `${num(now.hw / 60, 1)} min` : 'no service'}</b></>}
               </span>
             </div>
-            {!graphs ? null : mode === 'ev' ? <EvChart e={e} hour={now.h} seek={seek} /> : mode === 'water' ? <WaterChart e={e} hour={now.h} seek={seek} /> : mode === 'telecom' ? <TelecomChart e={e} hour={now.h} seek={seek} /> : mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} /> : <TractionChart e={e} hour={now.h} seek={seek} />}
+            {!graphs ? null : mode === 'ev' ? <EvChart e={e} hour={now.h} seek={seek} pin={pin} /> : mode === 'water' ? <WaterChart e={e} hour={now.h} seek={seek} pin={pin} /> : mode === 'telecom' ? <TelecomChart e={e} hour={now.h} seek={seek} pin={pin} /> : mode === 'day' ? <DemandChart e={e} hour={now.h} hi={hi} setHi={setHi} seek={seek} pin={pin} /> : <TractionChart e={e} hour={now.h} seek={seek} pin={pin} />}
           </section>
         </>
       )}
@@ -390,7 +393,7 @@ function Axis() {
   );
 }
 
-function DemandChart({ e, hour, hi, setHi, seek }: { e: CityEngine; hour: number; hi: Sector | null; setHi: (s: Sector | null) => void; seek: (h: number) => void }) {
+function DemandChart({ e, hour, hi, setHi, seek, pin }: { e: CityEngine; hour: number; hi: Sector | null; setHi: (s: Sector | null) => void; seek: (h: number) => void; pin: Pinned | null }) {
   const tl = useTimeline(seek);
   const mins = e.scenario.mins, base = e.baseline.mins;
   const max = Math.max(...base.map((m) => m.total + m.unserved)) * 1.08;
@@ -425,6 +428,7 @@ function DemandChart({ e, hour, hi, setHi, seek }: { e: CityEngine; hour: number
             </button>
           </li>
         ))}
+        {pin && <PinRow label="Pinned peak" a={Math.max(...pin.day)} b={Math.max(...mins.map((q) => q.total))} unit="MW" />}
         {hasSolar && <li><span title="Rooftop solar output; the dashed line is the demand the grid has to meet after it."><i style={{ background: 'transparent', border: '1.5px dashed #ffe08a' }} />Rooftop solar<b>−{num(m.solar, m.solar < 10 ? 1 : 0)}</b></span></li>}
       </ul>
       <div className="cy-plot">
@@ -433,6 +437,7 @@ function DemandChart({ e, hour, hi, setHi, seek }: { e: CityEngine; hour: number
           {paths.map((p) => <path key={p.s} d={p.d} fill={SECTOR_INFO[p.s].colour} opacity={hi && hi !== p.s ? 0.18 : 0.85} />)}
           {e.trips.size > 0 && <polyline points={baseLine} className="cy-base" />}
           {hasSolar && <polyline points={netLine} className="cy-net" />}
+          {pin && <PinLine vals={pin.day} max={max} />}
           <line x1={(hour / 24) * CW} x2={(hour / 24) * CW} y1={0} y2={CH} className="cy-head" />
         </svg>
         <Markers events={e.scenario.events} seek={seek} />
@@ -443,7 +448,7 @@ function DemandChart({ e, hour, hi, setHi, seek }: { e: CityEngine; hour: number
   );
 }
 
-function TractionChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: number) => void }) {
+function TractionChart({ e, hour, seek, pin }: { e: CityEngine; hour: number; seek: (h: number) => void; pin: Pinned | null }) {
   const tl = useTimeline(seek);
   const mins = e.scenario.mins, base = e.baseline.mins;
   const max = Math.max(4, ...base.map((m) => m.metro + m.regen), ...mins.map((m) => m.metro + m.regen)) * 1.1;
@@ -461,6 +466,7 @@ function TractionChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (
   return (
     <div className="cy-chart">
       <ul className="cy-legend">
+        {pin && <PinRow label="Pinned peak" a={Math.max(...pin.metro)} b={Math.max(...mins.map((q) => q.metro))} unit="MW" />}
         <li><span><i style={{ background: '#ff8a5c' }} />From the grid<b>{num(m.metro, 1)}</b></span></li>
         <li><span><i style={{ background: '#86c5da' }} />Regen reused<b>{num(m.regen, 1)}</b></span></li>
         <li><span><i style={{ background: '#ff5b4f' }} />Burnt in resistors<b>{num(m.burnt, 1)}</b></span></li>
@@ -474,6 +480,7 @@ function TractionChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (
           <polygon points={`0,${CH} ${series.grid} ${CW},${CH}`} fill="#ff8a5c" opacity={0.8} />
           <polyline points={series.burnt} fill="none" stroke="#ff5b4f" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
           {e.trips.size > 0 && <polyline points={series.base} className="cy-base" />}
+          {pin && <PinLine vals={pin.metro} max={max} />}
           <line x1={(hour / 24) * CW} x2={(hour / 24) * CW} y1={0} y2={CH} className="cy-head" />
         </svg>
         <Markers events={e.scenario.events} seek={seek} />
@@ -850,7 +857,7 @@ function TelSum({ e, h }: { e: CityEngine; h: number }) {
   return <>Signal for <b>{Math.round(t.served * 100)} %</b> of people · <b>{num(t.battery)}</b> on battery · <b>{num(t.down)}</b> dark</>;
 }
 
-function TelecomChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: number) => void }) {
+function TelecomChart({ e, hour, seek, pin }: { e: CityEngine; hour: number; seek: (h: number) => void; pin: Pinned | null }) {
   const tl = useTimeline(seek);
   const mins = e.telecom.mins, n = e.net.sites.length;
   const paths = useMemo(() => {
@@ -877,6 +884,7 @@ function TelecomChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h
   return (
     <div className="cy-chart">
       <ul className="cy-legend">
+        {pin && <PinRow label="Pinned lowest signal" a={Math.min(...pin.served)} b={Math.min(...mins.map((q) => q.served * 100))} unit="%" higherIsBetter />}
         <li><span><i style={{ background: '#ece6d8' }} />People with signal<b>{Math.round(m.served * 100)} %</b></span></li>
         {(['battery', 'genset', 'isolated', 'down'] as const).map((k) => <li key={k}><span><i style={{ background: COL[k] }} />{LAB[k]}<b>{num(m[k])}</b></span></li>)}
         <li className="cy-day"><span>Sites<b>{num(n)}</b></span><small>share of sites, stacked; line: people served</small></li>
@@ -886,6 +894,7 @@ function TelecomChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h
           <Axis />
           {paths.out.map((p) => <path key={p.k} d={p.d} fill={COL[p.k]} opacity={0.8} />)}
           <polyline points={paths.served} fill="none" stroke="#ece6d8" strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
+          {pin && <PinLine vals={pin.served} max={100} />}
           <line x1={(hour / 24) * CW} x2={(hour / 24) * CW} y1={0} y2={CH} className="cy-head" />
         </svg>
         <Markers events={e.scenario.events} seek={seek} />
@@ -904,7 +913,7 @@ function WaterSum({ e, h }: { e: CityEngine; h: number }) {
   return <>Full pressure for <b>{Math.round(q.full * 100)} %</b> · low <b>{Math.round(q.low * 100)} %</b> · dry <b>{Math.round(q.dry * 100)} %</b></>;
 }
 
-function Stack({ e, hour, seek, series, max, unit, legend }: { e: CityEngine; hour: number; seek: (h: number) => void; series: { key: string; label: string; colour: string; v: (m: number) => number }[]; max: number; unit: string; legend: React.ReactNode }) {
+function Stack({ e, hour, seek, series, max, unit, legend, pinVals }: { e: CityEngine; hour: number; seek: (h: number) => void; series: { key: string; label: string; colour: string; v: (m: number) => number }[]; max: number; unit: string; legend: React.ReactNode; pinVals?: number[] }) {
   const tl = useTimeline(seek);
   const paths = useMemo(() => {
     const acc = new Float64Array(361);
@@ -927,6 +936,7 @@ function Stack({ e, hour, seek, series, max, unit, legend }: { e: CityEngine; ho
         <svg ref={tl.ref} viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" onPointerDown={tl.onPointerDown} onPointerMove={tl.onPointerMove} onPointerUp={tl.onPointerUp} role="slider" aria-label="Time of day" aria-valuemin={0} aria-valuemax={24} aria-valuenow={hour}>
           <Axis />
           {paths.map((p) => <path key={p.key} d={p.d} fill={p.colour} opacity={0.85} />)}
+          {pinVals && <PinLine vals={pinVals} max={max} />}
           <line x1={(hour / 24) * CW} x2={(hour / 24) * CW} y1={0} y2={CH} className="cy-head" />
         </svg>
         <Markers events={e.scenario.events} seek={seek} />
@@ -936,7 +946,7 @@ function Stack({ e, hour, seek, series, max, unit, legend }: { e: CityEngine; ho
   );
 }
 
-function EvChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: number) => void }) {
+function EvChart({ e, hour, seek, pin }: { e: CityEngine; hour: number; seek: (h: number) => void; pin: Pinned | null }) {
   const mins = e.ev.mins;
   const series = useMemo(() => [
     { key: 'home', label: 'Home', colour: '#ffb04d', v: (m: number) => mins[m].home },
@@ -945,14 +955,15 @@ function EvChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: num
   ], [mins]);
   const max = Math.max(1, ...mins.map((q) => q.home + q.work + q.hub)) * 1.1;
   const q = mins[Math.min(1439, Math.floor(hour * 60))];
-  return <Stack e={e} hour={hour} seek={seek} series={series} max={max} unit={`${num(max)} MW`} legend={<>
+  return <Stack e={e} hour={hour} seek={seek} series={series} max={max} unit={`${num(max)} MW`} pinVals={pin?.ev} legend={<>
+    {pin && <PinRow label="Pinned peak" a={Math.max(...pin.ev)} b={Math.max(...mins.map((q2) => q2.home + q2.work + q2.hub))} unit="MW" />}
     {series.map((sr) => <li key={sr.key}><span><i style={{ background: sr.colour }} />{sr.label}<b>{num(sr.v(Math.min(1439, Math.floor(hour * 60))), 1)}</b></span></li>)}
     <li><span><i style={{ background: 'transparent', border: '1px solid #ece6d8' }} />Cars waiting<b>{num(q.queue)}</b></span></li>
     <li className="cy-day"><span>Today<b>{num(e.ev.dailyMWh)} MWh</b></span><small>{num(e.ev.evs)} electric cars</small></li>
   </>} />;
 }
 
-function WaterChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: number) => void }) {
+function WaterChart({ e, hour, seek, pin }: { e: CityEngine; hour: number; seek: (h: number) => void; pin: Pinned | null }) {
   const mins = e.water.mins;
   const series = useMemo(() => [
     { key: 'full', label: 'Full pressure', colour: '#5fa8d3', v: (m: number) => mins[m].full * 100 },
@@ -960,8 +971,43 @@ function WaterChart({ e, hour, seek }: { e: CityEngine; hour: number; seek: (h: 
     { key: 'dry', label: 'No water', colour: '#ff5b4f', v: (m: number) => mins[m].dry * 100 },
   ], [mins]);
   const q = mins[Math.min(1439, Math.floor(hour * 60))];
-  return <Stack e={e} hour={hour} seek={seek} series={series} max={100} unit="100 % of people" legend={<>
+  return <Stack e={e} hour={hour} seek={seek} series={series} max={100} unit="100 % of people" pinVals={pin?.full} legend={<>
+    {pin && <PinRow label="Pinned lowest full pressure" a={Math.min(...pin.full)} b={Math.min(...mins.map((q2) => q2.full * 100))} unit="%" higherIsBetter />}
     {series.map((sr) => <li key={sr.key}><span><i style={{ background: sr.colour }} />{sr.label}<b>{Math.round(sr.v(Math.min(1439, Math.floor(hour * 60))))} %</b></span></li>)}
     <li className="cy-day"><span>Pumping<b>{num(q.mw, 1)} MW</b></span><small>150 L per person per day</small></li>
   </>} />;
+}
+
+// ------------------------------------------------------------------ compare
+
+type Pinned = { label: string; day: number[]; metro: number[]; served: number[]; full: number[]; ev: number[] };
+
+function snapshot(e: CityEngine, mode: Mode): Pinned {
+  const o = e.opts;
+  const bits = [e.city.climate[o.season].label.replace(/ \(.*\)/, ''), o.day];
+  if (o.special && o.special !== 'none') bits.push(SPECIAL[o.special].label);
+  if (mode === 'metro') bits.push(`${o.peakHeadway / 60} min headway`, o.regen ? 'regen on' : 'regen off', o.reversible ? 'reversible TSS' : 'diode TSS');
+  if (mode === 'telecom') bits.push(`${o.batteryH} h batteries`, `${Math.round(o.gensetShare * 100)} % generators`);
+  if (mode === 'ev') bits.push(`${Math.round(o.evShare * 100)} % EVs`, o.smartCharging ? 'smart charging' : 'no smart charging');
+  if (mode === 'water') bits.push(`${o.tankHours} h tanks`, `${Math.round(o.pumpGenShare * 100)} % pump generators`);
+  if (e.trips.size) bits.push(`${e.trips.size} out of service`);
+  return {
+    label: bits.join(', '),
+    day: e.scenario.mins.map((q) => q.total),
+    metro: e.scenario.mins.map((q) => q.metro),
+    served: e.telecom.mins.map((q) => q.served * 100),
+    full: e.water.mins.map((q) => q.full * 100),
+    ev: e.ev.mins.map((q) => q.home + q.work + q.hub),
+  };
+}
+
+function PinLine({ vals, max }: { vals: number[]; max: number }) {
+  const pts = vals.filter((_, i) => i % 4 === 0).map((v, k) => `${((k * 4) / 1440) * CW},${CH - (v / max) * CH}`).join(' ');
+  return <polyline points={pts} className="cy-pin" />;
+}
+
+function PinRow({ label, a, b, unit, higherIsBetter = false }: { label: string; a: number; b: number; unit: string; higherIsBetter?: boolean }) {
+  const d = b - a;
+  const worse = higherIsBetter ? d < 0 : d > 0;
+  return <li className="cy-pinrow"><span><i style={{ background: 'transparent', border: '1.5px dashed #ece6d8' }} />{label}<b>{num(a, a < 10 ? 1 : 0)} {unit} <em className={worse ? 'up' : 'down'}>{d >= 0 ? '+' : '−'}{num(Math.abs(d), Math.abs(d) < 10 ? 1 : 0)}</em></b></span></li>;
 }

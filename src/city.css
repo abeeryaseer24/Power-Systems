@@ -369,3 +369,11 @@ circle.hp-dead { fill: #33445a; stroke: none; }
 }
 .dc-out .hp-steps { grid-area: auto; }
 .cy-city-main > * { grid-area: auto; }
+.cy-pin { fill: none; stroke: var(--porcelain); stroke-width: 1.4; stroke-dasharray: 6 4; opacity: 0.85; vector-effect: non-scaling-stroke; }
+.cy-pinrow em { font-style: normal; font-size: 12px; margin-left: 4px; }
+.cy-pinrow em.up { color: var(--trip); }
+.cy-pinrow em.down { color: var(--ok); }
+.cy-pinned { position: absolute; right: 22px; bottom: 270px; max-width: 360px; margin: 0; padding: 6px 10px; font-size: 12.5px; color: #d3cdbf; background: rgba(8, 16, 28, 0.75); border-left: 2px dashed var(--porcelain); }
+.cy-metro .cy-pinned { bottom: 430px; }
+.cy-nographs .cy-pinned { bottom: 118px; }
+@media (max-width: 900px) { .cy-pinned { left: 12px; right: 12px; top: 210px; bottom: auto; max-width: none; } }
