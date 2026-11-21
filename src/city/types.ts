@@ -40,7 +40,9 @@ export type DemandParams = {
   resBase: number; // kW per person, always on
   resAct: number; // kW per person at full evening activity
   scale: number; // calibration factor on the bottom-up total
-  targetPeak?: number; // if set, scale is fitted so a summer weekday peaks at this, MW
+  targetPeak?: number; // if set, scale is fitted so a design day peaks at this, MW
+  heatShare?: number; // share of homes heated electrically (cold cities)
+  peakSeason?: 'summer' | 'winter'; // which season the target peak belongs to
 };
 
 export type MetroParams = {

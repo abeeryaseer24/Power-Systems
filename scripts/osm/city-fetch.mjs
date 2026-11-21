@@ -62,12 +62,14 @@ export function tilesOf(c) {
 export async function fetchCity(c) {
   const bb = c.bbox.join(',');
   const T = '[out:json][timeout:240];';
-  await overpass(`city-${c.id}-metro`, `${T}(relation[route=${c.metro.route}](${bb}););out geom;node(r:"stop");out;node(r:"stop_entry_only");out;node(r:"stop_exit_only");out;`);
+  if (c.metro) await overpass(`city-${c.id}-metro`, `${T}(relation[route=${c.metro.route}](${bb}););out geom;node(r:"stop");out;node(r:"stop_entry_only");out;node(r:"stop_exit_only");out;`);
   await overpass(`city-${c.id}-subs`, `${T}(node[power=substation](${bb});way[power=substation](${bb}););out center tags;`);
   await overpass(`city-${c.id}-water`, `${T}(way[natural=water](${bb});relation[natural=water](${bb});way[waterway=riverbank](${bb});relation[waterway=riverbank](${bb}););out geom qt;`);
   await overpass(`city-${c.id}-landuse`, `${T}(way[landuse~"^(commercial|retail|industrial|railway|military)$"](${bb});way[amenity~"^(hospital|university|college)$"](${bb});way[leisure~"^(park|golf_course|stadium)$"](${bb});way[landuse~"^(grass|recreation_ground|cemetery|farmland|meadow)$"](${bb}););out geom qt;`);
   await overpass(`city-${c.id}-roads`, `${T}way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|motorway_link|trunk_link|primary_link)$"](${bb});out geom qt;`);
-  for (const t of tilesOf(c)) await overpass(`city-${c.id}-bld-${t.key}`, `${T}way[building](${t.bb});out tags geom qt;`);
+  // very large cities: bounding boxes instead of full outlines, about four times lighter
+  const out = c.light ? 'out tags bb qt;' : 'out tags geom qt;';
+  for (const t of tilesOf(c)) await overpass(`city-${c.id}-bld-${t.key}`, `${T}way[building](${t.bb});${out}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

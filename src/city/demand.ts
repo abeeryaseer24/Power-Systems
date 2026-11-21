@@ -113,7 +113,9 @@ export function districtLoad(c: CityData, d: District, h: number, inp: DayInputs
   const acShare = c.demand.acShare; // households with at least one AC unit
   // bedroom AC keeps running through hot nights, so cooling follows occupancy, not activity
   const cool = Math.max(0, T - 25.5) * 0.05 * acShare * (0.55 + 0.45 * occ) + Math.max(0, T - 24) * 0.01 * occ; // AC + fans, kW per person
-  const resKw = c.demand.resBase + c.demand.resAct * act + cool + 0.04 * dark * occ;
+  // electric heating in cold cities: heat pumps, storage and panel heaters below 15 °C
+  const heat = Math.max(0, 15 - T) * 0.035 * (c.demand.heatShare ?? 0) * (0.45 + 0.55 * occ);
+  const resKw = c.demand.resBase + c.demand.resAct * act + cool + heat + 0.04 * dark * occ;
   // special days reshape the activity curves
   const sp = inp.special ?? 'none';
   let resMul = 1, comMul = 1, indMul = 1, extra = 0;
@@ -142,7 +144,7 @@ export function districtLoad(c: CityData, d: District, h: number, inp: DayInputs
   const offOcc = hourly(OFFICE_OCC, h) * (we ? 0.35 : 1);
   const shopOcc = hourly(SHOP_OCC, h) * (we ? 1.1 : 1);
   const comOcc = 0.6 * offOcc + 0.4 * shopOcc;
-  const wm2 = 6 + 22 * comOcc + Math.max(0, T - 23) * 1.25 * (0.25 + 0.75 * comOcc);
+  const wm2 = 6 + 22 * comOcc + Math.max(0, T - 23) * 1.25 * (0.25 + 0.75 * comOcc) + Math.max(0, 12 - T) * 0.6 * (c.demand.heatShare ?? 0) * (0.3 + 0.7 * comOcc);
   const com = (k * d.comM2 * wm2 * comMul) / 1e6 + extra;
 
   const ind = d.indMW * hourly(IND_SHIFT, h) * (we ? 0.78 : 1) * (1 + Math.max(0, T - 30) * 0.008) * indMul;

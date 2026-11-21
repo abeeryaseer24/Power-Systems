@@ -169,9 +169,14 @@ function build(c) {
   const raw = [];
   for (const t of tilesOf(c)) {
     for (const el of read(`city-${c.id}-bld-${t.key}`).elements) {
-      if (!el.geometry || el.geometry.length < 4) continue;
-      const pts = geo(el.geometry);
-      const a = area(pts);
+      let pts, a;
+      if (el.geometry && el.geometry.length >= 4) { pts = geo(el.geometry); a = area(pts); }
+      else if (el.bounds) {
+        // bounding boxes only (the light download for very large cities): footprint ~ 75 % of the box
+        const [bx0, bz1] = P(el.bounds.minlat, el.bounds.minlon), [bx1, bz0] = P(el.bounds.maxlat, el.bounds.maxlon);
+        pts = [[bx0, bz0], [bx1, bz0], [bx1, bz1], [bx0, bz1]];
+        a = Math.abs((bx1 - bx0) * (bz1 - bz0)) * 0.75;
+      } else continue;
       if (a < 20 || a > 200000) continue;
       let cx = 0, cz = 0;
       for (const [x, z] of pts) { cx += x; cz += z; }
@@ -184,7 +189,7 @@ function build(c) {
       const ca = Math.cos(ang), sa = Math.sin(ang);
       let mu = Infinity, Mu = -Infinity, mv = Infinity, Mv = -Infinity;
       for (const [x, z] of pts) { const u = (x - cx) * ca + (z - cz) * sa, v = -(x - cx) * sa + (z - cz) * ca; mu = Math.min(mu, u); Mu = Math.max(Mu, u); mv = Math.min(mv, v); Mv = Math.max(Mv, v); }
-      const k = Math.sqrt(a / Math.max(1, (Mu - mu) * (Mv - mv)));
+      const k = el.bounds && !el.geometry ? Math.sqrt(0.75) : Math.sqrt(a / Math.max(1, (Mu - mu) * (Mv - mv)));
       const tg = el.tags ?? {};
       let levels = parseFloat(tg['building:levels']);
       const hgt = parseFloat(tg.height);
@@ -252,55 +257,56 @@ function build(c) {
     for (let i = 0; i < pts.length; i += 32000) streets.push({ pts: pts.slice(i, i + 32001), major });
   }
 
-  // ---------------- metro
-  const metroEls = read(`city-${c.id}-metro`).elements;
-  const rel = metroEls.filter((x) => x.type === 'relation');
+  // ---------------- metro: the longest few lines, one route relation per line (both directions share it)
   const lines = [];
-  if (rel.length) {
-    const r = rel[0];
-    const ways = (r.members ?? []).filter((m) => m.type === 'way' && m.geometry && (m.role === '' || m.role === 'route')).map((m) => geo(m.geometry));
-    let pathLine = simplify(chain(ways), 8);
+  if (c.metro) {
+    const metroEls = read(`city-${c.id}-metro`).elements;
     const stopsById = new Map(metroEls.filter((x) => x.type === 'node').map((x) => [x.id, x]));
-    const stops = [];
-    for (const m of r.members ?? []) {
-      if (m.type !== 'node' || !/stop/.test(m.role)) continue;
-      const nd = stopsById.get(m.ref);
-      const lat = nd?.lat ?? m.lat, lon = nd?.lon ?? m.lon;
-      if (lat == null) continue;
-      const [x, z] = P(lat, lon);
-      const nm = (nd?.tags?.['name:en'] ?? nd?.tags?.name ?? `Stop ${stops.length + 1}`).replace(/\s*(metro|mrt)?\s*station\s*$/i, '').trim();
-      const { s: ch, d } = chainageOf(pathLine, x, z);
-      if (d < 300 && !stops.some((q) => q.name === nm || Math.abs(q.s - ch) < 300)) stops.push({ name: nm, s: Math.round(ch) });
+    const groups = new Map();
+    for (const r of metroEls.filter((x) => x.type === 'relation')) {
+      const t = r.tags ?? {};
+      const key = (t.ref ?? t['name:en'] ?? t.name ?? String(r.id)).replace(/\s*[:(].*$/, '').trim();
+      const ways = (r.members ?? []).filter((m) => m.type === 'way' && m.geometry && (m.role === '' || m.role === 'route'));
+      let len = 0;
+      for (const w of ways) for (let i = 1; i < w.geometry.length; i++) { const [ax, az] = P(w.geometry[i - 1].lat, w.geometry[i - 1].lon), [bx, bz] = P(w.geometry[i].lat, w.geometry[i].lon); len += Math.hypot(bx - ax, bz - az); }
+      if (!groups.has(key) || groups.get(key).len < len) groups.set(key, { r, len, key });
     }
-    stops.sort((a, b) => a.s - b.s);
-    // trim the line to the first and last station (depot spurs and tails beyond)
-    const L = pathLine.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - pathLine[i - 1][0], p[1] - pathLine[i - 1][1]) : 0), 0);
-    if (stops.length >= 2) {
+    const chosen = [...groups.values()].sort((p, q) => q.len - p.len).slice(0, c.metro.maxLines ?? 1);
+    chosen.forEach(({ r, key }, li) => {
+      const ways = (r.members ?? []).filter((m) => m.type === 'way' && m.geometry && (m.role === '' || m.role === 'route')).map((m) => geo(m.geometry));
+      let pathLine = simplify(chain(ways), 8);
+      const stops = [];
+      for (const m of r.members ?? []) {
+        if (m.type !== 'node' || !/stop/.test(m.role)) continue;
+        const nd = stopsById.get(m.ref);
+        const lat = nd?.lat ?? m.lat, lon = nd?.lon ?? m.lon;
+        if (lat == null) continue;
+        const [x, z] = P(lat, lon);
+        const nm = (nd?.tags?.['name:en'] ?? nd?.tags?.name ?? `Stop ${stops.length + 1}`).replace(/\s*(metro|mrt|underground|subway)?\s*station\s*$/i, '').trim();
+        const { s: ch, d } = chainageOf(pathLine, x, z);
+        if (d < 300 && !stops.some((q) => q.name === nm || Math.abs(q.s - ch) < 250)) stops.push({ name: nm, s: Math.round(ch) });
+      }
+      stops.sort((p, q) => p.s - q.s);
+      if (stops.length < 3) return;
+      // trim the line to its first and last station (depot spurs and tails beyond)
       const s0 = stops[0].s, s1 = stops[stops.length - 1].s;
-      const cut = [];
-      let acc = 0;
       const at = (sv) => { let a2 = 0; for (let i = 1; i < pathLine.length; i++) { const [ax, az] = pathLine[i - 1], [bx, bz] = pathLine[i]; const l = Math.hypot(bx - ax, bz - az); if (a2 + l >= sv) { const t = (sv - a2) / l; return [ax + (bx - ax) * t, az + (bz - az) * t]; } a2 += l; } return pathLine[pathLine.length - 1]; };
-      cut.push(at(s0));
+      const cut = [at(s0)];
+      let acc = 0;
       for (let i = 1; i < pathLine.length; i++) { acc += Math.hypot(pathLine[i][0] - pathLine[i - 1][0], pathLine[i][1] - pathLine[i - 1][1]); if (acc > s0 && acc < s1) cut.push(pathLine[i]); }
       cut.push(at(s1));
       pathLine = cut;
       stops.forEach((q) => { q.s -= s0; });
-      console.log(`  metro: ${(L / 1000).toFixed(1)} km mapped, ${((s1 - s0) / 1000).toFixed(1)} km between ${stops.length} stations`);
-    }
-    // traction substations: every second station, positions modelled (not mapped in OSM)
-    const tss = stops.filter((_, i) => i % 2 === 0 || i === stops.length - 1).map((q) => {
-      const p = pathLine[0];
-      void p;
-      return { name: `${q.name} TSS`, s: q.s, sub: '', modelled: true };
+      console.log(`  metro ${key}: ${((s1 - s0) / 1000).toFixed(1)} km, ${stops.length} stations`);
+      // traction substations: every second station, positions modelled (not mapped in OSM)
+      const tss = stops.filter((_, i) => i % 2 === 0 || i === stops.length - 1).map((q) => ({ name: `${q.name} TSS`, s: q.s, sub: '', modelled: true }));
+      const line = { id: `l${li + 1}`, name: c.metro.lineName ? c.metro.lineName(key) : (r.tags?.['name:en'] ?? r.tags?.name ?? key).replace(/\s*[:(].*$/, ''), colour: r.tags?.colour ?? ['#ffb04d', '#86c5da', '#c9b8ff'][li % 3], path: pathLine.map(([x, z]) => [Math.round(x), Math.round(z)]), stations: stops, tss };
+      for (const t of line.tss) {
+        const pt = at(t.s + s0);
+        t.sub = subs[nearestSub(pt[0], pt[1])].id;
+      }
+      lines.push(line);
     });
-    const line = { id: 'l1', name: c.metro.name, colour: rel[0].tags?.colour ?? '#006E34', path: pathLine.map(([x, z]) => [Math.round(x), Math.round(z)]), stations: stops, tss };
-    // feed each TSS from the nearest grid substation
-    for (const t of line.tss) {
-      let acc2 = 0, pt = line.path[0];
-      for (let i = 1; i < line.path.length; i++) { const l = Math.hypot(line.path[i][0] - line.path[i - 1][0], line.path[i][1] - line.path[i - 1][1]); if (acc2 + l >= t.s) { const f = (t.s - acc2) / l; pt = [line.path[i - 1][0] + (line.path[i][0] - line.path[i - 1][0]) * f, line.path[i - 1][1] + (line.path[i][1] - line.path[i - 1][1]) * f]; break; } acc2 += l; }
-      t.sub = subs[nearestSub(pt[0], pt[1])].id;
-    }
-    lines.push(line);
   }
 
   // ---------------- districts
@@ -366,16 +372,17 @@ function build(c) {
     id: c.id, name: c.name, country: c.country, kind: 'real', lat: c.center[0], bounds,
     population: c.population,
     notes: [
-      `Buildings, storeys, land use, streets, water, ${c.metro.name} and its stations, and the substations come from OpenStreetMap (© OpenStreetMap contributors, ODbL).`,
+      `Buildings, storeys, land use, streets, water, ${c.metro ? 'metro lines and stations, ' : ''}and the substations come from OpenStreetMap (© OpenStreetMap contributors, ODbL).`,
       `Population: ${c.populationSource}, spread over residential floor area.`,
       `${Math.round((100 * raw.filter((b) => b.imputed).length) / raw.length)} % of buildings have no storey count in OpenStreetMap; theirs is estimated from tagged neighbours.`,
       `Service areas are split by nearest grid substation, not from real feeder maps. Only ${subs.length} grid substations inside the city are mapped in OpenStreetMap (the real network has many more), so each area is large.`,
-      'Traction substation positions on the metro are modelled; they are not mapped in OpenStreetMap.',
+      ...(c.metro ? ['Traction substation positions on the metro are modelled; they are not mapped in OpenStreetMap.'] : []),
+      ...(c.extraNotes ?? []),
       c.peakSource,
     ],
     climate: c.climate,
     demand: c.demand,
-    metro: { voltage: c.metro.voltage, E: c.metro.E ?? 1650, capacity: c.metro.capacity, vmax: c.metro.vmax, peakHeadway: c.metro.peakHeadway, tssRating: c.metro.tssRating ?? 5, service: c.metro.service, peaks: c.metro.peaks, offpeak: c.metro.offpeak, interchange: c.metro.interchange },
+    metro: c.metro ? { voltage: c.metro.voltage, E: c.metro.E ?? Math.round(c.metro.voltage * 1.1), capacity: c.metro.capacity, vmax: c.metro.vmax, peakHeadway: c.metro.peakHeadway, tssRating: c.metro.tssRating ?? 5, service: c.metro.service, peaks: c.metro.peaks, offpeak: c.metro.offpeak, interchange: c.metro.interchange } : { voltage: 1500, E: 1650, capacity: 1000, vmax: 20, peakHeadway: 300, tssRating: 5 },
     districts,
     subs: subs.map(({ short, ...q }) => q),
     lines,

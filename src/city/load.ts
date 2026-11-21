@@ -51,7 +51,7 @@ export async function loadCity(id: string): Promise<CityData> {
 function calibrate(c: CityData) {
   const T = c.demand.targetPeak;
   if (!T) return;
-  const inp = { season: 'summer' as const, day: 'weekday' as const, heat: 0 };
+  const inp = { season: (c.demand.peakSeason ?? 'summer'), day: 'weekday' as const, heat: 0 };
   for (let it = 0; it < 3; it++) {
     let best = 0, bh = 0;
     for (let m = 0; m < 1440; m += 10) {
