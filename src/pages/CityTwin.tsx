@@ -711,7 +711,7 @@ function Inspector({ sel, e, now, mode, onClose, onFocus, onTrip, trips, onLook,
     body = <Rows rows={[['Chainage', `${num(st.s / 1000, 2)} km`], ['Platform', '150 m, elevated, 13 m above street'], ['Dwell', '25–50 s, longer at the peak']]} />;
   }
   return (
-    <aside className="cy-insp" aria-label="Inspector">
+    <aside className={`cy-insp ${sel ? '' : 'idle'}`} aria-label="Inspector">
       <p className="cy-kicker">{kicker}</p>
       <h2>{title}</h2>
       {body}

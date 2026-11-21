@@ -324,3 +324,48 @@ circle.hp-dead { fill: #33445a; stroke: none; }
 .cy-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .cy-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.03em; padding: 2px 8px 2px 13px; margin: -10px 0 0; color: var(--night); background: var(--porcelain); clip-path: polygon(7px 0, 100% 0, 100% 100%, 7px 100%, 0 50%); transition: opacity 0.25s; }
 .cy-insp-act .cy-look { background: var(--sodium) !important; color: var(--night); border-color: var(--sodium) !important; }
+
+/* ---------------------------------------------------------------- phones */
+@media (max-width: 900px) {
+  .cy-title { left: 12px; right: 12px; top: 10px; }
+  .cy-title h1 { font-size: 34px; }
+  .cy-switch { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .cy-switch::-webkit-scrollbar { display: none; }
+  .cy-switch a { flex: 0 0 auto; white-space: nowrap; }
+  .cy-tools, .cy-metro .cy-tools, .cy-nographs .cy-tools { top: 128px; bottom: auto; left: 12px; right: 12px; justify-content: flex-start; }
+  .cy-tools .pv-cut, .cy-tools .pv-seg button { font-size: 13px; padding: 6px 9px; }
+  .cy-insp.idle { display: none; }
+  .cy-insp, .cy-metro .cy-insp { top: auto; bottom: 312px; left: 12px; right: 12px; width: auto; max-height: 38vh; }
+  .cy-nographs .cy-insp, .cy-nographs.cy-metro .cy-insp { bottom: 132px; max-height: 46vh; }
+  .cy-strip { padding: 4px 12px 10px; }
+  .cy-controls { gap: 8px; padding: 10px 0 6px; }
+  .cy-clock { font-size: 24px; min-width: 64px; }
+  .cy-metro .cy-clock { min-width: 96px; }
+  .cy-controls .pv-seg button { padding: 5px 8px; font-size: 13px; }
+  .cy-tour { top: 172px; left: 12px; right: 12px; width: auto; max-height: 46vh; overflow: auto; }
+  .cy-inputs { top: 172px; max-height: calc(100% - 330px); }
+  .cy-schem { bottom: 286px; }
+  .cy-schem svg { height: 92px; }
+}
+@media (max-width: 900px) {
+  .cy-strip .cy-legend { display: none; }
+  .cy-schem { bottom: 248px; }
+  .cy-insp, .cy-metro .cy-insp { bottom: 256px; }
+  .cy-metro .cy-insp { bottom: 392px; max-height: 26vh; }
+  .cy-note { display: none; }
+}
+@media (max-width: 760px) {
+  .bo-page, .hp-page, .dc-page { padding: 14px 12px 0; }
+  .bo-graph, .hp-diagram { overflow-x: auto; }
+  .bo-g { min-width: 700px; }
+  .hp-sld { min-width: 640px; max-height: none; }
+  .hp-scale { position: static; margin-bottom: 8px; }
+  .bo-lanes-in { grid-template-columns: 88px 1fr; gap: 6px; }
+  .bo-lab { font-size: 12px; }
+  .hp-bar { gap: 8px 12px; font-size: 12.5px; }
+  .hp-bar input[type='range'] { flex-basis: 100%; }
+  .dc-chain span { font-size: 14px; padding: 7px 10px; margin-right: 20px; }
+  .dc-scale b { font-size: 28px; }
+}
+.dc-out .hp-steps { grid-area: auto; }
+.cy-city-main > * { grid-area: auto; }
