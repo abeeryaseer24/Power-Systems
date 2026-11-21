@@ -25,7 +25,11 @@ export default function Blackout() {
       if (!alive) return;
       setCity(c);
       await new Promise((r) => setTimeout(r, 30));
-      eng.current = new CityEngine(c);
+      const e = new CityEngine(c, {}, { deferred: true });
+      const { rerunDay } = await import('../city/remote');
+      await rerunDay(e, 12);
+      if (!alive) return;
+      eng.current = e;
       setCas(runCascade(c, eng.current, o));
     })();
     return () => { alive = false; };

@@ -58,8 +58,10 @@ export default function CityTwin({ mode }: { mode: Mode }) {
       setBusy(`Simulating a day in ${c.name}`);
       await new Promise((r) => setTimeout(r, 40));
       if (!alive || !host.current) return;
-      const e = new CityEngine(c);
-      e.seek(mode === 'metro' ? 8.1 : 17.5);
+      const e = new CityEngine(c, {}, { deferred: true });
+      const { rerunDay } = await import('../city/remote');
+      await rerunDay(e, mode === 'metro' ? 8.1 : 17.5);
+      if (!alive || !host.current) return;
       eng.current = e;
       setOpts({ ...e.opts });
       scene = new TwinScene(host.current, c, { view: mode === 'metro' && c.lines.length ? 'metro' : 'city' });
@@ -126,17 +128,19 @@ export default function CityTwin({ mode }: { mode: Mode }) {
     return () => removeEventListener('keydown', key);
   }, []);
 
-  const rerun = useCallback((fn: (e: CityEngine) => void, msg = 'Re-running the day') => {
+  // change the inputs here, re-run the whole day in the worker, then adopt it
+  const rerun = useCallback(async (fn: (e: CityEngine) => void, msg = 'Re-running the day') => {
     const e = eng.current;
     if (!e) return;
     setBusy(msg);
-    setTimeout(() => {
-      fn(e);
-      setOpts({ ...e.opts });
-      setTrips([...e.trips.keys()]);
-      lastEv.current = e.hour;
-      setBusy('');
-    }, 40);
+    fn(e);
+    const { rerunDay } = await import('../city/remote');
+    await rerunDay(e, e.hour);
+    if (eng.current !== e) return;
+    setOpts({ ...e.opts });
+    setTrips([...e.trips.keys()]);
+    lastEv.current = e.hour;
+    setBusy('');
   }, []);
 
   const seek = (h: number) => {
@@ -194,9 +198,9 @@ export default function CityTwin({ mode }: { mode: Mode }) {
 
       {ready && e && now && minute && opts && (
         <>
-          <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win), 'Simulating the outage')} onOpts={(o) => rerun((en) => en.setOpts(o))} />
+          <Captions mode={mode} e={e} now={now} minute={minute} feed={feed} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false), 'Simulating the outage')} onOpts={(o) => rerun((en) => en.setOpts(o, false))} />
           <Inspector sel={sel} e={e} now={now} mode={mode} onClose={() => setSel(null)} onFocus={(p) => { const v = scn.current?.posOf(p); if (v) scn.current!.focus(v, p.type === 'district' ? 2600 : 700); }}
-            onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win), on ? 'Taking it out of service' : 'Back in service')} trips={trips} />
+            onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false), on ? 'Taking it out of service' : 'Back in service')} trips={trips} />
 
           <div className="cy-tools">
             <div className="pv-seg" role="group" aria-label="Camera">
@@ -207,7 +211,7 @@ export default function CityTwin({ mode }: { mode: Mode }) {
             {mode === 'metro' && <button className={`pv-cut ${flow ? 'on' : ''}`} onClick={() => setFlow(!flow)} aria-pressed={flow}>Current flow</button>}
             <button className={`pv-cut ${panel === 'inputs' ? 'on' : ''}`} onClick={() => setPanel(panel === 'inputs' ? null : 'inputs')} aria-expanded={panel === 'inputs'}>Model inputs</button>
           </div>
-          {panel === 'inputs' && <Inputs city={e.city} mode={mode} opts={opts} trips={trips} onOpts={(o) => rerun((en) => en.setOpts(o))} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win))} onClose={() => setPanel(null)} />}
+          {panel === 'inputs' && <Inputs city={e.city} mode={mode} opts={opts} trips={trips} onOpts={(o) => rerun((en) => en.setOpts(o, false))} onTrip={(id, on, win) => rerun((en) => en.trip(id, on, win, false))} onClose={() => setPanel(null)} />}
 
           {mode === 'metro' && graphs && <LineSchematic e={e} line={line} setLine={setLine} sel={sel} setSel={setSel} />}
 

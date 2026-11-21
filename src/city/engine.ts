@@ -195,6 +195,7 @@ function designRatings(x: Ctx) {
 }
 
 export type DayRun = { mins: Minute[]; events: CityEvent[] };
+export type EngineRuns = { baseline: DayRun; scenario: DayRun; cps: { t: number; state: string }[]; ev: EvRun; water: WaterRun; telecom: TelecomRun };
 
 export class CityEngine {
   opts: CityOpts;
@@ -217,18 +218,20 @@ export class CityEngine {
   get stations() { return (this._st ??= buildStations(this.city)); }
   private acc = 0;
 
-  constructor(public city: CityData, opts: Partial<CityOpts> = {}) {
+  ready = false;
+
+  constructor(public city: CityData, opts: Partial<CityOpts> = {}, mode: { deferred?: boolean } = {}) {
     const x = (this.x = makeCtx(city));
     this.opts = { ...DEFAULT_OPTS, peakHeadway: city.metro.peakHeadway, ...opts };
     this.ratings = designRatings(x);
     for (const s of x.c.subs) this.graph.add(s.id, s.name);
     for (const d of x.c.districts) this.graph.add(`d:${d.id}`, d.name, [d.sub]);
     x.tssList.forEach((t) => this.graph.add(`tss:${t.line}:${t.idx}`, t.name, [t.sub]));
-    this.recompute(8);
+    if (!mode.deferred) this.recompute(8);
   }
 
-  /** Re-run the day after a change to the inputs or the trips, then return to hour h. */
-  recompute(h = this.hour) {
+  /** Everything the heavy day run produces: plain data, so a Web Worker can compute it. */
+  computeRuns(): EngineRuns {
     const x = this.x;
     // EV charging and water pumping first: they add load to the day run
     const evBase = runEv(this.city, this.hubs, this.opts, () => true);
@@ -236,21 +239,36 @@ export class CityEngine {
     const exBase: Extra = { evD: evBase.districtMW, water: Float32Array.from(wBase.mins, (q) => q.mw) };
     const down = this.downByMinute();
     const upFn = (m: number, d: number) => !down[m].has(this.city.districts[d].sub);
-    this.ev = this.trips.size ? runEv(this.city, this.hubs, this.opts, upFn) : evBase;
-    this.water = this.trips.size ? runWater(this.city, this.stations, this.opts, upFn) : wBase;
-    const exSc: Extra = this.trips.size ? { evD: this.ev.districtMW, water: Float32Array.from(this.water.mins, (q) => q.mw) } : exBase;
+    const ev = this.trips.size ? runEv(this.city, this.hubs, this.opts, upFn) : evBase;
+    const water = this.trips.size ? runWater(this.city, this.stations, this.opts, upFn) : wBase;
+    const exSc: Extra = this.trips.size ? { evD: ev.districtMW, water: Float32Array.from(water.mins, (q) => q.mw) } : exBase;
     const base = runDay(x, this.opts, new Map(), this.ratings, exBase);
-    this.baseline = { mins: base.mins, events: findEvents(x, base.mins, this.opts, new Map(), this.ratings) };
+    const baseline = { mins: base.mins, events: findEvents(x, base.mins, this.opts, new Map(), this.ratings) };
+    let scenario = baseline, cps = base.cps;
     if (this.trips.size) {
       const sc = runDay(x, this.opts, this.trips, this.ratings, exSc);
-      this.scenario = { mins: sc.mins, events: findEvents(x, sc.mins, this.opts, this.trips, this.ratings) };
-      this.cps = sc.cps;
-    } else {
-      this.scenario = this.baseline;
-      this.cps = base.cps;
+      scenario = { mins: sc.mins, events: findEvents(x, sc.mins, this.opts, this.trips, this.ratings) };
+      cps = sc.cps;
     }
-    this.runTelecom();
+    const telecom = runTelecom(this.city, this.net, this.opts, upFn);
+    return { baseline, scenario, cps, ev, water, telecom };
+  }
+
+  /** Take a finished day run (from this thread or a worker) and return to hour h. */
+  adopt(r: EngineRuns, h = this.hour) {
+    this.baseline = r.baseline;
+    this.scenario = r.scenario;
+    this.cps = r.cps;
+    this.ev = r.ev;
+    this.water = r.water;
+    this.telecom = r.telecom;
+    this.ready = true;
     this.seek(h);
+  }
+
+  /** Re-run the day after a change to the inputs or the trips, then return to hour h. */
+  recompute(h = this.hour) {
+    this.adopt(this.computeRuns(), h);
   }
 
   /** The mobile network against the same outages, minute by minute. */
@@ -266,15 +284,16 @@ export class CityEngine {
     this.telecom = runTelecom(c, this.net, this.opts, (m, d) => !down[m].has(c.districts[d].sub));
   }
 
-  setOpts(o: Partial<CityOpts>) {
+  /** Change inputs; run = false leaves the re-run to the caller (e.g. a worker). */
+  setOpts(o: Partial<CityOpts>, run = true) {
     Object.assign(this.opts, o);
-    this.recompute();
+    if (run) this.recompute();
   }
 
-  trip(id: string, on: boolean, win: [number, number] = WHOLE_DAY) {
+  trip(id: string, on: boolean, win: [number, number] = WHOLE_DAY, run = true) {
     if (on) this.trips.set(id, win);
     else this.trips.delete(id);
-    this.recompute();
+    if (run) this.recompute();
   }
 
   get hour() {
