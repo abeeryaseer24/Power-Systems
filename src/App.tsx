@@ -31,13 +31,15 @@ const Trailer = lazy(() => import('./pages/Trailer'));
 const Plants = lazy(() => import('./pages/Plants'));
 const ControlRoomPage = lazy(() => import('./pages/ControlRoomPage'));
 const Fallout = lazy(() => import('./pages/Fallout'));
+const Cities = lazy(() => import('./pages/Cities'));
+const CityTwin = lazy(() => import('./pages/CityTwin'));
 
 export default function App() {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
-  const chrome = (!pathname.startsWith('/control') || pathname === '/control-room') && !/^\/control-room\/./.test(pathname) && !/^\/(atlas|blackouts|documentary|plants|fallout)\/./.test(pathname) && !pathname.startsWith('/what-if') && !pathname.startsWith('/black-start') && !pathname.startsWith('/dhaka-tonight');
+  const chrome = (!pathname.startsWith('/control') || pathname === '/control-room') && !/^\/control-room\/./.test(pathname) && !/^\/(atlas|blackouts|documentary|plants|fallout)\/./.test(pathname) && !/^\/city(\/|$)/.test(pathname) && !pathname.startsWith('/what-if') && !pathname.startsWith('/black-start') && !pathname.startsWith('/dhaka-tonight');
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
@@ -81,6 +83,9 @@ export default function App() {
           <Route path="/control-room/:id" element={<ControlRoomPage />} />
           <Route path="/fallout" element={<Fallout />} />
           <Route path="/fallout/:id" element={<Fallout />} />
+          <Route path="/cities" element={<Cities />} />
+          <Route path="/city" element={<CityTwin key="day" mode="day" />} />
+          <Route path="/city/metro" element={<CityTwin key="metro" mode="metro" />} />
           <Route path="/course" element={<Course />} />
           <Route path="/course/:id" element={<Course />} />
           <Route path="/nuclear/:id" element={<Nuclear />} />
