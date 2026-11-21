@@ -36,6 +36,9 @@ const CityTwin = lazy(() => import('./pages/CityTwin'));
 const Hospital = lazy(() => import('./pages/Hospital'));
 const Blackout = lazy(() => import('./pages/Blackout'));
 const DataCentre = lazy(() => import('./pages/DataCentre'));
+const Launch = lazy(() => import('./pages/Launch'));
+const Orbit = lazy(() => import('./pages/Orbit'));
+const Mars = lazy(() => import('./pages/Mars'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -87,6 +90,9 @@ export default function App() {
           <Route path="/fallout" element={<Fallout />} />
           <Route path="/fallout/:id" element={<Fallout />} />
           <Route path="/cities" element={<Cities />} />
+          <Route path="/frontier/launch" element={<Launch />} />
+          <Route path="/frontier/orbit" element={<Orbit />} />
+          <Route path="/frontier/mars" element={<Mars />} />
           <Route path="/city" element={<Navigate to="/city/meridia" replace />} />
           <Route path="/city/metro" element={<Navigate to="/city/meridia/metro" replace />} />
           <Route path="/city/:id" element={<CityTwinRoute mode="day" />} />

@@ -33,6 +33,14 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
     ],
   },
   {
+    label: 'Frontier',
+    items: [
+      { to: '/frontier/launch', label: 'Launch day', note: 'The power behind a heavy rocket launch' },
+      { to: '/frontier/orbit', label: 'Grid in orbit', note: 'Sixteen sunsets a day on a space station' },
+      { to: '/frontier/mars', label: 'Mars microgrid', note: 'Riding out a global dust storm' },
+    ],
+  },
+  {
     label: 'Engineering',
     items: [
       { to: '/protection', label: 'Protection', note: 'Look through a distance relay’s eyes' },

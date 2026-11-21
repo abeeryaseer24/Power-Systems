@@ -205,3 +205,16 @@ describe('special days', () => {
     expect(tot(22.5, 'gp') - tot(22.5, 'none')).toBeGreaterThan(20);
   });
 });
+
+describe('frontier', () => {
+  it('eclipse, launch power and the Mars storm behave', async () => {
+    const { eclipseFraction, marsRun, DEFAULT_MARS } = await import('../frontier/space');
+    const { jetPowerGW } = await import('../frontier/launch');
+    expect(eclipseFraction(0) * 92.7).toBeGreaterThan(33);
+    expect(eclipseFraction(0) * 92.7).toBeLessThan(39);
+    expect(eclipseFraction(75)).toBe(0);
+    expect(jetPowerGW()).toBeGreaterThan(80);
+    const solar = marsRun(DEFAULT_MARS), nuke = marsRun({ ...DEFAULT_MARS, reactors: 4 });
+    expect(nuke.shedH).toBeLessThan(solar.shedH);
+  });
+});
