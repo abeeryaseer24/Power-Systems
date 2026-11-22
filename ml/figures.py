@@ -185,5 +185,42 @@ def fig_gnn():
     s.save('fig6_gnn_folds.svg')
 
 
+# ---------------------------------------------------------------- Fig. 7: Bangladesh load shedding
+def fig_loadshed():
+    d = load('public/data/loadshed/bd_backtest.json')
+    m, r = d['monthly'], d['results']
+    s = Svg(760, 330)
+    # left: monthly mean absolute error of three forecasters, with the month's mean shed
+    x0, x1, y0, y1 = 60, 470, 34, 240
+    top = 1800
+    Y = axes(s, x0, y0, x1, y1, 0, top, (0, 600, 1200, 1800), label='MW')
+    s.text((x0 + x1) / 2, 18, 'Evening-peak load shed: monthly mean absolute error', 11, 'middle', INK, 'bold')
+    bw = (x1 - x0) / len(m)
+    for i, row in enumerate(m):
+        bx = x0 + i * bw
+        for j, (k, col) in enumerate((('nldc', C['neso']), ('persist', C['base']), ('model', C['ours']))):
+            v = min(row[k], top)
+            s.rect(bx + 2 + j * (bw - 4) / 3, Y(v), (bw - 4) / 3 - 0.5, y1 - Y(v), col)
+        if i % 3 == 0:
+            s.text(bx + bw / 2, y1 + 13, row['month'], 8.5, 'middle', MUTE)
+    s.poly([(x0 + (i + 0.5) * bw, Y(min(row['actual'], top))) for i, row in enumerate(m)], INK, 1.4, '3 2')
+    for i, (lab, col) in enumerate((('NLDC plan', C['neso']), ('Same as yesterday', C['base']), ('Model', C['ours']))):
+        s.rect(x0 + 10 + i * 120, 262, 11, 11, col); s.text(x0 + 26 + i * 120, 271, lab, 10)
+    s.line(x0 + 370, 267, x0 + 392, 267, INK, 1.4, '3 2'); s.text(x0 + 396, 271, 'mean shed', 10)
+    # right: share of shedding evenings called, and false alarms
+    a = r['any']
+    ox, oy = 530, 50
+    s.text(640, 18, 'Will there be shedding tonight?', 11, 'middle', INK, 'bold')
+    for i, (k, lab) in enumerate((('nldc', 'NLDC plan'), ('persist', 'Yesterday'), ('model', 'Model'))):
+        y = oy + i * 62
+        s.text(ox, y, lab, 10.5, 'start', INK, 'bold')
+        s.rect(ox, y + 6, a[f'hit_{k}'] * 150, 14, C['ours'] if k == 'model' else C['neso'] if k == 'nldc' else C['base'])
+        s.text(ox + a[f'hit_{k}'] * 150 + 4, y + 17, f"{a[f'hit_{k}'] * 100:.0f} % called", 9.5)
+        s.rect(ox, y + 24, a[f'false_{k}'] * 150, 10, '#d9a3a3')
+        s.text(ox + a[f'false_{k}'] * 150 + 4, y + 33, f"{a[f'false_{k}'] * 100:.0f} % false alarms", 9.5, 'start', MUTE)
+    s.text(380, 312, f"{r['test_days']} test days, {r['from']} to {r['to']}; models retrained monthly on earlier days only", 10, 'middle', MUTE)
+    s.save('fig7_loadshed.svg')
+
+
 if __name__ == '__main__':
-    fig_grids(); fig_forecast(); fig_surrogate(); fig_dispatch(); fig_gnn()
+    fig_grids(); fig_forecast(); fig_surrogate(); fig_dispatch(); fig_gnn(); fig_loadshed()

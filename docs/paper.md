@@ -1,12 +1,12 @@
-# Tested on What They Have Never Seen: Four Machine-Learning Studies for Power-System Operation on Open, Map-Derived Grids
+# Tested on What They Have Never Seen: Five Machine-Learning Studies for Power-System Operation on Open, Map-Derived Grids
 
-*Draft, 22 November 2026. Author: Talha Yaseer Abeer. Every number and figure in this draft comes from the result files in the repository (see Section 8).*
+*Draft, 22 November 2026, with Study E added the same evening. Author: Talha Yaseer Abeer. Every number and figure in this draft comes from the result files in the repository (see Section 9).*
 
 ---
 
 ## Abstract
 
-Machine-learning methods for power-system operation are usually evaluated on the same networks and conditions they were trained on, which says little about how they behave when the grid, the contingency or the day is new. We built an open platform: a dynamic simulator with AC power flow, protection and frequency control, running on 17 real transmission grids reconstructed from OpenStreetMap. On it we ran four studies, each judged on data its model never saw.
+Machine-learning methods for power-system operation are usually evaluated on the same networks and conditions they were trained on, which says little about how they behave when the grid, the contingency or the day is new. We built an open platform: a dynamic simulator with AC power flow, protection and frequency control, running on 17 real transmission grids reconstructed from OpenStreetMap. On it, and on two real operational datasets, we ran five studies, each judged on data its model never saw.
 
 1. **Day-ahead demand forecasting for Great Britain.** A gradient-boosted model was backtested over 46,478 half-hours from March 2024 to October 2026, retrained monthly and fed only the weather forecasts available at the time. It reaches a 3.52 % mean absolute percentage error (MAPE), against 2.79 % for the system operator's (NESO's) published forecast. Averaging the two gives 2.64 %, better than either alone. Conformal calibration raises the coverage of the 10–90 % range from 59 % to 79 %.
 2. **A learned AC power flow for N-1 screening.** The network's inputs describe each outage only through classical DC distribution factors, never the line's identity. On outages withheld from training it predicts line loadings with a mean error of 0.04–0.52 % of rating, against 0.22–1.83 % for DC screening. It catches 96–99.6 % of overloads, and screens a full N-1 set 200–770 times faster than the fast decoupled load flow (FDLF).
@@ -16,7 +16,9 @@ Machine-learning methods for power-system operation are usually evaluated on the
    - A learned terminal value of stored energy inside the optimiser gives a small but significant saving: $3.8 k/day, 95 % CI $2.8–4.7 k.
 4. **Cascade prediction with a graph neural network (GNN)** on 9,929 simulated cascades across 17 grids, evaluated with every grid held out once. On unseen grids the GNN predicts the share of load lost with 23.7 % mean error, against 31.7 % for gradient boosting on screening features, and major events with an AUC of 0.82 against 0.74. Bus-level boosted trees remain slightly better at naming the substations that lose supply (AUC 0.86 against 0.83).
 
-Across the four studies, the gap between in-distribution and out-of-distribution accuracy is large, method-dependent, and invisible without the right test.
+5. **Same-day load-shedding prediction for Bangladesh** from 690 consecutive daily reports of the national load dispatch centre (NLDC), tested on 508 later days. The operator's own morning plan foresaw shedding on only 37 % of the 335 evenings that had it. Learning adds little on the megawatts: a correction to NLDC's planned figure reduces the mean error from 257 to 242 MW, not significantly, while simply averaging the plan with the previous evening's outcome gives 230 MW (significant, 95 % CI 10–44 MW better). On whether any shedding will happen, the previous evening is already as good as the model (AUC 0.89 against 0.88).
+
+Across the five studies, the gap between in-distribution and out-of-distribution accuracy is large, method-dependent, and invisible without the right test.
 
 ---
 
@@ -29,12 +31,12 @@ This work makes that test the centre of the evaluation. Its contributions are:
 1. **An open simulation platform** of 17 transmission grids rebuilt from OpenStreetMap.
    - Each grid has an AC power flow (FDLF with a Newton–Raphson reference), governor droop and AGC, under-frequency load shedding, thermal, distance and out-of-step protection, voltage-collapse detection, and an external equivalent for interconnections.
    - It runs in a web browser, so every result can be inspected interactively.
-2. **Four studies, each with a held-out test built for its task:** later months for forecasting, withheld outages for power flow, unseen days for dispatch, and unseen grids for cascades.
+2. **Five studies, each with a held-out test built for its task:** later months for forecasting and for load shedding, withheld outages for power flow, unseen days for dispatch, and unseen grids for cascades.
 3. **Physics-informed designs that generalise better than black boxes:**
    - DC distribution factors as the outage encoding for the power-flow surrogate;
    - hindsight imitation as the warm start for reinforcement learning;
    - learned storage values inside an optimiser.
-4. **Negative results reported alongside positive ones.** These include a residual RL-on-MPC agent that never beat its starting point, and five regularisation strategies that barely moved the GNN's bus-level generalisation.
+4. **Negative results reported alongside positive ones.** These include a residual RL-on-MPC agent that never beat its starting point, five regularisation strategies that barely moved the GNN's bus-level generalisation, and a load-shedding model that does not significantly beat a two-line average of the operator's plan and yesterday's outcome.
 
 ## 2. Related work
 
@@ -57,6 +59,8 @@ This work makes that test the centre of the evaluation. Its contributions are:
   - RL can match MPC in multi-energy systems given adequate constraint handling and pre-training [19];
   - demonstrations from simple rules can improve RL battery dispatch [20].
 - We add a case with realistic forecast error and a perfect-foresight floor. Imitation of hindsight-optimal decisions is what makes RL competitive with MPC, and the only *significant* gain over MPC comes from machine learning placed inside the optimiser, as a learned value of stored energy.
+
+**Supply shortfalls and load shedding.** Most load-forecasting work, including the competitions above, assumes demand is served. In supply-constrained systems the operational question is different: how much demand will *not* be served tonight. We found few published, out-of-sample studies of same-day or day-ahead load-shedding prediction from an operator's own daily reports, and none that scores against the operator's published plan; this needs a proper literature search before submission. Study E is such a test, on Bangladesh's national grid.
 
 **Graph neural networks for cascading failures.**
 - GNNs have been used:
@@ -344,13 +348,71 @@ Making the features grid-independent (loads relative to the grid's average, angl
 
 ---
 
-## 8. Threats to validity and reproducibility
+## 8. Study E: same-day load-shedding prediction (Bangladesh)
+
+### 8.1 Data
+
+Power Grid Bangladesh PLC publishes a daily operation report from its National Load Dispatch Centre [25]. We downloaded and parsed every report in spreadsheet form: 690 consecutive days, 31 December 2024 to 20 November 2026, with no gaps. Each gives:
+- **the day's actuals:** evening-peak load shed and demand for each of nine zones, peak and minimum generation, energy served and not served, the fuel mix, imports, gas delivered to power plants and the maximum temperature;
+- **the plan for the next day:** forecast peak demand and generation, forecast temperature, and planned load shedding by zone;
+- **a plant-by-plant table** of present capacity, expected availability and the reason for any shortfall ("gas shortage", "liquid fuel shortage", maintenance), which we aggregate into megawatts out by reason.
+
+Reports up to 22 January 2025 state energy in MWh rather than GWh; the parser detects and rescales them.
+
+Shedding is frequent and uneven. It occurred at the evening peak on 424 of the 690 days, exceeded 1,000 MW on 75, and peaked at 3,047 MW. From April 2026 it surged: the monthly mean rose from about 100 MW in 2025 to 1,704 MW in August 2026.
+
+### 8.2 Information set and protocol
+
+The report for day D is issued at about 11:00 on D+1, together with the plan for D+1. A forecast for day D therefore sees actuals up to D−1, NLDC's plan for D, and the calendar (weekend, Ramadan, Eid). That is exactly what NLDC itself knew when it made its plan.
+
+- **Target:** load shed at the evening-peak hour (substation end, MW), national and for each zone.
+- **Protocol:** expanding window; retrained at the start of each month on all earlier days and tested on that month, from July 2025 to November 2026 (508 days, 335 with shedding, 74 above 1,000 MW).
+- **Baselines:** NLDC's planned shed; persistence (the previous evening); the 7-day mean; and the average of NLDC's plan and persistence, which needs no learning.
+- **Model:** LightGBM with a Huber loss, predicting the *correction* to NLDC's planned figure, from 77 inputs; separate classifiers for any shedding and for more than 1,000 MW.
+- **Intervals:** paired moving-block bootstrap with 7-day blocks.
+
+A direct model of the megawatts (Tweedie loss) did worse, at 274 MW: in April and August 2026 it met shedding deeper than anything in its training data and could not extrapolate. Predicting a correction to the operator's plan avoids that, since the plan already moves with the regime. A residual on persistence (244 MW), ridge regression (253 MW) and the plant-outage features changed little.
+
+### 8.3 Results
+
+| Forecast | MAE | RMSE | vs NLDC, MW [95 % CI] |
+|---|---|---|---|
+| NLDC's planned shed | 257 MW | 498 MW | — |
+| Persistence (previous evening) | 252 MW | 511 MW | |
+| 7-day mean | 296 MW | 519 MW | |
+| Model (correction to NLDC) | 242 MW | 465 MW | −14.7 [−30.4, +0.3] |
+| NLDC and persistence, averaged | 230 MW | 454 MW | −27.3 [−44.2, −10.4] |
+| **Model, NLDC and persistence, averaged** | **227 MW** | **443 MW** | **−29.5 [−44.7, −15.9]** |
+
+The three-way average beats the two-way average by only 2.3 MW (95 % CI −8.6 to +3.6). In the surge months (183 days in months with a mean above 500 MW) every error is large: 568 MW for NLDC and 520 MW for the three-way average, against 82 and 63 MW in the calm months.
+
+Will there be any shedding at the evening peak?
+
+| Forecaster | Shedding evenings called | False alarms on quiet evenings | AUC |
+|---|---|---|---|
+| NLDC's plan | 37 % | 2 % | 0.68 |
+| Persistence | 89 % | 22 % | 0.89 |
+| Model | 91 % | 29 % | 0.88 |
+
+For severe evenings (above 1,000 MW) the order reverses: NLDC's plan names 70 % of them, persistence 68 % and the classifier 42 %, at 3–6 % false alarms.
+
+![**Figure 7.** Bangladesh load shedding over 508 test days. Left: monthly mean absolute error of NLDC's plan, persistence and the model, with the month's mean shed. Right: share of shedding evenings each forecaster called, and its false alarms.](figures/fig7_loadshed.svg)
+
+**Findings:**
+- **The operator's plan is conservative about occurrence but informative about depth.** It rarely plans shedding that does not happen, misses most evenings that do have it, and is the best guide to the severe ones.
+- **Persistence is a strong baseline that the plan does not use.** Averaging the two, with no learning, cuts the error by 11 %, significantly.
+- **Learning adds little beyond that.** The inputs the model uses most are the previous evening's shed, NLDC's plan and the previous evening's shortfall. Day-to-day shedding is driven by fuel deliveries and plant trips that the morning report does not foresee.
+- **Limitations:** two years of data, with most deep shedding in one season; NLDC's planned figure is a schedule, not necessarily a best estimate; shedding is reported at the substation end and may understate what consumers experience.
+
+---
+
+## 9. Threats to validity and reproducibility
 
 **Threats to validity:**
 - **Labels come from a simulator, not real events.** Studies B–D measure how well models learn the simulator's physics. The simulator's protection is simplified: no relay coordination studies, and no operator action inside 90 s.
 - **The grids are map-derived.** Their parameters are estimated, and mapping completeness varies between regions.
 - **The dispatch days are synthetic.**
-- **Only Study A uses real operational data throughout.**
+- **Studies A and E use real operational data throughout;** Study E has only two years, with most deep shedding in one season.
 
 **Reproducibility:** the repository contains every script.
 
@@ -360,24 +422,28 @@ Making the features grid-independent (loads relative to the grid's average, angl
 | B | `ml/surrogate.py` | `src/ai/surrogate-data.test.ts` | `public/data/surrogate/` |
 | C | `ml/dispatch.py`, `ml/dispatch_finetune.py`, `ml/dispatch_eval.py` | — | `public/data/dispatch/sa.json` |
 | D | `ml/gnn.py`, `ml/gnn_gen.py` | `src/ai/cascade-data.test.ts` | `public/data/cascade/gnn.json` |
+| E | `ml/fetch_pgcb.py`, `ml/parse_pgcb.py`, `ml/loadshed.py` | — | `public/data/loadshed/bd_backtest.json` |
 
 Each trained model runs in the browser, and a test checks it against the Python original.
 
 **Hardware:** one laptop with an 8-core CPU and an RTX 5060 GPU (8 GB). The slowest single training run was the cascade study, at 25 minutes for 3 seeds over seven splits.
 
-## 9. Conclusion
+## 10. Conclusion
 
-Four operational tasks, four held-out tests. In every case the in-distribution score overstated what the model would do on something new, and by different amounts for different methods. The methods that held up best encoded the physics rather than the identity of the thing they had seen:
+Five operational tasks, five held-out tests. In every case the in-distribution score overstated what the model would do on something new, and by different amounts for different methods. The methods that held up best encoded the physics rather than the identity of the thing they had seen:
 - DC distribution factors instead of line identities;
 - imitation of hindsight-optimal decisions;
 - a learned value of stored energy inside an optimiser;
 - message passing over the network's own structure.
 
+The real-data load-shedding study adds a sobering counterpoint: when the operator's plan and yesterday's outcome are both available, a two-line average captures most of what a learned model can, and the useful contribution is to show that simple gain.
+
 **Future work:**
 - real disturbance records for validation;
 - multi-outage power-flow surrogates;
 - topology-robust bus-level cascade prediction;
-- real-data dispatch on recorded South Australian days.
+- real-data dispatch on recorded South Australian days;
+- longer load-shedding histories, and fuel-delivery data (LNG cargoes, gas-field output) as inputs.
 
 ---
 
@@ -430,5 +496,7 @@ Four operational tasks, four held-out tests. In every case the in-distribution s
 [23] Chen et al., "Prediction of cascading failure size using a graph neural network with dynamic weights," *IEEE PES General Meeting*, 2026. **[verify]**
 
 [24] T. Zhou, X. Li and H. Lu, "Inductive power grid cascading failure analysis with GRU-gated graph attention," arXiv:2605.07010, 2026.
+
+[25] Power Grid Bangladesh PLC, National Load Dispatch Centre, "Daily operation report," https://erp.powergrid.gov.bd (reports for 31 December 2024 to 20 November 2026, accessed 22 November 2026).
 
 *Entries marked [verify] were found through web search; their authors, venues or years must be checked against the publisher before submission.*
