@@ -18,5 +18,15 @@
   "lines": 0,
   "districts": 54,
   "blurb": "A 20-million city that peaks in the afternoon heat: 8.7 GW, the highest of any Indian city."
+ },
+ {
+  "id": "karachi",
+  "name": "Karachi",
+  "country": "Pakistan",
+  "kind": "real",
+  "population": 20382881,
+  "lines": 0,
+  "districts": 6,
+  "blurb": "Pakistan’s port city of twenty million, supplied by a single utility, with sea breezes and long humid evenings."
  }
 ]

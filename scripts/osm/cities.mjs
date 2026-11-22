@@ -63,6 +63,8 @@ export const CITIES = [
       winter: { tmax: 26, tmin: 13, dec: -21, label: 'Winter (January)' },
     },
     demand: { acShare: 0.25, resBase: 0.05, resAct: 0.12, cars: 0.1, evShare: 0.01, scale: 1, targetPeak: 3563 },
+    hospital: { name: 'Civil Hospital', beds: 2000, source: 'Express Tribune, 2026, reporting the Sindh government expansion plan from 2,000 to 2,500 beds' },
+    gridSubs: 'karachi',
     metro: null,
     extraNotes: ['Karachi has bus rapid transit but no metro yet.'],
   },

@@ -130,6 +130,26 @@ function build(c) {
     const clean = name.replace(/\s*(132|230)\s*\/\s*33\s*kV?/i, '').replace(/\s*(grid\s*)?(sub\s*-?station|grid station|s\/s)\s*$/i, '').trim();
     subs.push({ id: `s${subs.length}`, name: `${clean} ${v.some((x) => x >= 230000) ? '230/132/33' : '132/33'} kV`, short: clean, x: Math.round(x), z: Math.round(z) });
   }
+  // where the city's own query finds few named grid substations (Karachi: 34 of 47 have no name or voltage),
+  // take the 132 kV+ substations inside the city from the transmission-grid model of the same region, which
+  // was built from OpenStreetMap by following the power lines (scripts/osm/build.mjs)
+  if (c.gridSubs) {
+    const reg = JSON.parse(fs.readFileSync(`public/data/regions/${c.gridSubs}.json`, 'utf8'));
+    const [lat0, lon0] = reg.center, kx = 111.32 * Math.cos((lat0 * Math.PI) / 180), kz = 110.57;
+    const [s, w, n, e] = c.bbox;
+    let added = 0;
+    for (const b of reg.buses) {
+      if (b.kv < 132 || b.boundary) continue;
+      const lat = lat0 - b.z / kz, lon = lon0 + b.x / kx;
+      if (lat < s || lat > n || lon < w || lon > e) continue;
+      const [x, z] = P(lat, lon);
+      if (subs.some((q) => Math.hypot(q.x - x, q.z - z) < 400)) continue;
+      const clean = b.name.replace(/\s*\d+\s*(kv|KV|kV)\b.*$/, '').replace(/\s*(grid\s*)?(sub\s*-?station|grid station|s\/s)\s*$/i, '').trim() || b.name;
+      subs.push({ id: `s${subs.length}`, name: `${clean} ${b.kv >= 220 ? `${b.kv}/132` : '132/11'} kV`, short: clean, x: Math.round(x), z: Math.round(z) });
+      added++;
+    }
+    console.log(`  + ${added} grid substations from the ${c.gridSubs} transmission model`);
+  }
   console.log(`  substations: ${subs.length}`);
   if (subs.length > 64) subs.length = 64;
   const nearestSub = (x, z) => { let b = 0, bd = Infinity; subs.forEach((q, i) => { const d = (q.x - x) ** 2 + (q.z - z) ** 2; if (d < bd) { bd = d; b = i; } }); return b; };
