@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { CityEngine, CityEvent, CityOpts, Minute } from '../city/engine';
 import type { Pick, TwinScene } from '../city/TwinScene';
 import type { CityData } from '../city/types';
@@ -25,6 +25,7 @@ const HI: Partial<Record<Sector, number>> = { res: 0, com: 1, ind: 2, inst: 3, m
 
 export default function CityTwin({ mode }: { mode: Mode }) {
   const { id: cityId = 'meridia' } = useParams();
+  const go = useNavigate();
   const [city, setCity] = useState<CityData | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const eng = useRef<CityEngine | null>(null);
@@ -58,6 +59,8 @@ export default function CityTwin({ mode }: { mode: Mode }) {
     (async () => {
       const [{ CityEngine }, { TwinScene }, { loadCity }] = await Promise.all([import('../city/engine'), import('../city/TwinScene'), import('../city/load')]);
       const c = await loadCity(cityId);
+      // a city with no mapped metro has no traction view: show its day instead of a broken page
+      if (mode === 'metro' && !c.lines.length) { go(`/city/${cityId}`, { replace: true }); return; }
       if (!alive || !host.current) return;
       setCity(c);
       setBusy(`Simulating a day in ${c.name}`);

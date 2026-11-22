@@ -8,5 +8,15 @@
   "lines": 1,
   "districts": 11,
   "blurb": "Bangladesh’s capital: 470,000 mapped buildings, MRT Line 6 on 1500 V DC, and a long humid summer of air conditioners."
+ },
+ {
+  "id": "delhi",
+  "name": "Delhi",
+  "country": "India",
+  "kind": "real",
+  "population": 16787941,
+  "lines": 0,
+  "districts": 54,
+  "blurb": "A 20-million city that peaks in the afternoon heat: 8.7 GW, the highest of any Indian city."
  }
 ]

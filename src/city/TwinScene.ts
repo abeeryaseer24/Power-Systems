@@ -481,12 +481,15 @@ varying vec2 vC; uniform vec3 uClear;`).replace('void main() {', `void main() {
         this.tssGlow.push(sp);
       }
     });
-    const deck = new THREE.Mesh(mergeGeometries(deckG), concrete);
-    deck.castShadow = deck.receiveShadow = true;
-    const piers = new THREE.Mesh(mergeGeometries(pierG), concrete);
-    piers.castShadow = true;
-    const rails = new THREE.Mesh(mergeGeometries(railG), new THREE.MeshStandardMaterial({ color: '#4d4f52', roughness: 0.5, metalness: 0.6 }));
-    this.scene.add(deck, piers, rails);
+    // cities without a mapped metro (Delhi, Karachi, Colombo, Adelaide) have nothing to merge
+    if (deckG.length) {
+      const deck = new THREE.Mesh(mergeGeometries(deckG), concrete);
+      deck.castShadow = deck.receiveShadow = true;
+      const piers = new THREE.Mesh(mergeGeometries(pierG), concrete);
+      piers.castShadow = true;
+      const rails = new THREE.Mesh(mergeGeometries(railG), new THREE.MeshStandardMaterial({ color: '#4d4f52', roughness: 0.5, metalness: 0.6 }));
+      this.scene.add(deck, piers, rails);
+    }
     // the trains: six cars each
     const carG = new THREE.BoxGeometry(2.9, 3.6, TRAIN.length / TRAIN.cars - 1.2);
     carG.translate(0, DECK + 1.25 + 1.8, 0);

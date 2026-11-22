@@ -45,6 +45,7 @@ export const CITIES = [
       winter: { tmax: 21, tmin: 8, dec: -21, label: 'Winter (January)' },
     },
     demand: { acShare: 0.4, resBase: 0.06, resAct: 0.14, cars: 0.2, evShare: 0.03, scale: 1, targetPeak: 8748, heatShare: 0.05 },
+    hospital: { name: 'Safdarjung Hospital', beds: 2994, source: 'Ministry of Health and Family Welfare reply to Parliament, 2024-25; AIIMS across the road is not tagged as a hospital in OpenStreetMap' },
     metro: null,
     extraNotes: ['Delhi Metro runs on 25 kV AC overhead lines; AC traction is not modelled yet, so this city has City Day and the other models but no metro page.'],
   },
