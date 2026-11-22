@@ -38,17 +38,33 @@ This work makes that test the centre of the evaluation. Its contributions are:
 
 ## 2. Related work
 
-*To be completed with a literature review. Planned coverage: (i) load forecasting benchmarks against system-operator forecasts; (ii) neural power-flow and OPF surrogates and their topology handling; (iii) RL for economic dispatch and storage scheduling, and its comparison with MPC; (iv) GNNs for cascading-failure and contingency analysis, especially studies that test on unseen topologies.*
+**Load forecasting.**
+- Probabilistic load forecasting is well surveyed [10].
+- The Global Energy Forecasting Competitions (GEFCom) established the benchmarks most methods are now compared on: GEFCom2014 for probabilistic forecasts [11] and GEFCom2017 for hierarchical probabilistic forecasts [12]. Gradient boosting trained on quantiles ranked among the strongest entries, and probabilistic LightGBM remains a competitive recent baseline [13].
+- Fewer studies benchmark directly against a transmission operator's own published day-ahead forecast, out of sample, with only the weather forecasts available at the time. That comparison is ours.
 
-The methods used here build on:
-- fast decoupled load flow [1] and DC distribution factors [2];
-- gradient boosting [3];
-- conformalised quantile regression [4];
-- proximal policy optimisation [5];
-- neural message passing [6];
-- the HiGHS linear programming solver [7];
-- ERA5 reanalysis for historical weather [8];
-- OpenStreetMap [9].
+**Learned power flow and contingency analysis.**
+- Neural surrogates for AC power flow must cope with topology changes, which is exactly what an N-1 study introduces.
+- *Guided dropout* encodes the outaged element in the network's structure, and generalises from N-1 to some N-2 cases [14].
+- Convolutional regression surrogates have been used for N-1 screening under uncertain injections [15].
+- Graph neural networks process topology changes natively [16].
+- Recent work repurposes a single base-case model for post-contingency AC states using PTDF-based fixed-point iteration [17].
+- Our surrogate follows the same physics-first idea from another direction: classical DC distribution factors are the *only* description of the outage the network receives, and it learns the AC correction. We show this separates generalisation to unseen outages from memorisation of known ones.
+
+**Reinforcement learning against optimisation for dispatch.**
+- Comparisons of RL and model predictive control for storage and dispatch are mixed:
+  - RL and MPC trade off data efficiency, online computation and robustness [18];
+  - RL can match MPC in multi-energy systems given adequate constraint handling and pre-training [19];
+  - demonstrations from simple rules can improve RL battery dispatch [20].
+- We add a case with realistic forecast error and a perfect-foresight floor. Imitation of hindsight-optimal decisions is what makes RL competitive with MPC, and the only *significant* gain over MPC comes from machine learning placed inside the optimiser, as a learned value of stored energy.
+
+**Graph neural networks for cascading failures.**
+- GNNs have been used:
+  - to predict grid states through each generation of a cascade [21];
+  - to transfer node-level cascade centrality from small synthetic networks to larger grids [22];
+  - to estimate cascade size [23];
+  - and, very recently, to analyse cascades zero-shot on grids unseen in training [24].
+- Our contribution to this line is an evaluation in which every one of 17 real, map-derived grids is held out once. It measures graph-level size and severity separately from bus-level outcomes, against strong tree-based baselines at both levels. The GNN transfers best at the graph level, while per-bus trees remain stronger at naming the buses that lose supply on a new grid.
 
 ## 3. Platform
 
@@ -360,13 +376,51 @@ Four operational tasks, four held-out tests. In every case the in-distribution s
 ## References
 
 [1] B. Stott and O. Alsac, "Fast decoupled load flow," *IEEE Trans. Power Apparatus and Systems*, vol. PAS-93, no. 3, pp. 859–869, 1974.
+
 [2] A. J. Wood, B. F. Wollenberg and G. B. Sheblé, *Power Generation, Operation, and Control*, 3rd ed. Wiley, 2013.
+
 [3] G. Ke et al., "LightGBM: A highly efficient gradient boosting decision tree," in *Advances in Neural Information Processing Systems 30*, 2017.
+
 [4] Y. Romano, E. Patterson and E. Candès, "Conformalized quantile regression," in *Advances in Neural Information Processing Systems 32*, 2019.
+
 [5] J. Schulman, F. Wolski, P. Dhariwal, A. Radford and O. Klimov, "Proximal policy optimization algorithms," arXiv:1707.06347, 2017.
+
 [6] J. Gilmer, S. S. Schoenholz, P. F. Riley, O. Vinyals and G. E. Dahl, "Neural message passing for quantum chemistry," in *Proc. ICML*, 2017.
+
 [7] Q. Huangfu and J. A. J. Hall, "Parallelizing the dual revised simplex method," *Mathematical Programming Computation*, vol. 10, pp. 119–142, 2018.
+
 [8] H. Hersbach et al., "The ERA5 global reanalysis," *Quarterly Journal of the Royal Meteorological Society*, vol. 146, pp. 1999–2049, 2020.
+
 [9] OpenStreetMap contributors, OpenStreetMap, https://www.openstreetmap.org, data under the Open Database Licence.
 
-*[References for the related-work section to be added after the literature review.]*
+[10] T. Hong and S. Fan, "Probabilistic electric load forecasting: A tutorial review," *International Journal of Forecasting*, vol. 32, no. 3, pp. 914–938, 2016.
+
+[11] T. Hong, P. Pinson, S. Fan, H. Zareipour, A. Troccoli and R. J. Hyndman, "Probabilistic energy forecasting: Global Energy Forecasting Competition 2014 and beyond," *International Journal of Forecasting*, vol. 32, no. 3, pp. 896–913, 2016.
+
+[12] T. Hong, J. Xie and J. Black, "Global energy forecasting competition 2017: Hierarchical probabilistic load forecasting," *International Journal of Forecasting*, vol. 35, no. 4, pp. 1389–1399, 2019.
+
+[13] "Electricity load and peak forecasting: Feature engineering, probabilistic LightGBM and temporal hierarchies," arXiv:2305.05575, 2023. **[verify authors]**
+
+[14] B. Donnot, I. Guyon, M. Schoenauer, A. Marot and P. Panciatici, "Fast power system security analysis with guided dropout," arXiv:1801.09870, 2018. **[verify venue]**
+
+[15] Y. Du, F. Li, J. Li and T. Zheng, "Achieving 100x acceleration for N-1 contingency screening with uncertain scenarios using deep convolutional neural network," NSF PAR 10107959. **[verify journal and year]**
+
+[16] "Graph neural networks for fast contingency analysis of power systems," arXiv:2310.04213. **[verify authors]**
+
+[17] S. Rahman, Y. Qin and V. Kekatos, "AC power flow contingency analysis using a single deep neural network," in *Proc. HICSS*, arXiv:2609.30859. **[verify year]**
+
+[18] N. El Hajj Chehade, M. Cho, S. Chinchali and H. Zhu, "Should we use model-free or model-based control? A case study of battery management systems," arXiv:2407.15313, 2024.
+
+[19] G. Ceusters et al., "Model-predictive control and reinforcement learning in multi-energy system case studies," arXiv:2104.09785, 2021. **[verify published version]**
+
+[20] M. Sage and J. McGill, "Economic battery storage dispatch with deep reinforcement learning from rule-based demonstrations," arXiv:2504.04326, 2025.
+
+[21] S. N. Chadaga, X. Wu and E. Modiano, "Power failure cascade prediction using graph neural networks," in *Proc. IEEE SmartGridComm*, 2023.
+
+[22] B. Kahng et al., "Prediction and mitigation of nonlocal cascading failures using graph neural networks," arXiv:2208.00133, 2022. **[verify authors]**
+
+[23] Chen et al., "Prediction of cascading failure size using a graph neural network with dynamic weights," *IEEE PES General Meeting*, 2026. **[verify]**
+
+[24] T. Zhou, X. Li and H. Lu, "Inductive power grid cascading failure analysis with GRU-gated graph attention," arXiv:2605.07010, 2026.
+
+*Entries marked [verify] were found through web search; their authors, venues or years must be checked against the publisher before submission.*
