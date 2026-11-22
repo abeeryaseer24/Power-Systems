@@ -84,7 +84,7 @@ export default function LoadShed() {
     <main id="main" className="page fc-page ls-page">
       <header className="fr-head fc-head">
         <p className="pv-kicker">Real grids · Machine learning · Bangladesh</p>
-        <h1>Will the lights go out tonight?</h1>
+        <h1>Who saw the shedding coming?</h1>
         <p>Every morning Bangladesh’s National Load Dispatch Centre publishes yesterday’s figures and its plan for today, load shedding included. We parsed {num(days.length)} consecutive daily reports, {fmtDate(days[0].date)} to {fmtDate(days[days.length - 1].date)}, and asked how well today’s evening-peak load shedding can be predicted from what is known at 11 in the morning. The official plan foresaw shedding on only {missed ? Math.round((100 * (shedDays - missed)) / shedDays) : 0} % of the test days on which it happened.</p>
       </header>
 
@@ -194,7 +194,7 @@ export default function LoadShed() {
           <li>Result: learning adds little. Averaging NLDC’s plan with yesterday’s outcome, which needs no model at all, cuts the error by about a tenth; the model’s extra contribution on top is not significant. That is a finding, not a failure: day-to-day shedding is driven by fuel deliveries and plant trips that the morning report does not foresee.</li>
           <li>NLDC’s planned figure is a schedule, not necessarily its best guess; utilities may also under-report shedding. Two years is short, and most of the deep shedding falls in one season.</li>
         </ul>
-        <p className="cy-hint">Code: <code>ml/fetch_pgcb.py</code>, <code>ml/parse_pgcb.py</code>, <code>ml/loadshed.py</code>. Plan a night of shedding yourself in <Link to="/dhaka-tonight">Dhaka tonight</Link>, or see the <Link to="/forecast">GB demand forecast</Link>.</p>
+        <p className="cy-hint">Code: <code>ml/fetch_pgcb.py</code>, <code>ml/parse_pgcb.py</code>, <code>ml/loadshed.py</code>. Use the forecast on <Link to="/load-shedding">tonight’s predictor</Link>, plan a night of shedding yourself in <Link to="/dhaka-tonight">Dhaka tonight</Link>, or see the <Link to="/forecast">GB demand forecast</Link>.</p>
       </section>
     </main>
   );

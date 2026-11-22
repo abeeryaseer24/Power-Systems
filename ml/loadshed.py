@@ -44,9 +44,14 @@ def in_windows(dates, wins):
     return m.astype(int)
 
 
-def build():
-    d = pd.read_csv(DATA / 'daily.csv', parse_dates=['date']).set_index('date').asfreq('D')
-    f = pd.read_csv(DATA / 'forecast.csv', parse_dates=['date']).set_index('date')
+def build(d=None, f=None):
+    """Feature and target frames. d, f: daily and forecast tables indexed by date (default: the parsed CSVs);
+    ml/loadshed_live.py passes the recent days kept in the repository so the live features match training."""
+    if d is None:
+        d = pd.read_csv(DATA / 'daily.csv', parse_dates=['date']).set_index('date')
+    if f is None:
+        f = pd.read_csv(DATA / 'forecast.csv', parse_dates=['date']).set_index('date')
+    d = d.asfreq('D')
     idx = pd.date_range(d.index.min(), f.index.max(), freq='D')
     d, f = d.reindex(idx), f.reindex(idx)
     X = pd.DataFrame(index=idx)

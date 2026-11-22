@@ -3,6 +3,9 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'public/data/loadshed/live.json'
+      - 'public/data/loadshed/live_state.json'
   pull_request:
 
 jobs:
