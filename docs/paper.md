@@ -1,6 +1,6 @@
 # Tested on What They Have Never Seen: Four Machine-Learning Studies for Power-System Operation on Open, Map-Derived Grids
 
-*Draft, 22 November 2026. Author: Talha Yaseer Abeer. Every number in this draft comes from the result files in the repository (see Section 8); figures are listed as placeholders.*
+*Draft, 22 November 2026. Author: Talha Yaseer Abeer. Every number and figure in this draft comes from the result files in the repository (see Section 8).*
 
 ---
 
@@ -85,7 +85,7 @@ Where mapping is incomplete, per-region options correct the model:
 
 Each correction is documented in the configuration file.
 
-*[Figure 1: the 17 grids, drawn from their bus coordinates.]*
+![**Figure 1.** The 17 transmission grids rebuilt from OpenStreetMap, drawn from their bus coordinates. Orange: 300 kV and above.](figures/fig1_grids.svg)
 
 ### 3.2 Simulator
 
@@ -130,7 +130,9 @@ Test period: 6 March 2024 to 30 October 2026, 46,478 half-hours.
 
 The model does not beat the operator, which has richer inputs (embedded-generation metering and operator judgement). But its errors are different enough that averaging the two beats both. The raw quantile range is too narrow because the models were trained on observed weather and run on forecast weather; conformal calibration corrects most of that gap.
 
-*[Figure 2: monthly MAPE of the model, NESO and the naive forecast. Figure 3: a winter week, a summer week and Christmas, with the calibrated range.]*
+![**Figure 2.** Monthly MAPE of the day-ahead forecasts over the 32-month backtest.](figures/fig2_forecast_monthly.svg)
+
+![**Figure 3.** A winter test week (from 13 January 2025): actual demand, this model with its calibrated 10–90 % range, and NESO's day-ahead forecast.](figures/fig3_forecast_week.svg)
 
 ---
 
@@ -183,6 +185,8 @@ Speed, measured in Python on one CPU core with the whole N-1 set evaluated as on
 | Contingencies screened | 60 | 87 | 309 |
 | Surrogate | 0.37 ms | 0.39 ms | 2.0 ms |
 | FDLF | 78 ms | 73 ms | 1,564 ms |
+
+![**Figure 4.** Line-loading error on outages withheld from training, by method and grid.](figures/fig4_surrogate.svg)
 
 **Findings:**
 - **The one-hot network memorises line identities.** It does worse on new outages than plain linear regression.
@@ -246,6 +250,8 @@ Days are synthetic, calibrated to published South Australian ranges.
 | MPC | $0.981 M | +14.2 % | — | — | 3.4 ms |
 | **MPC + learned storage value** | **$0.977 M** | **+13.8 %** | **+3.8 [+2.8, +4.7]** | **80** | 6.8 ms |
 | Perfect foresight | $0.859 M | floor | | | |
+
+![**Figure 5.** Mean daily cost of the six dispatchers on 100 held-out days.](figures/fig5_dispatch.svg)
 
 **Findings:**
 - **Imitating hindsight is what makes RL competitive here.** From scratch, PPO stalls at nearly 30 % above the floor; warm-started, it ties MPC while deciding 23 times faster.
@@ -313,6 +319,8 @@ Labels:
 | Houston, Madrid | 22.6 % | 21.6 % | 0.84 | 0.87 |
 | Rome, Tashkent, Caracas | 31.4 % | 34.8 % | 0.77 | 0.77 |
 | Dhaka, Dhaka metro, Sapporo | 31.4 % | 40.8 % | 0.67 | 0.76 |
+
+![**Figure 6.** Leave-grids-out results by fold: the GNN against gradient-boosted trees, for the share of load lost and for which buses lose supply.](figures/fig6_gnn_folds.svg)
 
 **Ablations** (first fold only, one seed; ✓ marks the setting kept):
 
