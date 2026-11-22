@@ -28,5 +28,15 @@
   "lines": 0,
   "districts": 6,
   "blurb": "Pakistan’s port city of twenty million, supplied by a single utility, with sea breezes and long humid evenings."
+ },
+ {
+  "id": "colombo",
+  "name": "Colombo",
+  "country": "Sri Lanka",
+  "kind": "real",
+  "population": 561314,
+  "lines": 0,
+  "districts": 2,
+  "blurb": "Sri Lanka’s commercial capital: a compact city of offices and ports on the island’s west coast."
  }
 ]

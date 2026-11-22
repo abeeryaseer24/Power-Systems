@@ -82,6 +82,7 @@ export const CITIES = [
       winter: { tmax: 30.5, tmin: 22.5, dec: -21, label: 'Cooler season (January)' },
     },
     demand: { acShare: 0.25, resBase: 0.06, resAct: 0.12, cars: 0.15, evShare: 0.02, scale: 1, targetPeak: 270 },
+    gridSubs: 'colombo',
     metro: null,
     extraNotes: ['Colombo has suburban railways but no metro.'],
   },

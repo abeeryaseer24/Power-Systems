@@ -37,6 +37,7 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
       { to: '/city/dhaka', label: 'Dhaka', note: 'A day of demand and MRT Line 6, from OpenStreetMap' },
       { to: '/city/delhi', label: 'Delhi', note: 'An 8.7 GW summer afternoon, from OpenStreetMap' },
       { to: '/city/karachi', label: 'Karachi', note: 'K-Electric’s 3.6 GW city, from OpenStreetMap' },
+      { to: '/city/colombo', label: 'Colombo', note: 'Sri Lanka’s port capital, 68 000 buildings, from OpenStreetMap' },
       { to: '/city/meridia', label: 'Meridia (prototype)', note: 'The fictional test city every model starts in' },
     ],
   },
