@@ -24,6 +24,7 @@ const GROUPS: { label: string; items: { to: string; label: string; note: string 
       { to: '/forecast', label: 'Demand forecast', note: 'Tomorrow’s GB demand, forecast by machine learning' },
       { to: '/surrogate', label: 'Learned load flow', note: 'N-1 screening by a neural network, checked live' },
       { to: '/dispatch', label: 'RL dispatch', note: 'A learning agent runs South Australia against an optimiser' },
+      { to: '/cascade', label: 'Cascade GNN', note: 'A graph network predicts where a blackout spreads' },
       { to: '/predictor', label: 'Predictor', note: 'Would an AI have seen it coming?' },
       { to: '/trailer', label: 'Trailer', note: 'A new cut of the disasters, every time' },
     ],

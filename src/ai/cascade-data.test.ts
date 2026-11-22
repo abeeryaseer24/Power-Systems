@@ -8,27 +8,9 @@ import { it } from 'vitest';
 import fs from 'node:fs';
 import { RegionSim, type RegionData } from '../grid/region';
 import { mulberry32 } from '../grid/profiles';
+import { snapshot } from './cascade';
 
 const OUT = 'ml/data/cascade';
-
-function snapshot(s: RegionSim) {
-  const n = s.buses.length;
-  const gen = new Array(n).fill(0), cap = new Array(n).fill(0);
-  s.gens.forEach((g) => { if (g.online) { gen[g.def.bus] += g.p; cap[g.def.bus] += g.avail; } });
-  const deg = new Array(n).fill(0);
-  s.branches.forEach((b) => { if (b.closed && !b.ext) { deg[b.def.a]++; deg[b.def.b]++; } });
-  const extBus = new Set<number>([s.ext.bus, ...(s.data.ext.tieBuses ?? [])]);
-  // node features: voltage class, load, generation, headroom, voltage, angle, degree, external tie
-  const x = s.buses.map((b, i) => [b.def.kv / 400, b.demand / 100, gen[i] / 100, Math.max(0, cap[i] - gen[i]) / 100, b.V, b.theta, deg[i] / 4, extBus.has(i) ? 1 : 0]);
-  const edges: number[][] = [], ea: number[][] = [];
-  s.branches.forEach((b) => {
-    if (!b.closed || b.ext) return;
-    edges.push([b.def.a, b.def.b]);
-    // edge features: reactance, rating, loading, voltage class, circuits
-    ea.push([b.def.x * 100, b.def.mva / 1000, b.loading, b.def.kv / 400, (b.def.circuits ?? 1) / 2]);
-  });
-  return { x, edges, ea };
-}
 
 it.skipIf(!process.env.DATA)('generate cascade graphs', () => {
   fs.mkdirSync(OUT, { recursive: true });
