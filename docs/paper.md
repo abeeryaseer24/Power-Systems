@@ -1,6 +1,6 @@
 # Tested on What They Have Never Seen: Five Machine-Learning Studies for Power-System Operation on Open, Map-Derived Grids
 
-*Draft, 22 November 2026, with Study E added the same evening. Author: Talha Yaseer Abeer. Every number and figure in this draft comes from the result files in the repository (see Section 9).*
+*Draft, 22 November 2026, with Study E added and references checked the same evening. Author: Talha Yaseer Abeer. Every number and figure in this draft comes from the result files in the repository (see Section 9).*
 
 ---
 
@@ -473,30 +473,30 @@ The real-data load-shedding study adds a sobering counterpoint: when the operato
 
 [12] T. Hong, J. Xie and J. Black, "Global energy forecasting competition 2017: Hierarchical probabilistic load forecasting," *International Journal of Forecasting*, vol. 35, no. 4, pp. 1389–1399, 2019.
 
-[13] "Electricity load and peak forecasting: Feature engineering, probabilistic LightGBM and temporal hierarchies," arXiv:2305.05575, 2023. **[verify authors]**
+[13] N. Rubattu, G. Maroni and G. Corani, "Electricity load and peak forecasting: Feature engineering, probabilistic LightGBM and temporal hierarchies," arXiv:2305.05575, 2023.
 
-[14] B. Donnot, I. Guyon, M. Schoenauer, A. Marot and P. Panciatici, "Fast power system security analysis with guided dropout," arXiv:1801.09870, 2018. **[verify venue]**
+[14] B. Donnot, I. Guyon, M. Schoenauer, A. Marot and P. Panciatici, "Fast power system security analysis with guided dropout," in *Proc. European Symposium on Artificial Neural Networks (ESANN)*, Bruges, Belgium, Apr. 2018; arXiv:1801.09870.
 
-[15] Y. Du, F. Li, J. Li and T. Zheng, "Achieving 100x acceleration for N-1 contingency screening with uncertain scenarios using deep convolutional neural network," NSF PAR 10107959. **[verify journal and year]**
+[15] Y. Du, F. Li, J. Li and T. Zheng, "Achieving 100x acceleration for N-1 contingency screening with uncertain scenarios using deep convolutional neural network," *IEEE Trans. Power Systems*, vol. 34, no. 4, pp. 3303–3305, Jul. 2019, doi: 10.1109/TPWRS.2019.2914860.
 
-[16] "Graph neural networks for fast contingency analysis of power systems," arXiv:2310.04213. **[verify authors]**
+[16] A. M. Nakiganda and S. Chatzivasileiadis, "Graph neural networks for fast contingency analysis of power systems," arXiv:2310.04213, 2023 (v3, 2025).
 
-[17] S. Rahman, Y. Qin and V. Kekatos, "AC power flow contingency analysis using a single deep neural network," in *Proc. HICSS*, arXiv:2609.30859. **[verify year]**
+[17] M. O. Rahman, J. Qin and V. Kekatos, "AC power flow contingency analysis using a single deep neural network," arXiv:2609.30859, 2026.
 
-[18] N. El Hajj Chehade, M. Cho, S. Chinchali and H. Zhu, "Should we use model-free or model-based control? A case study of battery management systems," arXiv:2407.15313, 2024.
+[18] M. F. El Hajj Chehade, Y.-h. Cho, S. Chinchali and H. Zhu, "Should we use model-free or model-based control? A case study of battery management systems," arXiv:2407.15313, 2024.
 
-[19] G. Ceusters et al., "Model-predictive control and reinforcement learning in multi-energy system case studies," arXiv:2104.09785, 2021. **[verify published version]**
+[19] G. Ceusters, R. Cantú Rodríguez, A. Bouso García, R. Franke, G. Deconinck, L. Helsen, A. Nowé, M. Messagie and L. Ramirez Camargo, "Model-predictive control and reinforcement learning in multi-energy system case studies," *Applied Energy*, vol. 303, art. 117634, 2021; arXiv:2104.09785.
 
-[20] M. Sage and J. McGill, "Economic battery storage dispatch with deep reinforcement learning from rule-based demonstrations," arXiv:2504.04326, 2025.
+[20] M. Sage, M. Staniszewski and Y. F. Zhao, "Economic battery storage dispatch with deep reinforcement learning from rule-based demonstrations," in *Proc. IEEE ICCAD*, 2023, doi: 10.1109/ICCAD57653.2023.10152299; arXiv:2504.04326.
 
-[21] S. N. Chadaga, X. Wu and E. Modiano, "Power failure cascade prediction using graph neural networks," in *Proc. IEEE SmartGridComm*, 2023.
+[21] S. Chadaga, X. Wu and E. Modiano, "Power failure cascade prediction using graph neural networks," in *Proc. IEEE SmartGridComm*, Glasgow, UK, 2023, pp. 1–7; arXiv:2404.16134.
 
-[22] B. Kahng et al., "Prediction and mitigation of nonlocal cascading failures using graph neural networks," arXiv:2208.00133, 2022. **[verify authors]**
+[22] B. Jhun, H. Choi, Y. Lee, J. Lee, C. H. Kim and B. Kahng, "Prediction and mitigation of nonlocal cascading failures using graph neural networks," *Chaos*, vol. 33, art. 013115, 2023, doi: 10.1063/5.0107420.
 
-[23] Chen et al., "Prediction of cascading failure size using a graph neural network with dynamic weights," *IEEE PES General Meeting*, 2026. **[verify]**
+[23] T. Chen, Z. Guo, P. Wang, K. Sun, J. Dong and B. Liu, "Prediction of cascading failure size using a graph neural network with dynamic weights," *IEEE PES General Meeting*, 2026 (paper PESGM2026-000889).
 
 [24] T. Zhou, X. Li and H. Lu, "Inductive power grid cascading failure analysis with GRU-gated graph attention," arXiv:2605.07010, 2026.
 
 [25] Power Grid Bangladesh PLC, National Load Dispatch Centre, "Daily operation report," https://erp.powergrid.gov.bd (reports for 31 December 2024 to 20 November 2026, accessed 22 November 2026).
 
-*Entries marked [verify] were found through web search; their authors, venues or years must be checked against the publisher before submission.*
+*References [13]–[24] were checked on 22 November 2026 against arXiv metadata and publisher or repository records (IEEE, AIP, Elsevier via RePEc, MIT DSpace, NSF PAR, the PESGM 2026 paper index).*
