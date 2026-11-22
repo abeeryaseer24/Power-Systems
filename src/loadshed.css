@@ -1,0 +1,60 @@
+/* Bangladesh load-shedding predictor page (ls- prefix) */
+.ls-page { --ls-zero: rgba(134, 197, 218, 0.08); --ls-none: transparent; }
+.ls-now .fc-scores { margin-bottom: 6px; }
+
+.ls-page > section { min-width: 0; }
+.ls-cal-wrap { overflow-x: auto; padding-bottom: 4px; max-width: 100%; }
+.ls-cal { width: 100%; height: auto; display: block; }
+.ls-month { font-size: 10px; fill: var(--steel); font-family: var(--display); letter-spacing: 0.04em; }
+.ls-ring { fill: none; stroke: var(--glaze); stroke-width: 1.1; }
+.ls-sel { fill: none; stroke: var(--porcelain); stroke-width: 1.4; }
+.ls-pickable { cursor: pointer; }
+.ls-pickable:hover rect:first-child { stroke: var(--porcelain); stroke-width: 0.8; }
+.ls-train { opacity: 0.55; }
+.ls-legend i { width: 12px; height: 12px; vertical-align: -2px; border-radius: 2px; }
+.ls-ring-key { border: 1.5px solid var(--glaze); box-sizing: border-box; }
+
+.ls-day-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.ls-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.ls-bars li { display: grid; grid-template-columns: 170px 1fr 90px; gap: 12px; align-items: center; font-size: 14px; color: var(--steel); }
+.ls-bars i { height: 14px; display: block; min-width: 2px; }
+.ls-bars b { font-family: var(--display); font-size: 20px; color: var(--porcelain); text-align: right; font-variant-numeric: tabular-nums; }
+.ls-bars .out i { background: var(--trip); }
+.ls-bars .ours i { background: var(--sodium); }
+.ls-bars .blend i { background: repeating-linear-gradient(90deg, var(--sodium) 0 5px, transparent 5px 8px); }
+.ls-bars .neso i { background: var(--glaze); }
+.ls-bars .pers i { background: var(--arc); }
+
+.ls-map { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, 64px); gap: 4px; max-width: 360px; }
+.ls-map div { border: 1px solid var(--rule); padding: 6px 8px; display: flex; flex-direction: column; justify-content: space-between; }
+.ls-map span { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--porcelain); }
+.ls-map b { font-family: var(--display); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.ls-called { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule-strong); border-left: 1px solid var(--rule-strong); margin-bottom: 14px; }
+.ls-called > div { padding: 14px 18px; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); }
+.ls-called h3 { font-family: var(--display); font-size: 20px; margin: 0 0 8px; font-weight: 700; }
+.ls-called p { margin: 0 0 4px; color: var(--steel); font-size: 14px; }
+.ls-called b { font-family: var(--display); font-size: 30px; font-weight: 800; color: var(--porcelain); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.ls-called .ours b { color: var(--sodium); }
+.ls-called .ls-auc { margin-top: 8px; font-size: 12.5px; color: var(--dim); }
+
+.ls-months .cy-axis-t { font-size: 11px; fill: var(--dim); }
+.ls-bar-pers { fill: var(--arc); opacity: 0.8; }
+.fc-legend .ls-k-pers { background: var(--arc); }
+
+.ls-zones { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; max-width: 940px; border-top: 1px solid var(--rule); }
+.ls-zones li { display: grid; grid-template-columns: 140px 1fr repeat(3, 130px); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); align-items: baseline; font-size: 14px; color: var(--steel); }
+.ls-zones span { font-family: var(--display); font-size: 19px; font-weight: 700; color: var(--porcelain); }
+.ls-zones em { font-style: normal; font-size: 13px; }
+.ls-zones b { font-weight: 400; font-variant-numeric: tabular-nums; }
+.ls-zones b:first-of-type { color: var(--sodium); }
+
+@media (max-width: 760px) {
+  .ls-day-grid { grid-template-columns: minmax(0, 1fr); }
+  .ls-map span { font-size: 10px; letter-spacing: 0; overflow-wrap: anywhere; }
+  .ls-map b { font-size: 18px; }
+  .ls-bars li { grid-template-columns: 110px 1fr 74px; font-size: 13px; }
+  .ls-called { grid-template-columns: 1fr; }
+  .ls-zones li { grid-template-columns: 1fr 1fr; }
+  .ls-zones em { grid-column: 1 / 3; }
+}

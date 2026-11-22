@@ -216,6 +216,40 @@ def parse_forecast(fc):
             key = 'chattogram' if nm.startswith('Chitt') or nm.startswith('Chatt') else nm.lower()
             if key in [z.lower() for z in ZONES] + ['total']:
                 d[f'f_ls_{key}_mw'] = num(fc.get(hr + 1, {}).get(c))
+    # plant table: present capacity (G) minus effective available at the evening peak (M), grouped by the reason
+    # given in Remarks (N), and effective evening availability by fuel (C). Forward-looking supply information.
+    out = {k: 0.0 for k in ('gas', 'liquid', 'coal', 'maint', 'contract', 'other')}
+    by_fuel = {}
+    for r in sorted(fc):
+        row = fc[r]
+        cap, eff, fuel = num(row.get('G')), num(row.get('M')), row.get('C', '')
+        if cap is None or eff is None or not row.get('B') or re.search(r'(?i)total|name of', row.get('B', '') + row.get('A', '')):
+            continue
+        if not fuel or re.search(r'(?i)^fuel$', fuel):
+            continue
+        fk = fuel.split('/')[0].strip().lower()
+        by_fuel[fk] = by_fuel.get(fk, 0.0) + eff
+        gap = max(0.0, cap - eff)
+        rem = row.get('N', '').lower()
+        if gap <= 0:
+            continue
+        if 'gas' in rem:
+            out['gas'] += gap
+        elif re.search(r'liquid|fuel|oil|hfo|hsd', rem):
+            out['liquid'] += gap
+        elif 'coal' in rem:
+            out['coal'] += gap
+        elif re.search(r'mainten|overhaul|repair|problem|shut|outage|trip|tripp|fault|break|defect', rem):
+            out['maint'] += gap
+        elif re.search(r'contract|expire', rem):
+            out['contract'] += gap
+        else:
+            out['other'] += gap
+    for k, v in out.items():
+        d[f'f_out_{k}_mw'] = v
+    for k in ('gas', 'hfo', 'coal', 'import', 'hydro', 'solar', 'wind', 'nuclear'):
+        d[f'f_eff_{k}_mw'] = by_fuel.get(k, 0.0)
+    d['f_eff_total_mw'] = sum(by_fuel.values())
     # hourly forecast table: Hour | Generation | Load-Shed | Demand -> keep the evening-peak load-shed max
     hr, _ = find(fc, r'^Load-?Shed$')
     if hr:

@@ -40,6 +40,7 @@ const Launch = lazy(() => import('./pages/Launch'));
 const Orbit = lazy(() => import('./pages/Orbit'));
 const Mars = lazy(() => import('./pages/Mars'));
 const Forecast = lazy(() => import('./pages/Forecast'));
+const LoadShed = lazy(() => import('./pages/LoadShed'));
 const Surrogate = lazy(() => import('./pages/Surrogate'));
 const Dispatch = lazy(() => import('./pages/Dispatch'));
 const Cascade = lazy(() => import('./pages/Cascade'));
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/reactor-startup" element={<ReactorStartup />} />
           <Route path="/predictor" element={<Predictor />} />
           <Route path="/forecast" element={<Forecast />} />
+          <Route path="/load-shedding" element={<LoadShed />} />
           <Route path="/surrogate" element={<Surrogate />} />
           <Route path="/dispatch" element={<Dispatch />} />
           <Route path="/cascade" element={<Cascade />} />
