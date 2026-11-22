@@ -60,7 +60,12 @@ This work makes that test the centre of the evaluation. Its contributions are:
   - demonstrations from simple rules can improve RL battery dispatch [20].
 - We add a case with realistic forecast error and a perfect-foresight floor. Imitation of hindsight-optimal decisions is what makes RL competitive with MPC, and the only *significant* gain over MPC comes from machine learning placed inside the optimiser, as a learned value of stored energy.
 
-**Supply shortfalls and load shedding.** Most load-forecasting work, including the competitions above, assumes demand is served. In supply-constrained systems the operational question is different: how much demand will *not* be served tonight. We found few published, out-of-sample studies of same-day or day-ahead load-shedding prediction from an operator's own daily reports, and none that scores against the operator's published plan; this needs a proper literature search before submission. Study E is such a test, on Bangladesh's national grid.
+**Supply shortfalls and load shedding.** Most load-forecasting work, including the competitions above, assumes demand is served. In supply-constrained systems the operational question is how much demand will *not* be served.
+- **Bangladesh.** Public datasets now exist: daily demand, generation and load shedding extracted from the power board's PDF reports for 2019–2024 [28], and about 92,000 hourly records from the transmission operator's portal for 2015–2026 [29].
+  - GridUQ-Net forecasts load shedding one hour ahead from the hourly data with a multi-task BiLSTM and conformal intervals; for load shedding, *persistence was the best point forecaster* [26].
+  - A conference paper classifies whether shedding will occur with random forests and XGBoost [27].
+- **South Africa.** Work has targeted the driver of load shedding rather than the shedding itself: deep-learning ensembles forecast Eskom's unplanned capability loss factor [30].
+- **What is new here.** Among the studies we could read in full, none scores against the operator's own published plan, restricts the model to what the operator knew when it made that plan, uses the operator's plant-by-plant shortfall reasons, or reports zone-level errors. Study E does all four, at the daily evening peak. Its main finding, that persistence is hard to beat, agrees with the hourly result of [26]; we could not obtain the full text of [27].
 
 **Graph neural networks for cascading failures.**
 - GNNs have been used:
@@ -401,7 +406,7 @@ For severe evenings (above 1,000 MW) the order reverses: NLDC's plan names 70 % 
 **Findings:**
 - **The operator's plan is conservative about occurrence but informative about depth.** It rarely plans shedding that does not happen, misses most evenings that do have it, and is the best guide to the severe ones.
 - **Persistence is a strong baseline that the plan does not use.** Averaging the two, with no learning, cuts the error by 11 %, significantly.
-- **Learning adds little beyond that.** The inputs the model uses most are the previous evening's shed, NLDC's plan and the previous evening's shortfall. Day-to-day shedding is driven by fuel deliveries and plant trips that the morning report does not foresee.
+- **Learning adds little beyond that,** in line with the hourly study [26], where persistence was also the best point forecaster for load shedding. The inputs the model uses most are the previous evening's shed, NLDC's plan and the previous evening's shortfall. Day-to-day shedding is driven by fuel deliveries and plant trips that the morning report does not foresee.
 - **Limitations:** two years of data, with most deep shedding in one season; NLDC's planned figure is a schedule, not necessarily a best estimate; shedding is reported at the substation end and may understate what consumers experience.
 
 ---
@@ -443,7 +448,7 @@ The real-data load-shedding study adds a sobering counterpoint: when the operato
 - multi-outage power-flow surrogates;
 - topology-robust bus-level cascade prediction;
 - real-data dispatch on recorded South Australian days;
-- longer load-shedding histories, and fuel-delivery data (LNG cargoes, gas-field output) as inputs.
+- longer load-shedding histories (the hourly operator record goes back to 2015 [29]), and fuel-delivery data (LNG cargoes, gas-field output) as inputs.
 
 ---
 
@@ -499,4 +504,14 @@ The real-data load-shedding study adds a sobering counterpoint: when the operato
 
 [25] Power Grid Bangladesh PLC, National Load Dispatch Centre, "Daily operation report," https://erp.powergrid.gov.bd (reports for 31 December 2024 to 20 November 2026, accessed 22 November 2026).
 
-*References [13]–[24] were checked on 22 November 2026 against arXiv metadata and publisher or repository records (IEEE, AIP, Elsevier via RePEc, MIT DSpace, NSF PAR, the PESGM 2026 paper index).*
+[26] R. Rahman, M. F. Toushif, S. H. Simu, H. Akter, A. Ruslan and H. O. R. Howlader, "GridUQ-Net: A conformalized multi-task learning pipeline for uncertainty-aware and explainable power-system forecasting in supply-constrained grids of Bangladesh," *Energies*, vol. 19, no. 23, art. 5644, 2026, doi: 10.3390/en19235644.
+
+[27] M. Arifuzzaman, "An intelligent machine learning based load shedding prediction and smart energy management framework for power grid optimization in Bangladesh," in *Proc. IEEE Int. Conf. Signal Processing, Information, Communication and Systems (SPICSCON)*, 2026.
+
+[28] M. I. Hossain, T. Nafs, S. Yeaser and A. Newaz, "Multi-year dataset on daily electricity demand, generation, load shedding, and external conditions in Bangladesh," *Data in Brief*, 2025, doi: 10.1016/j.dib.2025.112014.
+
+[29] R. H. Rafi and M. I. Shekh, "Hourly electricity generation, demand, load shedding, and fuel mix dataset for Bangladesh (2015–2026)," Mendeley Data, v1, 2026, doi: 10.17632/vpk8spw2mm.1.
+
+[30] S. Motepe, A. N. Hasan and T. Shongwe, "Forecasting the total South African unplanned capability loss factor using an ensemble of deep learning techniques," *Energies*, vol. 15, no. 7, art. 2546, 2022, doi: 10.3390/en15072546.
+
+*References [13]–[24] were checked on 22 November 2026 against arXiv metadata and publisher or repository records (IEEE, AIP, Elsevier via RePEc, MIT DSpace, NSF PAR, the PESGM 2026 paper index); [26]–[30] come from a literature search the same day. [26] was read in full; [27]–[30] from their abstracts and repository records.*
